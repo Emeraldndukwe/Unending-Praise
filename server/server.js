@@ -661,4 +661,45 @@ app.put('/api/admin/users/:id/activate', requireAuth, requireSuperAdmin, async (
   }
 });
 
+// Utility endpoint to fix admin accounts (one-time setup - can be removed after use)
+app.post('/api/admin/fix-superadmin', async (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password) return res.status(400).json({ error: 'Missing email or password' });
+  
+  // Only allow fixing specific emails for security
+  const allowedEmails = ['admin@unendingpraise.com', 'emeraldndukwe2@gmail.com'];
+  if (!allowedEmails.includes(email.toLowerCase())) {
+    return res.status(403).json({ error: 'Email not allowed' });
+  }
+  
+  try {
+    // Check if user exists
+    const check = await pool.query('SELECT id, email, password_hash FROM users WHERE LOWER(email)=LOWER($1)', [email]);
+    if (check.rowCount === 0) {
+      // Create new superadmin
+      const hash = await bcrypt.hash(password, 10);
+      const result = await pool.query(
+        'INSERT INTO users (name, email, password_hash, role, status) VALUES ($1,$2,$3,$4,$5) RETURNING id, name, email, role, status',
+        [email.split('@')[0], email, hash, 'superadmin', 'active']
+      );
+      return res.json({ message: 'Superadmin created', user: result.rows[0] });
+    }
+    
+    // Verify password and upgrade to superadmin
+    const user = check.rows[0];
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) return res.status(401).json({ error: 'Invalid password' });
+    
+    // Upgrade to superadmin
+    const result = await pool.query(
+      "UPDATE users SET role='superadmin', status='active' WHERE id=$1 RETURNING id, name, email, role, status",
+      [user.id]
+    );
+    res.json({ message: 'Account upgraded to superadmin', user: result.rows[0] });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 
