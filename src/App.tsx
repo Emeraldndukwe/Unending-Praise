@@ -19,7 +19,7 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col">
       {!isAdmin && <Navbar />}
-      <main className="flex-grow overflow-hidden">
+      <main className="flex-grow">
         <AnimatePresence mode="wait">
           <Routes location={location} key={location.pathname}>
             {/* Home */}

@@ -47,7 +47,7 @@ export default function Testimonies() {
       {/* Content */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10 grid grid-cols-1 lg:grid-cols-3 gap-8 sm:gap-10">
         {/* Testimonies List */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 order-2 lg:order-1">
           {loading ? (
             <div className="text-center py-8 text-gray-600">Loading testimonies...</div>
           ) : testimonies.length === 0 ? (
@@ -60,7 +60,7 @@ export default function Testimonies() {
         </div>
 
         {/* Form */}
-        <div className="w-full">
+        <div className="w-full order-1 lg:order-2">
           <TestimonyForm />
         </div>
       </div>
