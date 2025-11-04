@@ -526,16 +526,46 @@ app.delete('/api/crusade-types/:id', requireAuth, requireAdmin, async (req, res)
 
 // Initialize default admin and minimal placeholder data on startup (Postgres)
 async function initializeDefaultAdmin() {
-  // seed default admin if none
-  const count = await pool.query('SELECT COUNT(*)::int AS n FROM users');
-  if ((count.rows[0]?.n || 0) === 0) {
-    const defaultPassword = 'admin123';
-    const hash = await bcrypt.hash(defaultPassword, 10);
-    await pool.query(
-      'INSERT INTO users (name, email, password_hash, role, status) VALUES ($1,$2,$3,$4,$5)',
-      ['Admin', 'admin@unendingpraise.com', hash, 'superadmin', 'active']
-    );
-    console.log('✅ Default superadmin created: admin@unendingpraise.com / admin123');
+  try {
+    // Ensure admin@unendingpraise.com is superadmin
+    const adminCheck = await pool.query('SELECT id, role FROM users WHERE LOWER(email)=LOWER($1)', ['admin@unendingpraise.com']);
+    if (adminCheck.rowCount > 0) {
+      const admin = adminCheck.rows[0];
+      if (admin.role !== 'superadmin') {
+        await pool.query("UPDATE users SET role='superadmin', status='active' WHERE id=$1", [admin.id]);
+        console.log('✅ Upgraded admin@unendingpraise.com to superadmin');
+      }
+    } else {
+      // Create default admin if none exists
+      const defaultPassword = 'admin123';
+      const hash = await bcrypt.hash(defaultPassword, 10);
+      await pool.query(
+        'INSERT INTO users (name, email, password_hash, role, status) VALUES ($1,$2,$3,$4,$5)',
+        ['Admin', 'admin@unendingpraise.com', hash, 'superadmin', 'active']
+      );
+      console.log('✅ Default superadmin created: admin@unendingpraise.com / admin123');
+    }
+
+    // Ensure emeraldndukwe2@gmail.com is superadmin
+    const emeraldCheck = await pool.query('SELECT id, role, password_hash FROM users WHERE LOWER(email)=LOWER($1)', ['emeraldndukwe2@gmail.com']);
+    if (emeraldCheck.rowCount > 0) {
+      const emerald = emeraldCheck.rows[0];
+      if (emerald.role !== 'superadmin') {
+        await pool.query("UPDATE users SET role='superadmin', status='active' WHERE id=$1", [emerald.id]);
+        console.log('✅ Upgraded emeraldndukwe2@gmail.com to superadmin');
+      }
+    } else {
+      // Create emerald superadmin account
+      const emeraldPassword = 'Emrys2004';
+      const emeraldHash = await bcrypt.hash(emeraldPassword, 10);
+      await pool.query(
+        'INSERT INTO users (name, email, password_hash, role, status) VALUES ($1,$2,$3,$4,$5)',
+        ['Emerald', 'emeraldndukwe2@gmail.com', emeraldHash, 'superadmin', 'active']
+      );
+      console.log('✅ Created superadmin: emeraldndukwe2@gmail.com');
+    }
+  } catch (e) {
+    console.error('Error initializing admin accounts:', e);
   }
 }
 
