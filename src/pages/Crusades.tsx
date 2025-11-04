@@ -16,15 +16,25 @@ type Crusade = {
   type?: string;
 };
 
+type CrusadeType = {
+  id: string;
+  name: string;
+  description?: string;
+};
+
 export default function Crusades() {
   const [allCrusades, setAllCrusades] = useState<Crusade[]>([]);
+  const [crusadeTypes, setCrusadeTypes] = useState<CrusadeType[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/crusades')
-      .then(res => res.json())
-      .then((data: Crusade[]) => {
-        setAllCrusades(data);
+    Promise.all([
+      fetch('/api/crusades').then(res => res.json()),
+      fetch('/api/crusade-types').then(res => res.json()).catch(() => [])
+    ])
+      .then(([crusades, types]: [Crusade[], CrusadeType[]]) => {
+        setAllCrusades(crusades);
+        setCrusadeTypes(types);
         setLoading(false);
       })
       .catch(() => {
@@ -32,9 +42,23 @@ export default function Crusades() {
       });
   }, []);
 
-  // Filter crusades by type (if type exists, otherwise use all for prison)
-  const prisonCrusades = allCrusades.filter((c) => !c.type || c.type === "prison").slice(0, 3);
-  const onlineCrusades = allCrusades.filter((c) => c.type === "online").slice(0, 3);
+  // Dynamically generate sections based on crusade types
+  // If no types exist, show default sections (prison and online)
+  const getCrusadesByType = (typeName: string) => {
+    if (!typeName || typeName.toLowerCase() === 'prison') {
+      // For prison or undefined, show crusades without type or with prison type
+      return allCrusades.filter((c) => !c.type || c.type.toLowerCase() === "prison").slice(0, 3);
+    }
+    return allCrusades.filter((c) => c.type && c.type.toLowerCase() === typeName.toLowerCase()).slice(0, 3);
+  };
+
+  // Get all unique types from crusades, or use default types
+  const activeTypes = crusadeTypes.length > 0 
+    ? crusadeTypes 
+    : [
+        { id: 'default-prison', name: 'Prison', description: 'Crusades held in correctional facilities' },
+        { id: 'default-online', name: 'Online', description: 'Virtual crusades and online events' }
+      ];
 
   if (loading) {
     return <div className="p-8 text-center text-gray-600">Loading crusades…</div>;
@@ -73,62 +97,54 @@ export default function Crusades() {
           THE CRUSADES
         </h3>
 
-        {/* Prison Crusades */}
-        <div className="mb-20">
-          <h2 className="text-3xl font-semibold">Prison Crusades</h2>
-          <motion.div
-            className="h-[2px] bg-black/30 rounded-full w-full mt-3"
-            initial={{ scaleX: 0 }}
-            animate={{ scaleX: 1 }}
-            transition={{ duration: 1.2, ease: "easeInOut" }}
-            style={{ transformOrigin: "left" }}
-          />
+        {/* Dynamically generate sections for each crusade type */}
+        {activeTypes.map((crusadeType, index) => {
+          const typeCrusades = getCrusadesByType(crusadeType.name);
+          const typeSlug = crusadeType.name.toLowerCase().replace(/\s+/g, '-');
+          
+          return (
+            <div key={crusadeType.id} className={index < activeTypes.length - 1 ? "mb-20" : ""}>
+              <h2 className="text-3xl font-semibold">{crusadeType.name} Crusades</h2>
+              <motion.div
+                className="h-[2px] bg-black/30 rounded-full w-full mt-3"
+                initial={{ scaleX: 0 }}
+                animate={{ scaleX: 1 }}
+                transition={{ duration: 1.2, ease: "easeInOut", delay: index * 0.1 }}
+                style={{ transformOrigin: "left" }}
+              />
 
-          <p className="text-justify leading-8 text-gray-700 indent-8 max-w-5xl mt-10 mx-auto">
-            We have gone round the world for crusades, sharing the word of God
-            with our Man of God Rev. Chris Oyakhilome. Join us and look at our
-            journey so far...
-          </p>
+              {crusadeType.description ? (
+                <p className="text-justify leading-8 text-gray-700 indent-8 max-w-5xl mt-10 mx-auto">
+                  {crusadeType.description}
+                </p>
+              ) : (
+                <p className="text-justify leading-8 text-gray-700 indent-8 max-w-5xl mt-10 mx-auto">
+                  We have gone round the world for crusades, sharing the word of God
+                  with our Man of God Rev. Chris Oyakhilome. Join us and look at our
+                  journey so far...
+                </p>
+              )}
 
-          <CrusadeCarousel data={prisonCrusades} />
-
-          <div className="flex justify-center mt-6">
-            <Link
-              to="/crusades/prison"
-              className="mt-1 px-10 py-4 bg-gray-700 rounded-2xl text-xs font-semibold hover:bg-gray-600 flex items-center gap-2 mx-auto text-white"
-            >
-              SEE ALL <ArrowUpRight size={16} />
-            </Link>
-          </div>
-        </div>
-
-        {/* Online Crusades */}
-        <div>
-          <h2 className="text-3xl font-semibold">Online Crusades</h2>
-          <motion.div
-            className="h-[2px] bg-black/30 rounded-full w-full mt-3"
-            initial={{ scaleX: 0 }}
-            animate={{ scaleX: 1 }}
-            transition={{ duration: 1.2, ease: "easeInOut" }}
-            style={{ transformOrigin: "left" }}
-          />
-
-          <p className="text-justify leading-8 text-gray-700 indent-8 max-w-5xl mt-10 mx-auto">
-            We have gone round the world for crusades, sharing the word of God
-            with our Man of God Rev. Chris Oyakhilome...
-          </p>
-
-          <CrusadeCarousel data={onlineCrusades} />
-
-          <div className="flex justify-center mt-6">
-            <Link
-              to="/crusades/online"
-              className="mt-1 px-10 py-4 bg-gray-700 rounded-2xl text-xs font-semibold hover:bg-gray-600 flex items-center gap-2 mx-auto text-white"
-            >
-              SEE ALL <ArrowUpRight size={16} />
-            </Link>
-          </div>
-        </div>
+              {typeCrusades.length > 0 ? (
+                <>
+                  <CrusadeCarousel data={typeCrusades} />
+                  <div className="flex justify-center mt-6">
+                    <Link
+                      to={`/crusades/${typeSlug}`}
+                      className="mt-1 px-10 py-4 bg-gray-700 rounded-2xl text-xs font-semibold hover:bg-gray-600 flex items-center gap-2 mx-auto text-white"
+                    >
+                      SEE ALL <ArrowUpRight size={16} />
+                    </Link>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-12 text-gray-500">
+                  <p>No {crusadeType.name.toLowerCase()} crusades yet. Check back soon!</p>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

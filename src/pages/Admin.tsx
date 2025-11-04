@@ -56,7 +56,7 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 
 export default function AdminPage() {
   const { token, setToken, headers } = useAuthToken();
-  const [tab, setTab] = useState<"testimonies" | "crusades" | "messages" | "songs" | "comments" | "users">("testimonies");
+  const [tab, setTab] = useState<"testimonies" | "crusades" | "messages" | "songs" | "comments" | "users" | "crusade-types">("testimonies");
   const [role, setRole] = useState<string>("");
   const [testimonies, setTestimonies] = useState<Testimony[]>([]);
   const [crusades, setCrusades] = useState<Crusade[]>([]);
@@ -65,6 +65,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [users, setUsers] = useState<Array<{id:string; name:string; email:string; role:string; status:string; created_at?: string;}>>([]);
+  const [crusadeTypes, setCrusadeTypes] = useState<Array<{id:string; name:string; description?:string; created_at?:string;}>>([]);
 
   // Admin comments management
   const [commentEntityType, setCommentEntityType] = useState<"testimony" | "crusade">("testimony");
@@ -101,6 +102,15 @@ export default function AdminPage() {
     createdAt: row.createdAt ?? row.created_at ?? new Date().toISOString(),
   });
 
+  const refreshCrusadeTypes = async () => {
+    try {
+      const types = await api<Array<{id:string; name:string; description?:string; created_at?:string;}>>("/api/crusade-types");
+      setCrusadeTypes(types);
+    } catch (e: any) {
+      console.error("Failed to load crusade types:", e);
+    }
+  };
+
   const refresh = async () => {
     setLoading(true);
     setError(null);
@@ -115,6 +125,7 @@ export default function AdminPage() {
       setCrusades((c as any[]).map(toCamelCrusade));
       setMessages(m);
       setSongs(s);
+      await refreshCrusadeTypes();
     } catch (e: any) {
       setError(e?.message || "Failed to load");
     } finally {
@@ -136,6 +147,7 @@ export default function AdminPage() {
       } catch {}
     };
     loadRole();
+    refreshCrusadeTypes();
   }, [token]); // Re-run when token changes
 
   const approveTestimony = async (id: string) => {
@@ -295,10 +307,10 @@ export default function AdminPage() {
         <div className="flex flex-wrap gap-2 mb-6 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-2 border border-[#54037C]/10">
           {((() => {
             const base = ["testimonies", "crusades", "messages", "songs", "comments"] as const;
-            if (role === 'superadmin') return ([...base, 'users'] as const);
-            if (!role || role === 'admin') return base;
+            if (role === 'superadmin') return ([...base, 'crusade-types', 'users'] as const);
+            if (!role || role === 'admin') return ([...base, 'crusade-types'] as const);
             if (role === 'testimony') return ["testimonies", "comments"] as const;
-            if (role === 'crusade') return ["crusades", "comments"] as const;
+            if (role === 'crusade') return (["crusades", "crusade-types", "comments"] as const);
             if (role === 'messages') return ["messages"] as const;
             if (role === 'songs') return ["songs"] as const;
             return base;
@@ -381,7 +393,7 @@ export default function AdminPage() {
 
       {tab === "crusades" && (
         <section className="space-y-6">
-          <CrusadeForm onSubmit={createCrusade} />
+          <CrusadeForm onSubmit={createCrusade} crusadeTypes={crusadeTypes} />
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
             <h2 className="text-xl font-bold text-[#54037C] mb-4">Crusades ({crusades.length})</h2>
             <div className="space-y-4">
@@ -538,6 +550,70 @@ export default function AdminPage() {
                 ))}
               </div>
             )}
+          </div>
+        </section>
+      )}
+
+      {tab === "crusade-types" && (
+        <section className="space-y-6">
+          <div className="bg-gradient-to-br from-[#54037C]/10 to-[#8A4EBF]/10 rounded-2xl shadow-lg p-6 border-2 border-[#54037C]/20">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-1 h-8 bg-[#54037C] rounded-full"></div>
+              <div>
+                <h2 className="text-2xl font-bold text-[#54037C]">Manage Crusade Types</h2>
+                <p className="text-sm text-gray-600">Create and manage different types of crusades (e.g., Prison, Online, Youth, etc.) with their details</p>
+              </div>
+            </div>
+            <CrusadeTypeForm onSubmit={async (payload) => {
+              await api(`/api/crusade-types`, {
+                method: "POST",
+                headers: Object.assign({}, headers as Record<string, string>, { "content-type": "application/json" }),
+                body: JSON.stringify(payload),
+              });
+              await refreshCrusadeTypes();
+            }} />
+          </div>
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-[#54037C]">All Crusade Types</h2>
+                <p className="text-sm text-gray-600">Total: {crusadeTypes.length} type{crusadeTypes.length !== 1 ? 's' : ''}</p>
+              </div>
+              {crusadeTypes.length > 0 && (
+                <div className="px-3 py-1 bg-[#54037C]/10 text-[#54037C] rounded-full text-sm font-medium">
+                  {crusadeTypes.length} Active
+                </div>
+              )}
+            </div>
+            <div className="space-y-4">
+              {crusadeTypes.length === 0 && (
+                <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
+                  <div className="text-gray-400 mb-2">📋</div>
+                  <div className="text-sm text-gray-500">No crusade types yet. Create your first type above.</div>
+                  <div className="text-xs text-gray-400 mt-1">Crusade types help organize and categorize your crusades (e.g., Prison, Online, Youth, etc.)</div>
+                </div>
+              )}
+              {crusadeTypes.map((type) => (
+                <CrusadeTypeItem 
+                  key={type.id}
+                  type={type}
+                  onDelete={async () => {
+                    if (confirm(`Are you sure you want to delete the "${type.name}" crusade type? This won't delete crusades of this type, but you won't be able to create new ones with this type.`)) {
+                      await api(`/api/crusade-types/${type.id}`, { method: "DELETE", headers: headers as HeadersInit });
+                      await refreshCrusadeTypes();
+                    }
+                  }}
+                  onUpdate={async (payload) => {
+                    await api(`/api/crusade-types/${type.id}`, {
+                      method: "PUT",
+                      headers: Object.assign({}, headers as Record<string, string>, { "content-type": "application/json" }),
+                      body: JSON.stringify(payload),
+                    });
+                    await refreshCrusadeTypes();
+                  }}
+                />
+              ))}
+            </div>
           </div>
         </section>
       )}
@@ -818,7 +894,7 @@ function CrusadeItem({ crusade, onDelete, onUpdate }: {
   );
 }
 
-function CrusadeForm({ onSubmit }: { onSubmit: (payload: Partial<Crusade>) => Promise<void> }) {
+function CrusadeForm({ onSubmit, crusadeTypes = [] }: { onSubmit: (payload: Partial<Crusade>) => Promise<void>; crusadeTypes?: Array<{id:string; name:string; description?:string;}> }) {
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
   const [location, setLocation] = useState("");
@@ -854,6 +930,7 @@ function CrusadeForm({ onSubmit }: { onSubmit: (payload: Partial<Crusade>) => Pr
   return (
     <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 mb-6 border border-[#54037C]/10">
       <h2 className="text-xl font-bold text-[#54037C] mb-4">Create New Crusade</h2>
+      <p className="text-sm text-gray-600 mb-4">Fill in all the details below to create a comprehensive crusade entry</p>
     <form
         className="space-y-4"
       onSubmit={(e) => {
@@ -875,43 +952,59 @@ function CrusadeForm({ onSubmit }: { onSubmit: (payload: Partial<Crusade>) => Pr
       }}
     >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Input label="Title" value={title} onChange={setTitle} placeholder="e.g., A Day of Blessings" />
-          <Input label="Date" value={date} onChange={setDate} placeholder="YYYY-MM-DD or Dec 2023" />
-          <Input label="Location" value={location} onChange={setLocation} placeholder="e.g., Lagos State" />
+          <Input label="Title *" value={title} onChange={setTitle} placeholder="e.g., A Day of Blessings" />
+          <Input label="Date *" value={date} onChange={setDate} placeholder="YYYY-MM-DD or Dec 2023" />
+          <Input label="Location *" value={location} onChange={setLocation} placeholder="e.g., Lagos State" />
           <label className="text-sm">
-            <div className="mb-1 font-medium text-gray-700">Type (select or add new)</div>
+            <div className="mb-1 font-medium text-gray-700">Crusade Type * (select existing or add new)</div>
             <div className="grid grid-cols-2 gap-2">
               <select value={type} onChange={(e) => setType(e.target.value)} className="w-full border border-gray-300 rounded-xl px-4 py-2">
-                <option value="">— Select —</option>
-                <option value="prison">prison</option>
-                <option value="online">online</option>
+                <option value="">— Select Type —</option>
+                {crusadeTypes.map((t) => (
+                  <option key={t.id} value={t.name}>{t.name}</option>
+                ))}
               </select>
               <input
-                placeholder="or create new"
+                placeholder="or create new type name"
                 className="w-full border border-gray-300 rounded-xl px-4 py-2"
                 value={newType}
-                onChange={(e) => setNewType(e.target.value)}
+                onChange={(e) => {
+                  setNewType(e.target.value);
+                  setType(""); // Clear selection when typing new type
+                }}
               />
             </div>
+            {type && crusadeTypes.find(t => t.name === type)?.description && (
+              <div className="mt-2 text-xs text-gray-600 bg-blue-50 p-2 rounded-lg border border-blue-200">
+                <strong className="text-[#54037C]">{crusadeTypes.find(t => t.name === type)?.name}:</strong> {crusadeTypes.find(t => t.name === type)?.description}
+              </div>
+            )}
           </label>
         </div>
         <div>
-          <label className="text-sm font-medium text-gray-700 mb-1 block">Description</label>
+          <label className="text-sm font-medium text-gray-700 mb-1 block">
+            Full Description * <span className="text-gray-500 font-normal">(Detailed information about the crusade)</span>
+          </label>
           <textarea
-            className="w-full border border-gray-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent h-24"
+            className="w-full border border-gray-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent h-32"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Full description of the crusade..."
+            placeholder="Provide a comprehensive description of the crusade: what happened, who attended, key moments, testimonies, etc. This will be shown on the crusade details page."
+            required
           />
+          <p className="text-xs text-gray-500 mt-1">This detailed description will be displayed on the individual crusade page.</p>
         </div>
         <div>
-          <label className="text-sm font-medium text-gray-700 mb-1 block">Summary (for preview)</label>
+          <label className="text-sm font-medium text-gray-700 mb-1 block">
+            Summary <span className="text-gray-500 font-normal">(Short preview text)</span>
+          </label>
           <textarea
             className="w-full border border-gray-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent h-20"
             value={summary}
             onChange={(e) => setSummary(e.target.value)}
-            placeholder="Short summary (auto-generated if left empty)"
+            placeholder="A brief summary that will appear in previews and carousels (auto-generated from description if left empty)"
           />
+          <p className="text-xs text-gray-500 mt-1">This short summary appears in carousels and preview cards. Leave empty to auto-generate from description.</p>
         </div>
         <div>
           <label className="text-sm font-medium text-gray-700 mb-2 block">Media (Images & Videos)</label>
@@ -1148,7 +1241,157 @@ function MessageForm({ onSubmit }: { onSubmit: (payload: Partial<Message>) => Pr
   );
 }
 
-function Input({ label, value, onChange, placeholder, type = "text" }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string }) {
+function CrusadeTypeForm({ onSubmit }: { onSubmit: (payload: { name: string; description?: string }) => Promise<void> }) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  return (
+    <form
+      className="space-y-4 bg-white rounded-xl p-5 border border-gray-200"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!name.trim()) {
+          alert("Please enter a crusade type name");
+          return;
+        }
+        onSubmit({ name: name.trim(), description: description.trim() || undefined }).then(() => {
+          setName("");
+          setDescription("");
+        }).catch((err) => {
+          alert(err?.message || "Failed to create crusade type");
+        });
+      }}
+    >
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <Input label="Type Name *" value={name} onChange={setName} placeholder="e.g., Prison, Online, Youth" required />
+          <p className="text-xs text-gray-500 mt-1">This name will be used to categorize crusades</p>
+        </div>
+        <div className="flex items-end">
+          <div className="w-full">
+            <div className="text-xs text-gray-600 mb-2">💡 Examples: Prison, Online, Youth, Outreach, Healing, Revival</div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <label className="text-sm font-medium text-gray-700 mb-1 block">
+          Description/Details <span className="text-gray-500 font-normal">(Optional but recommended)</span>
+        </label>
+        <textarea
+          className="w-full border border-gray-300 rounded-xl px-4 py-2 h-36 focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Enter comprehensive details about this crusade type. For example: 'Prison crusades focus on ministering to inmates, sharing the gospel, and providing hope and transformation in correctional facilities. These events typically include worship, preaching, prayer, and testimonies.'"
+        />
+        <p className="text-xs text-gray-500 mt-1">This description helps clarify what this crusade type represents and will be shown when selecting this type while creating crusades.</p>
+      </div>
+      <button type="submit" className="w-full md:w-auto px-8 py-3 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-xl font-semibold transition shadow-md">
+        ➕ Create Crusade Type
+      </button>
+    </form>
+  );
+}
+
+function CrusadeTypeItem({ 
+  type, 
+  onDelete, 
+  onUpdate 
+}: { 
+  type: { id: string; name: string; description?: string; created_at?: string };
+  onDelete: () => void;
+  onUpdate: (payload: { name?: string; description?: string }) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(type.name);
+  const [description, setDescription] = useState(type.description || "");
+
+  if (editing) {
+    return (
+      <div className="p-5 border-2 border-[#54037C] rounded-xl bg-gradient-to-br from-[#54037C]/5 to-white">
+        <div className="mb-4">
+          <Input label="Type Name *" value={name} onChange={setName} />
+          <p className="text-xs text-gray-500 mt-1">This name will be used to categorize crusades</p>
+        </div>
+        <div className="mb-4">
+          <label className="text-sm font-medium text-gray-700 mb-1 block">
+            Description/Details <span className="text-gray-500 font-normal">(Optional but recommended)</span>
+          </label>
+          <textarea
+            className="w-full border border-gray-300 rounded-xl px-4 py-2 h-36 focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Enter comprehensive details about this crusade type..."
+          />
+          <p className="text-xs text-gray-500 mt-1">This description will be shown when selecting this type while creating crusades.</p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            className="px-6 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-xl font-medium transition"
+            onClick={() => {
+              onUpdate({ name: name.trim(), description: description.trim() || undefined }).then(() => setEditing(false));
+            }}
+          >
+            💾 Save Changes
+          </button>
+          <button
+            className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-medium transition"
+            onClick={() => {
+              setName(type.name);
+              setDescription(type.description || "");
+              setEditing(false);
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-5 border-2 border-gray-200 rounded-xl bg-white hover:shadow-lg hover:border-[#54037C]/30 transition-all">
+      <div className="flex flex-col md:flex-row justify-between gap-4">
+        <div className="flex-1">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-2 h-2 rounded-full bg-[#54037C]"></div>
+            <h3 className="font-bold text-xl text-[#54037C]">{type.name}</h3>
+          </div>
+          {type.description ? (
+            <div className="pl-5">
+              <p className="text-sm text-gray-700 mb-3 whitespace-pre-wrap leading-relaxed">{type.description}</p>
+            </div>
+          ) : (
+            <div className="pl-5">
+              <p className="text-xs text-gray-400 italic bg-gray-50 p-2 rounded border border-dashed border-gray-300">
+                ⚠️ No description provided. Consider adding details about this crusade type.
+              </p>
+            </div>
+          )}
+          {type.created_at && (
+            <div className="pl-5 text-xs text-gray-500 mt-2">
+              Created: {new Date(type.created_at).toLocaleString()}
+            </div>
+          )}
+        </div>
+        <div className="flex flex-row md:flex-col gap-2 md:w-auto w-full">
+          <button 
+            className="flex-1 md:flex-none px-4 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-xl text-sm font-medium transition" 
+            onClick={() => setEditing(true)}
+          >
+            ✏️ Edit
+          </button>
+          <button 
+            className="flex-1 md:flex-none px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-medium transition" 
+            onClick={onDelete}
+          >
+            🗑️ Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Input({ label, value, onChange, placeholder, type = "text", required }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string; required?: boolean }) {
   return (
     <label className="text-sm">
       <div className="mb-1 font-medium text-gray-700">{label}</div>
@@ -1158,6 +1401,7 @@ function Input({ label, value, onChange, placeholder, type = "text" }: { label: 
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
+        required={required}
       />
     </label>
   );

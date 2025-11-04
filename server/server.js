@@ -48,8 +48,16 @@ async function ensureSchema() {
       CREATE TABLE IF NOT EXISTS crusade_types (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         name TEXT NOT NULL UNIQUE,
+        description TEXT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+      -- Add description column if it doesn't exist (migration)
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='crusade_types' AND column_name='description') THEN
+          ALTER TABLE crusade_types ADD COLUMN description TEXT;
+        END IF;
+      END $$;
 
       CREATE TABLE IF NOT EXISTS testimonies (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -495,10 +503,10 @@ app.get('/api/crusade-types', async (_req, res) => {
 });
 
 app.post('/api/crusade-types', requireAuth, requireAdmin, async (req, res) => {
-  const { name } = req.body || {};
+  const { name, description } = req.body || {};
   if (!name) return res.status(400).json({ error: 'Missing name' });
   try {
-    const result = await pool.query('INSERT INTO crusade_types (name) VALUES ($1) RETURNING *', [name]);
+    const result = await pool.query('INSERT INTO crusade_types (name, description) VALUES ($1, $2) RETURNING *', [name, description || null]);
     res.status(201).json(result.rows[0]);
   } catch (e) {
     if (e.code === '23505') return res.status(409).json({ error: 'Type already exists' });
@@ -508,9 +516,9 @@ app.post('/api/crusade-types', requireAuth, requireAdmin, async (req, res) => {
 });
 
 app.put('/api/crusade-types/:id', requireAuth, requireAdmin, async (req, res) => {
-  const { id } = req.params; const { name } = req.body || {};
+  const { id } = req.params; const { name, description } = req.body || {};
   try {
-    const result = await pool.query('UPDATE crusade_types SET name=COALESCE($1,name) WHERE id=$2 RETURNING *', [name, id]);
+    const result = await pool.query('UPDATE crusade_types SET name=COALESCE($1,name), description=COALESCE($2,description) WHERE id=$3 RETURNING *', [name, description, id]);
     if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
     res.json(result.rows[0]);
   } catch (e) {
