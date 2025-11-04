@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { compressImage, compressVideo } from "../utils/mediaOptimizer";
 
 type Testimony = { 
   id: string; 
@@ -267,8 +268,8 @@ export default function AdminPage() {
                 className="px-4 py-2 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium transition text-sm" 
                 onClick={() => { setToken(""); }}
               >
-                Logout
-              </button>
+          Logout
+        </button>
               <button 
                 className="px-4 py-2 rounded-xl bg-[#54037C] hover:bg-[#54037C]/90 text-white font-medium transition text-sm shadow-md" 
                 onClick={refresh}
@@ -277,7 +278,7 @@ export default function AdminPage() {
               </button>
             </div>
           </div>
-        </div>
+      </div>
 
         {/* Tabs */}
         <div className="flex flex-wrap gap-2 mb-6 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-2 border border-[#54037C]/10">
@@ -291,19 +292,19 @@ export default function AdminPage() {
             if (role === 'songs') return ["songs"] as const;
             return base;
           })()).map((k) => (
-            <button
-              key={k}
+          <button
+            key={k}
               className={`px-4 py-2 rounded-xl font-semibold text-sm transition capitalize ${
                 tab === k 
                   ? "bg-[#54037C] text-white shadow-md" 
                   : "bg-transparent text-gray-600 hover:bg-[#54037C]/10"
               }`}
               onClick={() => setTab(k as any)}
-            >
-              {k}
-            </button>
-          ))}
-        </div>
+          >
+            {k}
+          </button>
+        ))}
+      </div>
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4">
@@ -340,7 +341,7 @@ export default function AdminPage() {
                 />
               ))}
             </div>
-          </div>
+                </div>
 
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
             <h2 className="text-xl font-bold text-[#54037C] mb-4">Approved ({testimonies.filter(t => t.approved).length})</h2>
@@ -362,8 +363,8 @@ export default function AdminPage() {
                   }}
                 />
               ))}
-            </div>
-          </div>
+                </div>
+              </div>
         </section>
       )}
 
@@ -389,8 +390,8 @@ export default function AdminPage() {
                   }}
                 />
               ))}
-            </div>
-          </div>
+                </div>
+              </div>
         </section>
       )}
 
@@ -412,12 +413,12 @@ export default function AdminPage() {
                       <div className="text-sm text-gray-600 mb-2">{m.email} {m.phone && `• ${m.phone}`}</div>
                       <p className="text-sm text-gray-700">{m.message}</p>
                       <div className="text-xs text-gray-500 mt-2">{new Date(m.createdAt).toLocaleString()}</div>
-                    </div>
-                    <button className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm h-fit" onClick={() => deleteItem("messages", m.id)}>
-                      Delete
-                    </button>
-                  </div>
                 </div>
+                    <button className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm h-fit" onClick={() => deleteItem("messages", m.id)}>
+                    Delete
+                  </button>
+                </div>
+              </div>
               ))}
             </div>
           </div>
@@ -520,9 +521,9 @@ export default function AdminPage() {
                         setManagedComments(list);
                       }}
                     >
-                      Delete
-                    </button>
-                  </div>
+                    Delete
+                  </button>
+                </div>
                 ))}
               </div>
             )}
@@ -819,38 +820,39 @@ function CrusadeForm({ onSubmit }: { onSubmit: (payload: Partial<Crusade>) => Pr
   const [previewImage, setPreviewImage] = useState("");
   const [previewVideo, setPreviewVideo] = useState("");
 
-  const handleMediaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
-    Array.from(files).forEach(file => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const url = reader.result as string;
+    for (const file of Array.from(files)) {
+      try {
         if (file.type.startsWith("image/")) {
-          setImages(prev => [...prev, url]);
-          if (!previewImage && !previewVideo) setPreviewImage(url);
+          const compressed = await compressImage(file);
+          setImages(prev => [...prev, compressed]);
+          if (!previewImage && !previewVideo) setPreviewImage(compressed);
         } else if (file.type.startsWith("video/")) {
-          setVideos(prev => [...prev, url]);
-          if (!previewImage && !previewVideo) setPreviewVideo(url);
+          const compressed = await compressVideo(file);
+          setVideos(prev => [...prev, compressed]);
+          if (!previewImage && !previewVideo) setPreviewVideo(compressed);
         }
-      };
-      reader.readAsDataURL(file);
-    });
+      } catch (err: any) {
+        alert(`Error processing ${file.name}: ${err.message}`);
+      }
+    }
   };
 
   return (
     <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 mb-6 border border-[#54037C]/10">
       <h2 className="text-xl font-bold text-[#54037C] mb-4">Create New Crusade</h2>
-      <form
+    <form
         className="space-y-4"
-        onSubmit={(e) => {
-          e.preventDefault();
+      onSubmit={(e) => {
+        e.preventDefault();
           const finalType = newType.trim() ? newType.trim() : type;
           onSubmit({ title, date, location, description, summary, type: finalType, images, videos, previewImage, previewVideo }).then(() => {
-            setTitle("");
-            setDate("");
+          setTitle("");
+          setDate("");
             setLocation("");
-            setDescription("");
+          setDescription("");
             setSummary("");
             setType("");
             setNewType("");
@@ -858,9 +860,9 @@ function CrusadeForm({ onSubmit }: { onSubmit: (payload: Partial<Crusade>) => Pr
             setVideos([]);
             setPreviewImage("");
             setPreviewVideo("");
-          });
-        }}
-      >
+        });
+      }}
+    >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input label="Title" value={title} onChange={setTitle} placeholder="e.g., A Day of Blessings" />
           <Input label="Date" value={date} onChange={setDate} placeholder="YYYY-MM-DD or Dec 2023" />
@@ -965,7 +967,7 @@ function CrusadeForm({ onSubmit }: { onSubmit: (payload: Partial<Crusade>) => Pr
         <button className="w-full px-4 py-3 bg-[#54037C] hover:bg-[#54037C]/90 text-white font-semibold rounded-xl transition shadow-md">
           Create Crusade
         </button>
-      </form>
+    </form>
     </div>
   );
 }
@@ -980,44 +982,45 @@ function TestimonyForm({ onSubmit }: { onSubmit: (payload: Partial<Testimony>) =
   const [previewImage, setPreviewImage] = useState("");
   const [previewVideo, setPreviewVideo] = useState("");
 
-  const handleMediaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
-    Array.from(files).forEach(file => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const url = reader.result as string;
+    for (const file of Array.from(files)) {
+      try {
         if (file.type.startsWith("image/")) {
-          setImages(prev => [...prev, url]);
-          if (!previewImage && !previewVideo) setPreviewImage(url);
+          const compressed = await compressImage(file);
+          setImages(prev => [...prev, compressed]);
+          if (!previewImage && !previewVideo) setPreviewImage(compressed);
         } else if (file.type.startsWith("video/")) {
-          setVideos(prev => [...prev, url]);
-          if (!previewImage && !previewVideo) setPreviewVideo(url);
+          const compressed = await compressVideo(file);
+          setVideos(prev => [...prev, compressed]);
+          if (!previewImage && !previewVideo) setPreviewVideo(compressed);
         }
-      };
-      reader.readAsDataURL(file);
-    });
+      } catch (err: any) {
+        alert(`Error processing ${file.name}: ${err.message}`);
+      }
+    }
   };
 
   return (
     <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 mb-6 border border-[#54037C]/10">
       <h2 className="text-xl font-bold text-[#54037C] mb-4">Create New Testimony</h2>
-      <form
+    <form
         className="space-y-4"
-        onSubmit={(e) => {
-          e.preventDefault();
+      onSubmit={(e) => {
+        e.preventDefault();
           onSubmit({ name, title, content, summary, images, videos, previewImage, previewVideo, approved: false }).then(() => {
-            setName("");
+          setName("");
             setTitle("");
-            setContent("");
+          setContent("");
             setSummary("");
             setImages([]);
             setVideos([]);
             setPreviewImage("");
             setPreviewVideo("");
-          });
-        }}
-      >
+        });
+      }}
+    >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input label="Name" value={name} onChange={setName} placeholder="Author name" />
           <Input label="Title" value={title} onChange={setTitle} placeholder="Testimony title" />
@@ -1105,7 +1108,7 @@ function TestimonyForm({ onSubmit }: { onSubmit: (payload: Partial<Testimony>) =
         <button className="w-full px-4 py-3 bg-[#54037C] hover:bg-[#54037C]/90 text-white font-semibold rounded-xl transition shadow-md">
           Add Testimony
         </button>
-      </form>
+    </form>
     </div>
   );
 }

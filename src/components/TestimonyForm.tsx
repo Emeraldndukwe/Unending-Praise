@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Upload } from "lucide-react"; // ✅ icon library (npm i lucide-react)
+import { Upload } from "lucide-react";
+import { compressImage, compressVideo, formatFileSize, getFileSizeMB } from "../utils/mediaOptimizer";
 
 export default function TestimonyForm() {
   const [formData, setFormData] = useState({
@@ -35,20 +36,22 @@ export default function TestimonyForm() {
     }
 
     try {
-      // Convert images and videos to base64 for storage (simplified approach)
+      // Convert images and videos to base64 with compression
       const imageUrls: string[] = [];
       const videoUrls: string[] = [];
+      
       for (const file of formData.attachments) {
-        const reader = new FileReader();
-        const promise = new Promise<string>((resolve) => {
-          reader.onload = () => resolve(reader.result as string);
-          reader.readAsDataURL(file);
-        });
-        const url = await promise;
-        if (file.type.startsWith("image/")) {
-          imageUrls.push(url);
-        } else if (file.type.startsWith("video/")) {
-          videoUrls.push(url);
+        try {
+          if (file.type.startsWith("image/")) {
+            const compressed = await compressImage(file);
+            imageUrls.push(compressed);
+          } else if (file.type.startsWith("video/")) {
+            const compressed = await compressVideo(file);
+            videoUrls.push(compressed);
+          }
+        } catch (err: any) {
+          alert(`Error processing ${file.name}: ${err.message}`);
+          throw err;
         }
       }
 
@@ -159,6 +162,8 @@ export default function TestimonyForm() {
           <div className="flex flex-wrap gap-3 mt-2">
             {formData.attachments.map((file, index) => {
               const url = URL.createObjectURL(file);
+              const sizeMB = getFileSizeMB(file);
+              const isLarge = (file.type.startsWith("image/") && sizeMB > 1) || (file.type.startsWith("video/") && sizeMB > 5);
 
               return file.type.startsWith("image/") ? (
                 <div key={index} className="relative">
@@ -168,6 +173,7 @@ export default function TestimonyForm() {
                     className="w-20 h-20 object-cover rounded-lg border"
                 />
                   <span className="absolute top-0 right-0 bg-blue-500 text-white text-xs px-1 rounded">IMG</span>
+                  {isLarge && <span className="absolute bottom-0 left-0 bg-yellow-500 text-white text-xs px-1 rounded">{formatFileSize(file.size)}</span>}
                 </div>
               ) : (
                 <div key={index} className="relative">
@@ -177,6 +183,7 @@ export default function TestimonyForm() {
                   muted
                 />
                   <span className="absolute top-0 right-0 bg-red-500 text-white text-xs px-1 rounded">VID</span>
+                  {isLarge && <span className="absolute bottom-0 left-0 bg-yellow-500 text-white text-xs px-1 rounded">{formatFileSize(file.size)}</span>}
                 </div>
               );
             })}
