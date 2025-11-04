@@ -32,7 +32,7 @@ interface ImageCarouselProps {
 }
 
 const ImageCarousel = forwardRef<ImageCarouselRef, ImageCarouselProps>(
-  ({ media, autoPlay = true, interval = 4500 }, ref) => {
+  ({ media, autoPlay = true, interval = 8000 }, ref) => {
     const [active, setActive] = useState(0);
     const [showGallery, setShowGallery] = useState(false);
     const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);

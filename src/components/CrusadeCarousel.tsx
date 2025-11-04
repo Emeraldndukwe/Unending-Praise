@@ -37,7 +37,7 @@ export default function CrusadeCarousel({ data }: CrusadeCarouselProps) {
   useEffect(() => {
     const interval = setInterval(() => {
       setActive((prev) => (prev + 1) % list.length);
-    }, 3500);
+    }, 7000);
     return () => clearInterval(interval);
   }, [list.length]);
 

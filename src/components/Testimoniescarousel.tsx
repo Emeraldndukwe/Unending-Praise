@@ -100,10 +100,10 @@ export default function TestimoniesCarousel() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Auto-slide every 3 seconds
+  // Auto-slide every 6 seconds
   useEffect(() => {
     if (testimonies.length === 0) return;
-    const interval = setInterval(() => setActive((prev) => (prev + 1) % testimonies.length), 3000);
+    const interval = setInterval(() => setActive((prev) => (prev + 1) % testimonies.length), 6000);
     return () => clearInterval(interval);
   }, [testimonies.length]);
 
