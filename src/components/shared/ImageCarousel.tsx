@@ -8,6 +8,12 @@ import React, {
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Swiper, SwiperSlide } from "swiper/react";
+import { Navigation, Pagination, TouchEvents, Autoplay } from "swiper/modules";
+import type { Swiper as SwiperType } from "swiper";
+import "swiper/css";
+import "swiper/css/navigation";
+import "swiper/css/pagination";
 
 export interface MediaItem {
   type: "image" | "video";
@@ -30,28 +36,20 @@ const ImageCarousel = forwardRef<ImageCarouselRef, ImageCarouselProps>(
     const [active, setActive] = useState(0);
     const [showGallery, setShowGallery] = useState(false);
     const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
+    const swiperRef = useRef<SwiperType | null>(null);
 
     useImperativeHandle(ref, () => ({
       openGallery: () => setShowGallery(true),
     }));
 
-    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Autoplay handled by Swiper Autoplay module
 
-    // Main autoplay
-    useEffect(() => {
-      if (!autoPlay || media.length <= 1 || fullscreenIndex !== null) return;
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => {
-        setActive((prev) => (prev + 1) % media.length);
-      }, interval);
-      return () => {
-        if (timerRef.current) clearTimeout(timerRef.current);
-        timerRef.current = null;
-      };
-    }, [active, autoPlay, interval, media.length, fullscreenIndex]);
-
-    const next = useCallback(() => setActive((s) => (s + 1) % media.length), [media.length]);
-    const prev = useCallback(() => setActive((s) => (s - 1 + media.length) % media.length), [media.length]);
+    const next = useCallback(() => {
+      swiperRef.current?.slideNext();
+    }, []);
+    const prev = useCallback(() => {
+      swiperRef.current?.slidePrev();
+    }, []);
 
     const fullscreenNext = useCallback(() => {
       setFullscreenIndex((prev) => (prev === null ? 0 : (prev + 1) % media.length));
@@ -73,16 +71,7 @@ const ImageCarousel = forwardRef<ImageCarouselRef, ImageCarouselProps>(
       return () => window.removeEventListener("keydown", handler);
     }, [fullscreenIndex, fullscreenNext, fullscreenPrev]);
 
-    // Main carousel swipe
-    const startX = useRef<number | null>(null);
-    const handleTouchStart = (e: React.TouchEvent) => (startX.current = e.touches[0].clientX);
-    const handleTouchEnd = (e: React.TouchEvent) => {
-      if (startX.current === null) return;
-      const delta = e.changedTouches[0].clientX - startX.current;
-      if (delta > 50) prev();
-      else if (delta < -50) next();
-      startX.current = null;
-    };
+    // Swiper handles touch gestures, keeping legacy handlers for compatibility
 
     // Fullscreen swipe
     const fsStartX = useRef<number | null>(null);
@@ -97,63 +86,77 @@ const ImageCarousel = forwardRef<ImageCarouselRef, ImageCarouselProps>(
 
     return (
       <>
-        <div
-          className="relative w-full flex flex-col items-center select-none"
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-        >
-          {/* Card container */}
+        <div className="relative w-full flex flex-col items-center select-none">
+          {/* Card container with Swiper */}
           <div className="relative w-full flex justify-center h-[400px] overflow-visible">
-            {media.map((item, index) => {
-              const total = media.length;
+            <Swiper
+              modules={[Navigation, Pagination, TouchEvents, Autoplay]}
+              spaceBetween={30}
+              slidesPerView={3}
+              centeredSlides={true}
+              loop={media.length > 3}
+              autoplay={autoPlay ? {
+                delay: interval,
+                disableOnInteraction: false,
+                pauseOnMouseEnter: true,
+              } : false}
+              onSwiper={(swiper) => {
+                swiperRef.current = swiper;
+                swiper.slideTo(active);
+              }}
+              onSlideChange={(swiper) => {
+                setActive(swiper.realIndex);
+              }}
+              touchEventsTarget="container"
+              touchRatio={1}
+              threshold={10}
+              allowTouchMove={true}
+              breakpoints={{
+                640: { slidesPerView: 3, spaceBetween: 30 },
+                768: { slidesPerView: 3, spaceBetween: 30 },
+                1024: { slidesPerView: 5, spaceBetween: 30 },
+              }}
+              className="w-full h-full"
+            >
+              {media.map((item, index) => {
+                const offset = index - active;
+                const total = media.length;
+                let normalizedOffset = offset;
+                if (normalizedOffset > total / 2) normalizedOffset -= total;
+                if (normalizedOffset < -total / 2) normalizedOffset += total;
 
-              // Determine max visible cards
-              let maxVisible = 5;
-              if (total === 4) maxVisible = 3;
-              else if (total === 2) maxVisible = 2;
-              else if (total === 1) maxVisible = 1;
+                const isActive = normalizedOffset === 0;
+                let scale = 1;
+                if (Math.abs(normalizedOffset) === 1) scale = 0.92;
+                else if (Math.abs(normalizedOffset) === 2) scale = 0.78;
+                else if (Math.abs(normalizedOffset) >= 3) scale = 0.62;
 
-              let offset = index - active;
-              if (offset > total / 2) offset -= total;
-              if (offset < -total / 2) offset += total;
-
-              const isActive = offset === 0;
-
-              // Only render cards within visible range
-              if (Math.abs(offset) > Math.floor(maxVisible / 2)) return null;
-
-              // Scale based on offset
-              let scale = 1;
-              if (Math.abs(offset) === 1) scale = 0.92;
-              else if (Math.abs(offset) === 2) scale = 0.78;
-              else if (Math.abs(offset) >= 3) scale = 0.62;
-
-              return (
-                <motion.div
-                  key={item.url + index}
-                  initial={false}
-                  animate={{
-                    x: offset * 240,
-                    scale,
-                    opacity: 1,
-                    zIndex: isActive ? 30 : 20 - Math.abs(offset),
-                  }}
-                  transition={{ type: "spring", stiffness: 200, damping: 20 }}
-                  className="absolute rounded-xl overflow-hidden shadow-2xl bg-black cursor-pointer"
-                  style={{ width: 300, height: 300 }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setFullscreenIndex(index);
-                  }}
-                >
-                  {item.type === "image" ? (
-                    <img src={item.url} alt={item.caption ?? `media-${index}`} className="w-full h-full object-cover" />
-                  ) : (
-                    <video src={item.url} className="w-full h-full object-cover" controls playsInline />
-                  )}
-                </motion.div>
-              );
-            })}
+                return (
+                  <SwiperSlide key={item.url + index}>
+                    <motion.div
+                      initial={false}
+                      animate={{
+                        scale,
+                        opacity: 1,
+                      }}
+                      transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                      className="rounded-xl overflow-hidden shadow-2xl bg-black cursor-pointer mx-auto"
+                      style={{ width: 300, height: 300 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFullscreenIndex(index);
+                      }}
+                    >
+                      {item.type === "image" ? (
+                        <img src={item.url} alt={item.caption ?? `media-${index}`} className="w-full h-full object-cover" />
+                      ) : (
+                        <video src={item.url} className="w-full h-full object-cover" controls playsInline />
+                      )}
+                    </motion.div>
+                  </SwiperSlide>
+                );
+              })}
+            </Swiper>
           </div>
 
           {/* Pagination */}

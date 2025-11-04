@@ -1,7 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, animate } from "framer-motion";
 import { ChevronLeft, ChevronRight, ArrowUpRight } from "lucide-react";
 import { Link } from "react-router-dom";
+import { Swiper, SwiperSlide } from "swiper/react";
+import { Navigation, Pagination, TouchEvents, Autoplay } from "swiper/modules";
+import type { Swiper as SwiperType } from "swiper";
+import "swiper/css";
+import "swiper/css/navigation";
+import "swiper/css/pagination";
 
 type Testimony = {
   id: string;
@@ -33,6 +39,7 @@ export default function TestimoniesCarousel() {
   const [baseColor, setBaseColor] = useState(testimonies[1]?.color || "rgb(155, 89, 214)");
   const [isMobile, setIsMobile] = useState(false);
   const [animateIn, setAnimateIn] = useState(false);
+  const swiperRef = useRef<SwiperType | null>(null);
 
   useEffect(() => {
     fetch('/api/testimonies')
@@ -99,20 +106,15 @@ export default function TestimoniesCarousel() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Auto-slide every 3 seconds
-  useEffect(() => {
-    if (testimonies.length === 0) return;
-    const interval = setInterval(() => setActive((prev) => (prev + 1) % testimonies.length), 3000);
-    return () => clearInterval(interval);
-  }, [testimonies.length]);
+  // Auto-slide handled by Swiper Autoplay module
 
   const next = () => {
     if (testimonies.length === 0) return;
-    setActive((active + 1) % testimonies.length);
+    swiperRef.current?.slideNext();
   };
   const prev = () => {
     if (testimonies.length === 0) return;
-    setActive((active - 1 + testimonies.length) % testimonies.length);
+    swiperRef.current?.slidePrev();
   };
   const shorten = (text: string) => (text.length > 50 ? text.slice(0, 50) + "..." : text);
 
@@ -135,7 +137,38 @@ export default function TestimoniesCarousel() {
       <h1 className="text-3xl md:text-4xl font-extrabold mb-12">TESTIMONIES</h1>
 
       <div className="relative w-full flex justify-center h-[460px] overflow-visible">
-        <div className={`relative flex justify-center items-center ${isMobile ? "w-[700px]" : "w-[1000px]"}`}>
+        <Swiper
+          modules={[Navigation, Pagination, TouchEvents, Autoplay]}
+          spaceBetween={isMobile ? 20 : 40}
+          slidesPerView={isMobile ? 1.5 : 3}
+          centeredSlides={true}
+          loop={testimonies.length > 3}
+          autoplay={{
+            delay: 3000,
+            disableOnInteraction: false,
+            pauseOnMouseEnter: true,
+          }}
+          onSwiper={(swiper) => {
+            swiperRef.current = swiper;
+            swiper.slideTo(active);
+          }}
+          onSlideChange={(swiper) => {
+            const newActive = swiper.realIndex;
+            setActive(newActive);
+            if (testimonies[newActive]) {
+              const newColor = testimonies[newActive].color;
+              if (newColor !== baseColor) {
+                setBaseColor(newColor);
+              }
+            }
+          }}
+          touchEventsTarget="container"
+          touchRatio={1}
+          threshold={10}
+          allowTouchMove={true}
+          className="w-full h-full"
+          style={{ paddingLeft: isMobile ? "60px" : "80px", paddingRight: isMobile ? "60px" : "80px" }}
+        >
           {testimonies.map((item, index) => {
             const total = visibleCards;
             let offset = index - active;
@@ -157,36 +190,38 @@ export default function TestimoniesCarousel() {
             }
 
             return (
-              <motion.div
-                key={item.id}
-                onClick={() => setActive(index)}
-                initial={{ y: 200, opacity: 0 }}
-                animate={{
-                  x: offset * offsetDistance,
-                  scale: isActive ? 1.1 : scale,
-                  backgroundColor: bgColor,
-                  zIndex: isActive ? 50 : 40 - Math.abs(offset),
-                  y: animateIn ? 0 : 200,
-                  opacity: animateIn ? 1 : 0,
-                }}
-                transition={{
-                  type: "spring",
-                  stiffness: 180,
-                  damping: 22,
-                  backgroundColor: { duration: 0.6, ease: "easeInOut" },
-                }}
-                className="absolute rounded-3xl cursor-pointer text-white shadow-2xl overflow-hidden"
-                style={{ width: cardWidth, height: cardHeight }}
-              >
-                <div className="w-full flex justify-center mt-5">
-                  <img src={item.image} className={`w-[85%] ${isMobile ? "h-[120px]" : "h-[160px]"} object-cover rounded-xl`} />
-                </div>
-                <p className="px-5 mt-4 text-sm leading-relaxed">{isActive ? item.text : shorten(item.text)}</p>
-                <p className="font-bold text-xs mt-4">{item.name}</p>
-              </motion.div>
+              <SwiperSlide key={item.id}>
+                <motion.div
+                  onClick={() => {
+                    setActive(index);
+                    swiperRef.current?.slideTo(index);
+                  }}
+                  initial={{ y: 200, opacity: 0 }}
+                  animate={{
+                    scale: isActive ? 1.1 : scale,
+                    backgroundColor: bgColor,
+                    y: animateIn ? 0 : 200,
+                    opacity: animateIn ? 1 : 0,
+                  }}
+                  transition={{
+                    type: "spring",
+                    stiffness: 180,
+                    damping: 22,
+                    backgroundColor: { duration: 0.6, ease: "easeInOut" },
+                  }}
+                  className="rounded-3xl cursor-pointer text-white shadow-2xl overflow-hidden h-full flex flex-col"
+                  style={{ width: cardWidth, height: cardHeight }}
+                >
+                  <div className="w-full flex justify-center mt-5">
+                    <img src={item.image} className={`w-[85%] ${isMobile ? "h-[120px]" : "h-[160px]"} object-cover rounded-xl`} />
+                  </div>
+                  <p className="px-5 mt-4 text-sm leading-relaxed flex-grow">{isActive ? item.text : shorten(item.text)}</p>
+                  <p className="font-bold text-xs mt-4 px-5 pb-4">{item.name}</p>
+                </motion.div>
+              </SwiperSlide>
             );
           })}
-        </div>
+        </Swiper>
       </div>
 
       {/* Pagination & Arrows */}
