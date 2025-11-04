@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import CrusadeCard from "./CrusadeCard";
 import { Swiper, SwiperSlide } from "swiper/react";
-import { Navigation, Pagination, TouchEvents, Autoplay } from "swiper/modules";
+import { Navigation, Pagination, Autoplay } from "swiper/modules";
 import type { Swiper as SwiperType } from "swiper";
 import "swiper/css";
 import "swiper/css/navigation";
@@ -45,7 +45,7 @@ export default function CrusadeCarousel({ data }: CrusadeCarouselProps) {
       {/* CARDS */}
       <div className="relative w-full md:h-[420px] h-[300px] flex justify-center overflow-visible mt-3 px-2">
         <Swiper
-          modules={[Navigation, Pagination, TouchEvents, Autoplay]}
+          modules={[Navigation, Pagination, Autoplay]}
           spaceBetween={isMobile ? 20 : 40}
           slidesPerView={isMobile ? 1.5 : 3}
           centeredSlides={true}

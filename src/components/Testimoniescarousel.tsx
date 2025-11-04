@@ -3,7 +3,7 @@ import { motion, animate } from "framer-motion";
 import { ChevronLeft, ChevronRight, ArrowUpRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Swiper, SwiperSlide } from "swiper/react";
-import { Navigation, Pagination, TouchEvents, Autoplay } from "swiper/modules";
+import { Navigation, Pagination, Autoplay } from "swiper/modules";
 import type { Swiper as SwiperType } from "swiper";
 import "swiper/css";
 import "swiper/css/navigation";
@@ -121,7 +121,6 @@ export default function TestimoniesCarousel() {
   const visibleCards = isMobile ? 3 : testimonies.length;
   const cardWidth = isMobile ? 220 : 320;
   const cardHeight = isMobile ? 300 : 400;
-  const offsetDistance = isMobile ? 180 : 220;
 
   if (testimonies.length === 0) {
     return (
@@ -138,7 +137,7 @@ export default function TestimoniesCarousel() {
 
       <div className="relative w-full flex justify-center h-[460px] overflow-visible">
         <Swiper
-          modules={[Navigation, Pagination, TouchEvents, Autoplay]}
+          modules={[Navigation, Pagination, Autoplay]}
           spaceBetween={isMobile ? 20 : 40}
           slidesPerView={isMobile ? 1.5 : 3}
           centeredSlides={true}

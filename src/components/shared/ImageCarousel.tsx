@@ -9,7 +9,7 @@ import React, {
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Swiper, SwiperSlide } from "swiper/react";
-import { Navigation, Pagination, TouchEvents, Autoplay } from "swiper/modules";
+import { Navigation, Pagination, Autoplay } from "swiper/modules";
 import type { Swiper as SwiperType } from "swiper";
 import "swiper/css";
 import "swiper/css/navigation";
@@ -90,7 +90,7 @@ const ImageCarousel = forwardRef<ImageCarouselRef, ImageCarouselProps>(
           {/* Card container with Swiper */}
           <div className="relative w-full flex justify-center h-[400px] overflow-visible">
             <Swiper
-              modules={[Navigation, Pagination, TouchEvents, Autoplay]}
+              modules={[Navigation, Pagination, Autoplay]}
               spaceBetween={30}
               slidesPerView={3}
               centeredSlides={true}
@@ -125,7 +125,6 @@ const ImageCarousel = forwardRef<ImageCarouselRef, ImageCarouselProps>(
                 if (normalizedOffset > total / 2) normalizedOffset -= total;
                 if (normalizedOffset < -total / 2) normalizedOffset += total;
 
-                const isActive = normalizedOffset === 0;
                 let scale = 1;
                 if (Math.abs(normalizedOffset) === 1) scale = 0.92;
                 else if (Math.abs(normalizedOffset) === 2) scale = 0.78;
