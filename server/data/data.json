@@ -1,0 +1,168 @@
+{
+  "testimonies": [
+    {
+      "id": "e3f4869c-2240-41c2-9427-5233b99eeaa4",
+      "name": "Sarah Johnson",
+      "title": "Healing from Chronic Pain",
+      "content": "For over five years, I suffered from chronic pain that kept me from enjoying life. I tried every medical treatment available, but nothing worked. Then I found hope through prayer and faith. After months of consistent prayer and trusting God, I experienced complete healing. Today I am pain-free and living life to the fullest. God is truly a healer!",
+      "summary": "Complete healing from five years of chronic pain through prayer and faith.",
+      "approved": true,
+      "previewImage": "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=600&h=400&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=600&h=400&fit=crop"
+      ],
+      "createdAt": "2025-10-28T06:00:53.862Z"
+    },
+    {
+      "id": "264571a0-3f26-4c44-a592-106892d1e8f2",
+      "name": "Michael Chen",
+      "title": "Financial Breakthrough",
+      "content": "After losing my job and facing financial ruin, I trusted God for provision. I prayed daily and remained faithful in giving. Within three months, I received an unexpected job offer that paid twice my previous salary. God truly provides for those who trust in Him!",
+      "summary": "Financial breakthrough after job loss through prayer and faithful giving.",
+      "approved": true,
+      "previewImage": "https://images.unsplash.com/photo-1505373877841-8d25f7d46678?w=600&h=400&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1505373877841-8d25f7d46678?w=600&h=400&fit=crop"
+      ],
+      "createdAt": "2025-10-30T06:00:53.862Z"
+    },
+    {
+      "id": "4ebf697a-de37-4020-9dd8-59dc876a6998",
+      "createdAt": "2025-11-04T07:58:59.670Z",
+      "approved": false,
+      "name": "Emerald Ndukwe",
+      "title": "TOP G",
+      "email": "emeraldjace@gmail.com",
+      "phone": "08104723914",
+      "content": "sssssssssssssssssssssssssssssssssssssssssssssssssssssss v v v  ",
+      "images": [],
+      "videos": [],
+      "summary": "sssssssssssssssssssssssssssssssssssssssssssssssssssssss v v v  "
+    },
+    {
+      "id": "eac903f2-c717-4795-a98e-4ad97cecad1f",
+      "createdAt": "2025-11-04T07:59:55.746Z",
+      "approved": false,
+      "name": "Emerald Ndukwe",
+      "title": "ttt",
+      "email": "emeraldjace@gmail.com",
+      "phone": "08104723914",
+      "content": "ttttttttksnlz nsdfszgkhbsdfkhbdf  sfb s s dsghgs  gs",
+      "images": [],
+      "videos": [],
+      "summary": "ttttttttksnlz nsdfszgkhbsdfkhbdf  sfb s s dsghgs  gs"
+    },
+    {
+      "id": "dedfc0e4-df2d-4441-8576-1e8a5d530826",
+      "createdAt": "2025-11-04T13:56:08.015Z",
+      "approved": false,
+      "name": "Emerald Ndukwe",
+      "title": "ff",
+      "email": "emeraldjace@gmail.com",
+      "phone": "08104723914",
+      "content": "wq",
+      "images": [],
+      "videos": [],
+      "summary": "wq"
+    }
+  ],
+  "crusades": [
+    {
+      "id": "56850112-f124-4f2f-b9d2-345edf7f8d4d",
+      "title": "A Day of Blessings",
+      "location": "Lagos State",
+      "date": "Dec 2023",
+      "description": "A powerful prison crusade in Lagos that touched hundreds of inmates. The Word of God brought hope and transformation to many behind bars. Lives were changed, and inmates found new purpose in Christ.",
+      "summary": "Powerful prison crusade in Lagos bringing hope and transformation to hundreds of inmates.",
+      "previewImage": "https://images.unsplash.com/photo-1497435332909-251e61e4e502?w=680&h=400&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1497435332909-251e61e4e502?w=680&h=400&fit=crop",
+        "https://images.unsplash.com/photo-1548554448-087ebf1e11e3?w=680&h=400&fit=crop"
+      ],
+      "createdAt": "2025-10-05T06:00:53.862Z"
+    },
+    {
+      "id": "abe5c0cf-468f-447b-8855-5c2ee2d0f0ad",
+      "title": "A Day of Blessings",
+      "location": "Enugu State",
+      "date": "Nov 2023",
+      "description": "Enugu witnessed a mighty move of God during this prison outreach. Despite the challenges, God's Word penetrated hearts. Inmates received ministry and many gave their lives to Christ.",
+      "summary": "Mighty move of God in Enugu prison outreach with many giving their lives to Christ.",
+      "previewImage": "https://images.unsplash.com/photo-1548554448-087ebf1e11e3?w=680&h=400&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1548554448-087ebf1e11e3?w=680&h=400&fit=crop",
+        "https://images.unsplash.com/photo-1497435332909-251e61e4e502?w=680&h=400&fit=crop"
+      ],
+      "createdAt": "2025-09-05T06:00:53.862Z"
+    }
+  ],
+  "messages": [
+    {
+      "id": "616d0c62-6277-47b3-8062-b88cc4e602c1",
+      "createdAt": "2025-11-04T07:57:41.974Z",
+      "name": "Emerald Ndukwe",
+      "email": "emeraldjace@gmail.com",
+      "message": "Crusade request from Emerald Ndukwe. Phone: 08104723914",
+      "subject": "Crusade Request"
+    }
+  ],
+  "users": [
+    {
+      "id": "c634020c-3fc9-4884-9256-1534c861f8bd",
+      "name": "Admin",
+      "email": "admin@unendingpraise.com",
+      "passwordHash": "$2a$10$8KmGDPqGGc2pbc/njcr2.ey2jr9Xmj3ZH3UUyQQZeKlmU.2YbKH/2",
+      "role": "admin"
+    }
+  ],
+  "songs": [
+    {
+      "id": "442a1a34-120d-4789-b070-6f8b73583a83",
+      "title": "Great Is Thy Faithfulness",
+      "artist": "Thomas Chisholm",
+      "lyrics": "Great is Thy faithfulness, O God my Father,\nThere is no shadow of turning with Thee;\nThou changest not, Thy compassions, they fail not\nAs Thou hast been Thou forever wilt be.\n\nGreat is Thy faithfulness!\nGreat is Thy faithfulness!\nMorning by morning new mercies I see;\nAll I have needed Thy hand hath provided—\nGreat is Thy faithfulness, Lord, unto me!",
+      "date": "2025-11-04",
+      "createdAt": "2025-11-04T06:00:53.862Z"
+    },
+    {
+      "id": "2a40ffbc-6d7e-4983-b941-f27e11939456",
+      "title": "Amazing Grace",
+      "artist": "John Newton",
+      "lyrics": "Amazing grace! How sweet the sound\nThat saved a wretch like me!\nI once was lost, but now am found;\nWas blind, but now I see.",
+      "date": "2025-11-04",
+      "createdAt": "2025-11-04T06:00:53.862Z"
+    },
+    {
+      "id": "81689e1d-c6f1-472c-94df-1734825f2502",
+      "title": "How Great Thou Art",
+      "artist": "Stuart Hine",
+      "lyrics": "O Lord my God, when I in awesome wonder\nConsider all the worlds Thy hands have made,\nI see the stars, I hear the rolling thunder,\nThy power throughout the universe displayed.\n\nThen sings my soul, my Savior God, to Thee:\nHow great Thou art, how great Thou art!",
+      "date": "2025-11-04",
+      "createdAt": "2025-11-04T06:00:53.862Z"
+    }
+  ],
+  "comments": {
+    "testimony_e3f4869c-2240-41c2-9427-5233b99eeaa4": [
+      {
+        "id": "6977d695-05f5-40ea-bbd7-971a2fc41d6f",
+        "name": "yoma",
+        "comment": "hyyyyyyyyyy",
+        "createdAt": "2025-11-04T08:42:00.600Z"
+      },
+      {
+        "id": "20e03a32-3bbb-47cf-b413-d53896ec399c",
+        "name": "cd",
+        "comment": "hjdeyeue",
+        "createdAt": "2025-11-04T11:11:36.359Z"
+      }
+    ]
+  },
+  "liveChat": [
+    {
+      "id": "ee87b661-29f3-47cd-9055-72d8adcbc9d1",
+      "text": "Ndukwe",
+      "fromMe": true,
+      "createdAt": "2025-11-04T11:06:43.336Z"
+    }
+  ]
+}
