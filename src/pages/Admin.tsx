@@ -125,7 +125,7 @@ export default function AdminPage() {
   useEffect(() => {
     refresh();
     // load current user role if logged in
-    (async () => {
+    const loadRole = async () => {
       if (!token) return;
       try {
         const res = await fetch('/api/auth/me', { headers: headers as HeadersInit });
@@ -134,8 +134,9 @@ export default function AdminPage() {
           setRole(data?.user?.role || "");
         }
       } catch {}
-    })();
-  }, []);
+    };
+    loadRole();
+  }, [token]); // Re-run when token changes
 
   const approveTestimony = async (id: string) => {
     await api<Testimony>(`/api/testimonies/${id}/approve`, { method: "POST", headers: headers as HeadersInit });
@@ -203,6 +204,16 @@ export default function AdminPage() {
       if (!res.ok) throw new Error(data?.error || "Auth failed");
       setToken(data.token);
       setError(null);
+      // Refresh role immediately after login
+      setTimeout(async () => {
+        try {
+          const res = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${data.token}` } });
+          if (res.ok) {
+            const userData = await res.json();
+            setRole(userData?.user?.role || "");
+          }
+        } catch {}
+      }, 100);
       refresh();
     } catch (err: any) {
       setError(err?.message || "Auth failed");
