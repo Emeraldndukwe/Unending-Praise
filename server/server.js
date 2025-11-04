@@ -85,7 +85,7 @@ async function ensureSchema() {
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';`);
     await client.query('COMMIT');
   } catch (e) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
     console.error('Schema init error', e);
     throw e;
   } finally {
@@ -544,9 +544,26 @@ app.listen(PORT, async () => {
   console.log(`API server listening on http://localhost:${PORT}`);
   if (!process.env.DATABASE_URL) {
     console.warn('⚠️ DATABASE_URL not set. Set it for Postgres (Render)');
+    return;
   }
-  await ensureSchema();
-  await initializeDefaultAdmin();
+  // Initialize DB with timeout and error handling
+  try {
+    const timeout = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Database initialization timeout')), 10000)
+    );
+    await Promise.race([
+      (async () => {
+        await ensureSchema();
+        await initializeDefaultAdmin();
+        console.log('✅ Database initialized successfully');
+      })(),
+      timeout
+    ]);
+  } catch (e) {
+    console.error('❌ Database initialization failed:', e.message);
+    console.error('Server will continue but database features may not work.');
+    console.error('Please check DATABASE_URL and ensure PostgreSQL is accessible.');
+  }
 });
 
 // Email notifications helper
