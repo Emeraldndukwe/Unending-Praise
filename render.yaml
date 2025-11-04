@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: unendingpraise-web
+    env: node
+    rootDir: .
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_SSL
+        value: enabled
+      - key: SMTP_URL
+        sync: false
+      - key: MAIL_FROM
+        value: no-reply@unendingpraise.com
+

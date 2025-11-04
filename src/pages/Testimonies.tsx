@@ -54,7 +54,7 @@ export default function Testimonies() {
             <div className="text-center py-8 text-gray-600">No approved testimonies yet. Be the first to share!</div>
           ) : (
             testimonies.map((t) => (
-              <TestimonyCard key={t.id} {...t} />
+            <TestimonyCard key={t.id} {...t} />
             ))
           )}
         </div>

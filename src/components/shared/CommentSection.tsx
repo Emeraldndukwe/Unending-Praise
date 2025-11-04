@@ -1,4 +1,4 @@
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 interface Comment {
   id: string;
@@ -76,11 +76,11 @@ export default function CommentSection({ entityType, entityId }: CommentSectionP
             <div className="text-gray-600 text-sm">Be the first to comment.</div>
           ) : (
             comments.map((c) => (
-              <div key={c.id} className="text-gray-900 text-sm md:text-base">
-                <p className="font-medium">{c.name}</p>
-                <p className="text-gray-700 leading-relaxed">{c.comment}</p>
-                <hr className="mt-3" />
-              </div>
+            <div key={c.id} className="text-gray-900 text-sm md:text-base">
+              <p className="font-medium">{c.name}</p>
+              <p className="text-gray-700 leading-relaxed">{c.comment}</p>
+              <hr className="mt-3" />
+            </div>
             ))
           )}
         </div>

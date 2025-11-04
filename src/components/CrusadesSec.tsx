@@ -42,8 +42,8 @@ function CrusadesSection() {
           </p>
           <Link to="/crusades">
             <button className="mt-3 sm:mt-5 flex items-center justify-center md:justify-start gap-2 bg-purple-400 hover:bg-purple-500 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-medium text-sm sm:text-base transition">
-              SEE MORE →
-            </button>
+            SEE MORE →
+          </button>
           </Link>
         </div>
 
@@ -63,11 +63,11 @@ function CrusadesSection() {
                     'bottom-6 right-10 w-72 h-48 rotate-[5deg]'
                   }`}
                 >
-                  <img
+          <img
                     src={getImageUrl(idx)}
                     alt={crusade.title || `Crusade ${idx + 1}`}
                     className="w-full h-full object-cover rounded-3xl"
-                  />
+          />
                 </Link>
               ))}
             </>
@@ -108,7 +108,7 @@ function CrusadesSection() {
                       'bottom-20 left-1/2 transform -translate-x-1/2 w-24 h-24 sm:w-28 sm:h-28 rotate-[4deg] shadow-lg'
                     }`}
                   >
-                    <img
+            <img
                       src={getImageUrl(idx)}
                       alt={crusade.title || `Crusade ${idx + 1}`}
                       className="w-full h-full object-cover"
@@ -143,8 +143,8 @@ function CrusadesSection() {
               </p>
               <Link to="/crusades">
                 <button className="mt-3 sm:mt-4 bg-purple-400 hover:bg-purple-500 text-white px-5 sm:px-6 py-2 sm:py-3 rounded-full font-semibold text-xs sm:text-sm md:text-base transition">
-                  SEE MORE →
-                </button>
+                SEE MORE →
+              </button>
               </Link>
             </div>
           </div>

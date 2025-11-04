@@ -71,14 +71,14 @@ export default function TestimonyForm() {
 
       if (res.ok) {
         alert("Your testimony has been submitted! It will be reviewed before being posted.");
-        setFormData({
-          title: "",
-          name: "",
-          phone: "",
-          email: "",
-          testimony: "",
-          attachments: [],
-        });
+    setFormData({
+      title: "",
+      name: "",
+      phone: "",
+      email: "",
+      testimony: "",
+      attachments: [],
+    });
       } else {
         throw new Error('Submission failed');
       }
@@ -162,20 +162,20 @@ export default function TestimonyForm() {
 
               return file.type.startsWith("image/") ? (
                 <div key={index} className="relative">
-                  <img
-                    src={url}
-                    alt="preview"
+                <img
+                  src={url}
+                  alt="preview"
                     className="w-20 h-20 object-cover rounded-lg border"
-                  />
+                />
                   <span className="absolute top-0 right-0 bg-blue-500 text-white text-xs px-1 rounded">IMG</span>
                 </div>
               ) : (
                 <div key={index} className="relative">
-                  <video
-                    src={url}
+                <video
+                  src={url}
                     className="w-20 h-20 rounded-lg border object-cover"
-                    muted
-                  />
+                  muted
+                />
                   <span className="absolute top-0 right-0 bg-red-500 text-white text-xs px-1 rounded">VID</span>
                 </div>
               );

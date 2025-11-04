@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
-import CrusadeCard from "../components/CrusadeCard";
 import CrusadeForm from "../components/CrusadeForm";
 import CrusadeCarousel from "../components/CrusadeCarousel";
 import { motion } from "framer-motion";
@@ -36,6 +35,10 @@ export default function Crusades() {
   // Filter crusades by type (if type exists, otherwise use all for prison)
   const prisonCrusades = allCrusades.filter((c) => !c.type || c.type === "prison").slice(0, 3);
   const onlineCrusades = allCrusades.filter((c) => c.type === "online").slice(0, 3);
+
+  if (loading) {
+    return <div className="p-8 text-center text-gray-600">Loading crusades…</div>;
+  }
 
   return (
     <div className="w-full">

@@ -22,6 +22,7 @@ type Crusade = {
   summary?: string;
   date?: string;
   location?: string;
+  type?: string;
   images?: string[];
   videos?: string[];
   previewImage?: string;
@@ -39,8 +40,11 @@ function useAuthToken() {
     if (t) localStorage.setItem("authToken", t);
     else localStorage.removeItem("authToken");
   };
-  const headers = useMemo(() => (token ? { Authorization: `Bearer ${token}` } : {}), [token]);
-  return { token, setToken: save, headers };
+  const headers = useMemo<Record<string, string>>(
+    () => (token ? { Authorization: `Bearer ${token}` } : ({} as Record<string, string>)),
+    [token]
+  );
+  return { token, setToken: save, headers: headers as HeadersInit };
 }
 
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
@@ -51,13 +55,15 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 
 export default function AdminPage() {
   const { token, setToken, headers } = useAuthToken();
-  const [tab, setTab] = useState<"testimonies" | "crusades" | "messages" | "songs" | "comments">("testimonies");
+  const [tab, setTab] = useState<"testimonies" | "crusades" | "messages" | "songs" | "comments" | "users">("testimonies");
+  const [role, setRole] = useState<string>("");
   const [testimonies, setTestimonies] = useState<Testimony[]>([]);
   const [crusades, setCrusades] = useState<Crusade[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [users, setUsers] = useState<Array<{id:string; name:string; email:string; role:string; status:string; created_at?: string;}>>([]);
 
   // Admin comments management
   const [commentEntityType, setCommentEntityType] = useState<"testimony" | "crusade">("testimony");
@@ -117,15 +123,26 @@ export default function AdminPage() {
 
   useEffect(() => {
     refresh();
+    // load current user role if logged in
+    (async () => {
+      if (!token) return;
+      try {
+        const res = await fetch('/api/auth/me', { headers: headers as HeadersInit });
+        if (res.ok) {
+          const data = await res.json();
+          setRole(data?.user?.role || "");
+        }
+      } catch {}
+    })();
   }, []);
 
   const approveTestimony = async (id: string) => {
-    await api<Testimony>(`/api/testimonies/${id}/approve`, { method: "POST", headers });
+    await api<Testimony>(`/api/testimonies/${id}/approve`, { method: "POST", headers: headers as HeadersInit });
     refresh();
   };
 
   const deleteItem = async (kind: string, id: string) => {
-    await fetch(`/api/${kind}/${id}`, { method: "DELETE", headers });
+    await fetch(`/api/${kind}/${id}`, { method: "DELETE", headers: headers as HeadersInit });
     refresh();
   };
 
@@ -264,7 +281,16 @@ export default function AdminPage() {
 
         {/* Tabs */}
         <div className="flex flex-wrap gap-2 mb-6 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-2 border border-[#54037C]/10">
-          {(["testimonies", "crusades", "messages", "songs", "comments"] as const).map((k) => (
+          {((() => {
+            const base = ["testimonies", "crusades", "messages", "songs", "comments"] as const;
+            if (role === 'superadmin') return ([...base, 'users'] as const);
+            if (!role || role === 'admin') return base;
+            if (role === 'testimony') return ["testimonies", "comments"] as const;
+            if (role === 'crusade') return ["crusades", "comments"] as const;
+            if (role === 'messages') return ["messages"] as const;
+            if (role === 'songs') return ["songs"] as const;
+            return base;
+          })()).map((k) => (
             <button
               key={k}
               className={`px-4 py-2 rounded-xl font-semibold text-sm transition capitalize ${
@@ -272,7 +298,7 @@ export default function AdminPage() {
                   ? "bg-[#54037C] text-white shadow-md" 
                   : "bg-transparent text-gray-600 hover:bg-[#54037C]/10"
               }`}
-              onClick={() => setTab(k)}
+              onClick={() => setTab(k as any)}
             >
               {k}
             </button>
@@ -306,7 +332,7 @@ export default function AdminPage() {
                   onUpdate={async (payload) => {
                     await api<Testimony>(`/api/testimonies/${t.id}`, {
                       method: "PUT",
-                      headers: { ...headers, "content-type": "application/json" },
+                      headers: Object.assign({}, headers as Record<string, string>, { "content-type": "application/json" }),
                       body: JSON.stringify(payload),
                     });
                     refresh();
@@ -329,7 +355,7 @@ export default function AdminPage() {
                   onUpdate={async (payload) => {
                     await api<Testimony>(`/api/testimonies/${t.id}`, {
                       method: "PUT",
-                      headers: { ...headers, "content-type": "application/json" },
+                      headers: Object.assign({}, headers as Record<string, string>, { "content-type": "application/json" }),
                       body: JSON.stringify(payload),
                     });
                     refresh();
@@ -356,7 +382,7 @@ export default function AdminPage() {
                   onUpdate={async (payload) => {
                     await api<Crusade>(`/api/crusades/${c.id}`, {
                       method: "PUT",
-                      headers: { ...headers, "content-type": "application/json" },
+                      headers: Object.assign({}, headers as Record<string, string>, { "content-type": "application/json" }),
                       body: JSON.stringify(payload),
                     });
                     refresh();
@@ -500,6 +526,93 @@ export default function AdminPage() {
                 ))}
               </div>
             )}
+          </div>
+        </section>
+      )}
+
+      {tab === "users" && role === 'superadmin' && (
+        <section className="space-y-6">
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-[#54037C]">User Management</h2>
+              <button
+                className="px-3 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-xl text-sm"
+                onClick={async () => {
+                  try {
+                    const list = await api<typeof users>("/api/admin/users", { headers: headers as HeadersInit });
+                    setUsers(list);
+                  } catch (e:any) { setError(e?.message || 'Failed to load users'); }
+                }}
+              >
+                Load Users
+              </button>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <h3 className="font-semibold mb-2">Pending</h3>
+                <div className="space-y-3">
+                  {users.filter(u=>u.status!== 'active').map(u => (
+                    <div key={u.id} className="p-3 border rounded-xl flex items-center justify-between gap-3">
+                      <div>
+                        <div className="font-medium">{u.name} <span className="text-gray-500 text-sm">{u.email}</span></div>
+                        <div className="text-xs text-gray-500">role: {u.role} • status: {u.status}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <select
+                          className="border rounded px-2 py-1 text-sm"
+                          value={u.role}
+                          onChange={async (e) => {
+                            const roleVal = e.target.value;
+                            await fetch(`/api/admin/users/${u.id}/role`, { method:'PUT', headers: Object.assign({}, headers as Record<string,string>, { 'content-type':'application/json' }), body: JSON.stringify({ role: roleVal }) });
+                            const list = await api<typeof users>("/api/admin/users", { headers: headers as HeadersInit });
+                            setUsers(list);
+                          }}
+                        >
+                          {['admin','testimony','crusade','messages','songs','pending'].map(r => <option key={r} value={r}>{r}</option>)}
+                        </select>
+                        <button
+                          className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm"
+                          onClick={async () => {
+                            await fetch(`/api/admin/users/${u.id}/activate`, { method:'PUT', headers: headers as HeadersInit });
+                            const list = await api<typeof users>("/api/admin/users", { headers: headers as HeadersInit });
+                            setUsers(list);
+                          }}
+                        >Approve</button>
+                      </div>
+                    </div>
+                  ))}
+                  {users.filter(u=>u.status!== 'active').length === 0 && <div className="text-sm text-gray-500">No pending users</div>}
+                </div>
+              </div>
+              <div>
+                <h3 className="font-semibold mb-2">Active</h3>
+                <div className="space-y-3">
+                  {users.filter(u=>u.status=== 'active').map(u => (
+                    <div key={u.id} className="p-3 border rounded-xl flex items-center justify-between gap-3">
+                      <div>
+                        <div className="font-medium">{u.name} <span className="text-gray-500 text-sm">{u.email}</span></div>
+                        <div className="text-xs text-gray-500">role: {u.role} • status: {u.status}</div>
+                      </div>
+                      <div>
+                        <select
+                          className="border rounded px-2 py-1 text-sm"
+                          value={u.role}
+                          onChange={async (e) => {
+                            const roleVal = e.target.value;
+                            await fetch(`/api/admin/users/${u.id}/role`, { method:'PUT', headers: Object.assign({}, headers as Record<string,string>, { 'content-type':'application/json' }), body: JSON.stringify({ role: roleVal }) });
+                            const list = await api<typeof users>("/api/admin/users", { headers: headers as HeadersInit });
+                            setUsers(list);
+                          }}
+                        >
+                          {['superadmin','admin','testimony','crusade','messages','songs'].map(r => <option key={r} value={r}>{r}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  ))}
+                  {users.filter(u=>u.status=== 'active').length === 0 && <div className="text-sm text-gray-500">No active users</div>}
+                </div>
+              </div>
+            </div>
           </div>
         </section>
       )}

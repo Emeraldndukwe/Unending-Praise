@@ -105,11 +105,11 @@ export default function CrusadeDetails() {
               playsInline
             />
           ) : (
-            <img
+        <img
               src={heroMedia.url}
-              className="w-full h-[350px] md:h-[420px] object-cover"
+          className="w-full h-[350px] md:h-[420px] object-cover"
               alt={crusade.title || "Crusade"}
-            />
+        />
           )
         ) : (
           <div className="w-full h-[350px] md:h-[420px] bg-gray-200" />
@@ -125,14 +125,14 @@ export default function CrusadeDetails() {
 
           <div className="flex flex-wrap gap-6 mt-4 text-sm">
             {crusade.date && (
-              <div className="flex items-center gap-2">
-                <CalendarDays size={16} /> {crusade.date}
-              </div>
+            <div className="flex items-center gap-2">
+              <CalendarDays size={16} /> {crusade.date}
+            </div>
             )}
             {crusade.location && (
-              <div className="flex items-center gap-2">
-                <MapPin size={16} /> {crusade.location}
-              </div>
+            <div className="flex items-center gap-2">
+              <MapPin size={16} /> {crusade.location}
+            </div>
             )}
             <div className="flex items-center gap-2">
               <Camera size={16} /> {media.length} {media.length === 1 ? 'Media' : 'Photos / Videos'}
@@ -190,9 +190,9 @@ export default function CrusadeDetails() {
 
         {/* Image carousel */}
         {media.length > 0 && (
-          <div className="mt-6">
+        <div className="mt-6">
             <ImageCarousel ref={carouselRef} media={media} />
-          </div>
+        </div>
         )}
       </motion.div>
 

@@ -46,7 +46,7 @@ const Contacts: React.FC = () => {
         body: JSON.stringify(payload),
       });
       if (res.ok) {
-        alert("Your booking request has been submitted!");
+    alert("Your booking request has been submitted!");
         setBookingForm({
           participatingMinistries: "",
           ministryGroup: "",
@@ -82,7 +82,7 @@ const Contacts: React.FC = () => {
         body: JSON.stringify(payload),
       });
       if (res.ok) {
-        alert("Your message has been sent!");
+    alert("Your message has been sent!");
         setMessageForm({
           name: "",
           phone: "",

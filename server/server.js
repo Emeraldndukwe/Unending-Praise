@@ -8,6 +8,13 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { Pool } from 'pg';
+// Optional email notifications (nodemailer is optional)
+let nodemailer = null;
+try {
+  nodemailer = await import('nodemailer');
+} catch {
+  nodemailer = null;
+}
 
 loadEnv();
 
@@ -34,6 +41,7 @@ async function ensureSchema() {
         email TEXT NOT NULL UNIQUE,
         password_hash TEXT NOT NULL,
         role TEXT NOT NULL DEFAULT 'admin',
+        status TEXT NOT NULL DEFAULT 'active',
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
 
@@ -74,6 +82,7 @@ async function ensureSchema() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
+    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';`);
     await client.query('COMMIT');
   } catch (e) {
     await client.query('ROLLBACK');
@@ -140,6 +149,23 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+// Role guard: superadmin/admin have full access; otherwise must match allowed roles
+function requireRole(...allowed) {
+  return (req, res, next) => {
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    const role = req.user.role;
+    if (role === 'superadmin' || role === 'admin') return next();
+    if (allowed.includes(role)) return next();
+    return res.status(403).json({ error: 'Forbidden' });
+  };
+}
+
+function requireSuperAdmin(req, res, next) {
+  if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+  if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'Forbidden' });
+  next();
+}
+
 // Health
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true });
@@ -153,14 +179,15 @@ app.post('/api/auth/register', async (req, res) => {
     const existing = await pool.query('SELECT id FROM users WHERE LOWER(email)=LOWER($1)', [email]);
     if (existing.rowCount) return res.status(409).json({ error: 'Email already registered' });
     const hash = await bcrypt.hash(password, 10);
-    const role = 'admin';
+    const role = 'pending';
+    const status = 'pending';
     const insert = await pool.query(
-      'INSERT INTO users (name, email, password_hash, role) VALUES ($1,$2,$3,$4) RETURNING id, name, email, role',
-      [name, email, hash, role]
+      'INSERT INTO users (name, email, password_hash, role, status) VALUES ($1,$2,$3,$4,$5) RETURNING id, name, email, role, status',
+      [name, email, hash, role, status]
     );
     const user = insert.rows[0];
-    const token = createToken(user);
-    res.status(201).json({ token, user });
+    notifyUsersForRole('superadmin', `New admin registration: ${email}`, `${name} (${email}) requested access.`).catch(() => {});
+    res.status(201).json({ message: 'Registration received. Awaiting superadmin approval.', user: { id: user.id, name: user.name, email: user.email, role: user.role, status: user.status } });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Server error' });
@@ -171,11 +198,12 @@ app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'Missing fields' });
   try {
-    const result = await pool.query('SELECT id, name, email, role, password_hash FROM users WHERE LOWER(email)=LOWER($1)', [email]);
+    const result = await pool.query('SELECT id, name, email, role, status, password_hash FROM users WHERE LOWER(email)=LOWER($1)', [email]);
     if (result.rowCount === 0) return res.status(401).json({ error: 'Invalid credentials' });
     const row = result.rows[0];
     const ok = await bcrypt.compare(password, row.password_hash);
     if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
+    if (row.status !== 'active') return res.status(403).json({ error: 'Account pending approval' });
     const token = createToken({ id: row.id, name: row.name, email: row.email, role: row.role });
     res.json({ token, user: { id: row.id, name: row.name, email: row.email, role: row.role } });
   } catch (e) {
@@ -184,8 +212,13 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// Current user from token
+app.get('/api/auth/me', requireAuth, (req, res) => {
+  res.json({ user: { id: req.user.id, email: req.user.email, name: req.user.name, role: req.user.role } });
+});
+
 // Generic CRUD helpers
-function makeListRoute(key) {
+function makeListRoute(key, roleForWrite) {
   app.get(`/api/${key}`, (_req, res) => {
     const db = readDb();
     res.json(db[key]);
@@ -199,7 +232,7 @@ function makeListRoute(key) {
     res.status(201).json(item);
   });
 
-  app.put(`/api/${key}/:id`, requireAuth, requireAdmin, (req, res) => {
+  app.put(`/api/${key}/:id`, requireAuth, requireRole(roleForWrite), (req, res) => {
     const { id } = req.params;
     const db = readDb();
     const idx = db[key].findIndex((x) => x.id === id);
@@ -209,7 +242,7 @@ function makeListRoute(key) {
     res.json(db[key][idx]);
   });
 
-  app.delete(`/api/${key}/:id`, requireAuth, requireAdmin, (req, res) => {
+  app.delete(`/api/${key}/:id`, requireAuth, requireRole(roleForWrite), (req, res) => {
     const { id } = req.params;
     const db = readDb();
     const before = db[key].length;
@@ -221,8 +254,8 @@ function makeListRoute(key) {
 }
 
 // Entities: messages, songs (testimonies and crusades handled separately)
-makeListRoute('messages');
-makeListRoute('songs');
+makeListRoute('messages', 'messages');
+makeListRoute('songs', 'songs');
 
 // Testimonies routes (Postgres)
 app.get('/api/testimonies', async (_req, res) => {
@@ -235,7 +268,7 @@ app.get('/api/testimonies', async (_req, res) => {
   }
 });
 
-app.put('/api/testimonies/:id', requireAuth, requireAdmin, async (req, res) => {
+app.put('/api/testimonies/:id', requireAuth, requireRole('testimony'), async (req, res) => {
   const { id } = req.params;
   const { name, title, email, phone, content, summary, previewImage, previewVideo, images, videos, approved } = req.body || {};
   try {
@@ -257,7 +290,7 @@ app.put('/api/testimonies/:id', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-app.delete('/api/testimonies/:id', requireAuth, requireAdmin, async (req, res) => {
+app.delete('/api/testimonies/:id', requireAuth, requireRole('testimony'), async (req, res) => {
   const { id } = req.params;
   try {
     const result = await pool.query('DELETE FROM testimonies WHERE id=$1', [id]);
@@ -280,7 +313,7 @@ app.get('/api/crusades', async (_req, res) => {
   }
 });
 
-app.put('/api/crusades/:id', requireAuth, requireAdmin, async (req, res) => {
+app.put('/api/crusades/:id', requireAuth, requireRole('crusade'), async (req, res) => {
   const { id } = req.params;
   const { title, date, location, description, summary, type, previewImage, previewVideo, images, videos } = req.body || {};
   try {
@@ -301,7 +334,7 @@ app.put('/api/crusades/:id', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-app.delete('/api/crusades/:id', requireAuth, requireAdmin, async (req, res) => {
+app.delete('/api/crusades/:id', requireAuth, requireRole('crusade'), async (req, res) => {
   const { id } = req.params;
   try {
     const result = await pool.query('DELETE FROM crusades WHERE id=$1', [id]);
@@ -360,7 +393,7 @@ app.post('/api/comments/:entityType/:entityId', (req, res) => {
   res.status(201).json(newComment);
 });
 
-app.delete('/api/comments/:entityType/:entityId/:commentId', requireAuth, requireAdmin, (req, res) => {
+app.delete('/api/comments/:entityType/:entityId/:commentId', requireAuth, requireRole('testimony','crusade'), (req, res) => {
   const { entityType, entityId, commentId } = req.params;
   const db = readDb();
   if (!db.comments) db.comments = {};
@@ -374,7 +407,7 @@ app.delete('/api/comments/:entityType/:entityId/:commentId', requireAuth, requir
 });
 
 // Approve endpoint for testimonies (admin)
-app.post('/api/testimonies/:id/approve', requireAuth, requireAdmin, async (req, res) => {
+app.post('/api/testimonies/:id/approve', requireAuth, requireRole('testimony'), async (req, res) => {
   const { id } = req.params;
   try {
     const result = await pool.query('UPDATE testimonies SET approved=TRUE WHERE id=$1 RETURNING *', [id]);
@@ -407,7 +440,11 @@ app.post('/api/testimonies', async (req, res) => {
        RETURNING *`,
       [body.name || null, body.title || null, body.email || null, body.phone || null, body.content || null, body.summary || null, body.previewImage || null, body.previewVideo || null, JSON.stringify(images), JSON.stringify(videos), Boolean(body.approved)]
     );
-    res.status(201).json(result.rows[0]);
+    const created = result.rows[0];
+    // notify testimony admins and superadmins
+    notifyUsersForRole('testimony', `New testimony submitted: ${created.title || created.name || created.id}`,
+      'A new testimony was submitted and awaits review.').catch(() => {});
+    res.status(201).json(created);
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Server error' });
@@ -427,7 +464,11 @@ app.post('/api/crusades', async (req, res) => {
        RETURNING *`,
       [body.title || null, body.date || null, body.location || null, body.description || null, body.summary || null, body.type || null, body.previewImage || null, body.previewVideo || null, JSON.stringify(images), JSON.stringify(videos)]
     );
-    res.status(201).json(result.rows[0]);
+    const created = result.rows[0];
+    // notify crusade admins and superadmins
+    notifyUsersForRole('crusade', `New crusade created: ${created.title || created.id}`,
+      'A new crusade was added.').catch(() => {});
+    res.status(201).json(created);
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Server error' });
@@ -491,10 +532,10 @@ async function initializeDefaultAdmin() {
     const defaultPassword = 'admin123';
     const hash = await bcrypt.hash(defaultPassword, 10);
     await pool.query(
-      'INSERT INTO users (name, email, password_hash, role) VALUES ($1,$2,$3,$4)',
-      ['Admin', 'admin@unendingpraise.com', hash, 'admin']
+      'INSERT INTO users (name, email, password_hash, role, status) VALUES ($1,$2,$3,$4,$5)',
+      ['Admin', 'admin@unendingpraise.com', hash, 'superadmin', 'active']
     );
-    console.log('✅ Default admin created: admin@unendingpraise.com / admin123');
+    console.log('✅ Default superadmin created: admin@unendingpraise.com / admin123');
   }
 }
 
@@ -506,6 +547,101 @@ app.listen(PORT, async () => {
   }
   await ensureSchema();
   await initializeDefaultAdmin();
+});
+
+// Email notifications helper
+async function notifyUsersForRole(role, subject, text) {
+  try {
+    // select recipients by role or superadmin; only active users
+    let result;
+    if (role === 'superadmin') {
+      result = await pool.query(`SELECT email FROM users WHERE role='superadmin' AND status='active'`);
+    } else {
+      result = await pool.query(
+        `SELECT email FROM users WHERE (role = $1 OR role = 'superadmin') AND status='active'`,
+        [role]
+      );
+    }
+    const recipients = result.rows.map(r => r.email).filter(Boolean);
+    if (!recipients.length) return;
+    const smtpUrl = process.env.SMTP_URL;
+    if (!smtpUrl || !nodemailer) {
+      console.log(`[notify] ${subject} ->`, recipients);
+      return;
+    }
+    const transporter = nodemailer.createTransport(smtpUrl);
+    await transporter.sendMail({
+      from: process.env.MAIL_FROM || 'no-reply@unendingpraise.com',
+      to: recipients.join(','),
+      subject,
+      text
+    });
+  } catch (e) {
+    console.warn('notifyUsersForRole failed', e?.message);
+  }
+}
+
+// Serve built frontend (dist) from the same server for Render
+const distDir = path.resolve(__dirname, '../dist');
+if (fs.existsSync(distDir)) {
+  app.use(express.static(distDir));
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(distDir, 'index.html'));
+  });
+}
+
+// Superadmin user management APIs
+app.get('/api/admin/users', requireAuth, requireSuperAdmin, async (_req, res) => {
+  try {
+    const result = await pool.query('SELECT id, name, email, role, status, created_at FROM users ORDER BY created_at DESC');
+    res.json(result.rows);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.post('/api/admin/users', requireAuth, requireSuperAdmin, async (req, res) => {
+  const { name, email, password, role = 'admin' } = req.body || {};
+  if (!name || !email || !password) return res.status(400).json({ error: 'Missing fields' });
+  try {
+    const existing = await pool.query('SELECT id FROM users WHERE LOWER(email)=LOWER($1)', [email]);
+    if (existing.rowCount) return res.status(409).json({ error: 'Email already exists' });
+    const hash = await bcrypt.hash(password, 10);
+    const result = await pool.query(
+      'INSERT INTO users (name, email, password_hash, role, status) VALUES ($1,$2,$3,$4,$5) RETURNING id, name, email, role, status, created_at',
+      [name, email, hash, role, 'active']
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.put('/api/admin/users/:id/role', requireAuth, requireSuperAdmin, async (req, res) => {
+  const { id } = req.params; const { role } = req.body || {};
+  if (!role) return res.status(400).json({ error: 'Missing role' });
+  try {
+    const result = await pool.query('UPDATE users SET role=$1 WHERE id=$2 RETURNING id, name, email, role, status', [role, id]);
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    res.json(result.rows[0]);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.put('/api/admin/users/:id/activate', requireAuth, requireSuperAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query("UPDATE users SET status='active' WHERE id=$1 RETURNING id, name, email, role, status", [id]);
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    res.json(result.rows[0]);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 
