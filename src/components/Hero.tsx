@@ -27,7 +27,7 @@ export default function HeroSection() {
         {/* LEFT SIDE */}
         <div
           className={`flex-1 relative flex justify-center bg-transparent rounded-3xl z-20 ${
-            isMobile ? "sticky top-[88px]" : "static"
+            isMobile && showLiveVideo ? "sticky top-[88px]" : "static"
           }`}
         >
           <div className="w-full h-[18rem] md:h-[34rem] rounded-3xl shadow-lg overflow-hidden relative">
