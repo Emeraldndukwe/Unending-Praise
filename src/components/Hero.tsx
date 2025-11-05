@@ -12,7 +12,7 @@ export default function HeroSection() {
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<"songs" | "livechat">("songs");
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const playerRef = useRef<videojs.Player | null>(null);
+  const playerRef = useRef<any>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [debugLines, setDebugLines] = useState<string[]>([]);
 
@@ -42,10 +42,8 @@ export default function HeroSection() {
       return;
     }
 
-    // During dev, ensure we hit the backend origin directly (adjust port if different)
-    const src = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
-      ? `http://localhost:${import.meta?.env?.VITE_API_PORT || 5000}/api/hls/playlist.m3u8`
-      : "/api/hls/playlist.m3u8";
+    // Use direct HLS URL (no proxy)
+    const src = "https://vcpout-ams01.internetmultimediaonline.org/lmampraise/stream1/playlist.m3u8";
     const video = videoRef.current;
     if (!video) return;
 
@@ -126,16 +124,20 @@ export default function HeroSection() {
       });
       playerRef.current = player;
       player.on('error', () => {
-        const e = player.error();
+        const p: any = playerRef.current || player;
+        const e = p && typeof p.error === 'function' ? p.error() : undefined;
         log('video.js error', e);
         setVideoError('Playback error. Please try again.');
       });
       player.on('loadedmetadata', () => log('video.js loadedmetadata'));
       player.ready(() => {
-        player.play().catch(() => {
+        const p2: any = playerRef.current || player;
+        if (p2 && typeof p2.play === 'function') {
+          p2.play().catch(() => {
           setVideoError('Autoplay blocked — press play to start.');
           log('video.js: autoplay blocked');
-        });
+          });
+        }
       });
     } catch (e) {
       log('video.js init failed', String((e as Error)?.message || e));
