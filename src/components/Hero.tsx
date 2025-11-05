@@ -85,6 +85,20 @@ export default function HeroSection() {
     videoEventHandlers.forEach(([evt, handler]) => video.addEventListener(evt, handler));
     log("init", { src });
 
+    // Preflight: verify we can fetch the playlist via our proxy
+    (async () => {
+      try {
+        const resp = await fetch(src, { method: 'GET', cache: 'no-store' });
+        log('preflight: playlist status', { status: resp.status });
+        if (!resp.ok) {
+          setVideoError(`Playlist fetch failed: HTTP ${resp.status}`);
+        }
+      } catch (e) {
+        log('preflight: playlist fetch error', String((e as Error)?.message || e));
+        setVideoError('Playlist fetch error — check backend proxy');
+      }
+    })();
+
     // Native HLS on Safari/iOS
     if (video.canPlayType("application/vnd.apple.mpegURL")) {
       log("native-hls: supported");
