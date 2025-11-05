@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import SongList from "./SongList";
 import LiveChat from "./LiveChat";
@@ -9,6 +9,7 @@ export default function HeroSection() {
   const [showLiveVideo, setShowLiveVideo] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<"songs" | "livechat">("songs");
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
@@ -16,6 +17,65 @@ export default function HeroSection() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  // Initialize HLS playback when the live video is shown
+  useEffect(() => {
+    if (!showLiveVideo) {
+      const video = videoRef.current;
+      if (video) {
+        try {
+          video.pause();
+          video.removeAttribute("src");
+          video.load();
+        } catch {}
+      }
+      return;
+    }
+
+    const src = "https://vcpout-ams01.internetmultimediaonline.org/lmampraise/stream1/playlist.m3u8";
+    const video = videoRef.current;
+    if (!video) return;
+
+    // Native HLS on Safari/iOS
+    if (video.canPlayType("application/vnd.apple.mpegURL")) {
+      video.src = src;
+      video.play().catch(() => {});
+      return;
+    }
+
+    let hlsInstance: any;
+    let cancelled = false;
+
+    import("hls.js")
+      .then(({ default: Hls }) => {
+        if (cancelled) return;
+        if (Hls.isSupported()) {
+          hlsInstance = new Hls({ enableWorker: true });
+          hlsInstance.loadSource(src);
+          hlsInstance.attachMedia(video);
+          const tryPlay = () => {
+            video.play().catch(() => {});
+          };
+          hlsInstance.on(Hls.Events.MANIFEST_PARSED, tryPlay);
+          hlsInstance.on(Hls.Events.LEVEL_LOADED, tryPlay);
+        }
+      })
+      .catch(() => {
+        // no-op; fallback already attempted
+      });
+
+    return () => {
+      cancelled = true;
+      try {
+        if (hlsInstance) hlsInstance.destroy();
+        if (video) {
+          video.pause();
+          video.removeAttribute("src");
+          video.load();
+        }
+      } catch {}
+    };
+  }, [showLiveVideo]);
 
   return (
     <>
@@ -84,11 +144,14 @@ export default function HeroSection() {
                   transition={{ duration: 0.35 }}
                   className="absolute inset-0 rounded-3xl overflow-hidden"
                 >
-                  <iframe
-                    src="https://www.youtube.com/embed/YOUR_VIDEO_ID"
-                    title="Live stream"
-                    className="w-full h-full rounded-3xl"
-                    allowFullScreen
+                  <video
+                    ref={videoRef}
+                    className="w-full h-full rounded-3xl bg-black"
+                    controls
+                    autoPlay
+                    muted
+                    playsInline
+                    poster="/images/hero-bg.jpg"
                   />
                   <button
                     onClick={() => setShowLiveVideo(false)}
