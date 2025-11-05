@@ -1,4 +1,5 @@
 import express from 'express';
+import http from 'http';
 import cors from 'cors';
 import { config as loadEnv } from 'dotenv';
 import { v4 as uuid } from 'uuid';
@@ -604,7 +605,45 @@ async function initializeDefaultAdmin() {
 }
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, async () => {
+const server = http.createServer(app);
+
+// --- WebSocket Live Chat ---
+let WebSocketServer = null;
+try {
+  const wsMod = await import('ws');
+  WebSocketServer = wsMod.WebSocketServer;
+} catch {}
+
+if (WebSocketServer) {
+  const wss = new WebSocketServer({ server, path: '/ws/livechat' });
+  wss.on('connection', (ws) => {
+    try {
+      const db = readDb();
+      const recent = (db.liveChat || []).slice(-100);
+      ws.send(JSON.stringify({ type: 'init', messages: recent }));
+    } catch {}
+
+    ws.on('message', (data) => {
+      try {
+        const parsed = JSON.parse(data.toString());
+        if (parsed && typeof parsed.text === 'string' && parsed.text.trim()) {
+          const db = readDb();
+          if (!db.liveChat) db.liveChat = [];
+          const message = { id: uuid(), text: parsed.text.trim(), fromMe: !!parsed.fromMe, createdAt: new Date().toISOString() };
+          db.liveChat.push(message);
+          if (db.liveChat.length > 100) db.liveChat = db.liveChat.slice(-100);
+          writeDb(db);
+          const payload = JSON.stringify({ type: 'new_message', message });
+          wss.clients.forEach((client) => {
+            try { client.readyState === 1 && client.send(payload); } catch {}
+          });
+        }
+      } catch {}
+    });
+  });
+}
+
+server.listen(PORT, async () => {
   console.log(`API server listening on http://localhost:${PORT}`);
   if (!process.env.DATABASE_URL) {
     console.warn('⚠️ DATABASE_URL not set. Set it for Postgres (Render)');
