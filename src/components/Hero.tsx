@@ -60,11 +60,28 @@ export default function HeroSection() {
       return;
     }
 
-    // Wait a brief moment for DOM to settle after animation
-    const timer = setTimeout(() => {
+    // Wait for DOM to settle and video element to be mounted
+    let attempts = 0;
+    const maxAttempts = 20; // Try for up to 2 seconds (20 * 100ms)
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    
+    const tryInit = () => {
       const videoEl = videoRef.current;
-      if (!videoEl || playerRef.current) {
-        console.warn("[HeroSection] Video element not ready or player already exists");
+      if (!videoEl) {
+        attempts++;
+        if (attempts < maxAttempts) {
+          const timer = setTimeout(tryInit, 100);
+          timers.push(timer);
+          return;
+        }
+        console.warn("[HeroSection] Video element never became available");
+        setPlayerError("Video element not available. Please try again.");
+        setIsLoading(false);
+        return;
+      }
+
+      if (playerRef.current) {
+        console.warn("[HeroSection] Player already exists");
         return;
       }
 
@@ -148,10 +165,14 @@ export default function HeroSection() {
         setPlayerError("Failed to initialize video player. Please refresh the page.");
         setIsLoading(false);
       }
-    }, 150); // Slightly longer timeout for smoother animation
+    };
+
+    // Start trying to initialize after a short delay
+    const timer = setTimeout(tryInit, 200);
+    timers.push(timer);
 
     return () => {
-      clearTimeout(timer);
+      timers.forEach(t => clearTimeout(t));
     };
   }, [showLiveVideo]);
 
