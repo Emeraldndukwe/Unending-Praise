@@ -86,10 +86,11 @@ export default function HeroSection() {
                 >
                   <iframe
                     src="https://www.youtube.com/embed/live_stream?autoplay=1&mute=1"
-                    className="w-full h-full rounded-3xl"
+                    className="absolute inset-0 w-full h-full rounded-3xl"
                     allow="autoplay; encrypted-media"
                     allowFullScreen
                     frameBorder="0"
+                    style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }}
                   />
 
                   <button
