@@ -38,11 +38,49 @@ export default function HeroSection() {
     const video = videoRef.current;
     if (!video) return;
 
+    const log = (label: string, ...args: any[]) => {
+      // eslint-disable-next-line no-console
+      console.log(`[HLS] ${label}`, ...args);
+    };
+
+    // Attach common video element event logs
+    const onVideoError = () => {
+      const mediaError = video.error;
+      if (mediaError) {
+        const codeMap: Record<number, string> = {
+          1: "MEDIA_ERR_ABORTED",
+          2: "MEDIA_ERR_NETWORK",
+          3: "MEDIA_ERR_DECODE",
+          4: "MEDIA_ERR_SRC_NOT_SUPPORTED",
+        };
+        log("video.error", { code: mediaError.code, name: codeMap[mediaError.code] || "UNKNOWN" });
+        if (mediaError.code === 2) setVideoError("Network error fetching video — possible CORS issue.");
+        if (mediaError.code === 4) setVideoError("Source not supported — check stream format.");
+      } else {
+        log("video.error", "Unknown error");
+      }
+    };
+    const videoEventHandlers: Array<[keyof HTMLMediaElementEventMap, EventListener]> = [
+      ["loadedmetadata", () => log("video.loadedmetadata")],
+      ["loadeddata", () => log("video.loadeddata")],
+      ["canplay", () => log("video.canplay")],
+      ["playing", () => log("video.playing")],
+      ["pause", () => log("video.pause")],
+      ["stalled", () => log("video.stalled")],
+      ["waiting", () => log("video.waiting")],
+      ["progress", () => log("video.progress", video.buffered?.length ? video.buffered.end(0) : 0)],
+      ["error", onVideoError],
+    ];
+    videoEventHandlers.forEach(([evt, handler]) => video.addEventListener(evt, handler));
+    log("init", { src });
+
     // Native HLS on Safari/iOS
     if (video.canPlayType("application/vnd.apple.mpegURL")) {
+      log("native-hls: supported");
       video.src = src;
       video.play().catch(() => {
         setVideoError("Autoplay blocked — press play to start.");
+        log("native-hls: autoplay blocked");
       });
       return;
     }
@@ -54,17 +92,26 @@ export default function HeroSection() {
       .then(({ default: Hls }) => {
         if (cancelled) return;
         if (Hls.isSupported()) {
+          log("hls.js: supported");
           hlsInstance = new Hls({ enableWorker: true });
           hlsInstance.attachMedia(video);
           hlsInstance.loadSource(src);
           const tryPlay = () => {
             video.play().catch(() => {
               setVideoError("Autoplay blocked — press play to start.");
+              log("hls.js: autoplay blocked");
             });
           };
-          hlsInstance.on(Hls.Events.MANIFEST_PARSED, tryPlay);
-          hlsInstance.on(Hls.Events.LEVEL_LOADED, tryPlay);
+          hlsInstance.on(Hls.Events.MANIFEST_PARSED, (_e: any, data: any) => {
+            log("hls.js: manifest parsed", data?.levels?.map((l: any) => l?.height));
+            tryPlay();
+          });
+          hlsInstance.on(Hls.Events.LEVEL_LOADED, (_e: any, data: any) => {
+            log("hls.js: level loaded", { details: data?.details?.fragments?.length });
+            tryPlay();
+          });
           hlsInstance.on(Hls.Events.ERROR, (_e: any, data: any) => {
+            log("hls.js: error", data);
             // Surface meaningful network/cors/media errors to the UI
             if (data?.fatal) {
               if (data.type === "networkError") {
@@ -76,16 +123,20 @@ export default function HeroSection() {
               }
             }
           });
+        } else {
+          log("hls.js: not supported in this browser");
         }
       })
       .catch(() => {
         // no-op; fallback already attempted
+        log("hls.js: dynamic import failed");
       });
 
     return () => {
       cancelled = true;
       try {
         if (hlsInstance) hlsInstance.destroy();
+        videoEventHandlers.forEach(([evt, handler]) => video.removeEventListener(evt, handler));
         if (video) {
           video.pause();
           video.removeAttribute("src");
