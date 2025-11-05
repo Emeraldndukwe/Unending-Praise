@@ -25,10 +25,6 @@ export default function HeroSection() {
 
   // ✅ Handle HLS & Video.js setup / cleanup
   useEffect(() => {
-    const video = videoRef.current;
-    const streamSrc =
-      "https://vcpout-ams01.internetmultimediaonline.org/lmampraise/stream1/playlist.m3u8";
-
     if (!showLiveVideo) {
       // Cleanup when user switches away
       if (playerRef.current) {
@@ -40,16 +36,22 @@ export default function HeroSection() {
       return;
     }
 
-    if (!video) return;
+    // Wait for DOM to be ready (AnimatePresence animation)
+    const timer = setTimeout(() => {
+      const video = videoRef.current;
+      if (!video || playerRef.current) return;
 
-    // Prevent duplicate players
-    if (!playerRef.current) {
+      const streamSrc =
+        "https://vcpout-ams01.internetmultimediaonline.org/lmampraise/stream1/playlist.m3u8";
+
       playerRef.current = videojs(video, {
         controls: true,
         autoplay: true,
         muted: true,
         preload: "auto",
-        fluid: true,
+        fluid: false,
+        width: "100%",
+        height: "100%",
         html5: { vhs: { withCredentials: false } },
         sources: [{ src: streamSrc, type: "application/x-mpegURL" }],
       });
@@ -62,9 +64,10 @@ export default function HeroSection() {
       playerRef.current.ready(() => {
         playerRef.current?.play().catch(() => {});
       });
-    }
+    }, 100);
 
     return () => {
+      clearTimeout(timer);
       try {
         if (playerRef.current) {
           playerRef.current.dispose();
@@ -146,6 +149,7 @@ export default function HeroSection() {
                     className="video-js vjs-default-skin vjs-big-play-centered w-full h-full rounded-3xl bg-black"
                     playsInline
                     muted
+                    data-setup="{}"
                   />
 
                   <button
