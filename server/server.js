@@ -183,10 +183,19 @@ app.get('/api/health', (_req, res) => {
 // HLS reverse proxy to bypass CORS for livestream
 // Proxies everything under /api/hls/* to the origin base path
 const HLS_ORIGIN_BASE = 'https://vcpout-ams01.internetmultimediaonline.org/lmampraise/stream1';
+// Preflight to satisfy some dev setups
+app.options('/api/hls/*', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Range');
+  res.status(204).end();
+});
+
 app.get('/api/hls/*', async (req, res) => {
   try {
     const suffix = req.params[0] || '';
     const targetUrl = `${HLS_ORIGIN_BASE}/${suffix}`;
+    console.log(`[HLS PROXY] ${req.method} ${req.originalUrl} -> ${targetUrl}`);
     const upstream = await fetch(targetUrl);
 
     // Pass through content type or infer basic ones
@@ -203,7 +212,8 @@ app.get('/api/hls/*', async (req, res) => {
 
     if (upstream.body) {
       // Node 18+: convert Web stream to Node stream
-      Readable.fromWeb(upstream.body).pipe(res);
+      const toNodeStream = Readable.fromWeb ? Readable.fromWeb(upstream.body) : Readable.from(upstream.body);
+      toNodeStream.pipe(res);
     } else {
       res.end();
     }

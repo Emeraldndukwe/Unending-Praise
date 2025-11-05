@@ -35,7 +35,10 @@ export default function HeroSection() {
       return;
     }
 
-    const src = "/api/hls/playlist.m3u8";
+    // During dev, ensure we hit the backend origin directly (adjust port if different)
+    const src = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+      ? `http://localhost:${import.meta?.env?.VITE_API_PORT || 5000}/api/hls/playlist.m3u8`
+      : "/api/hls/playlist.m3u8";
     const video = videoRef.current;
     if (!video) return;
 
