@@ -372,6 +372,15 @@ app.post('/api/messages', async (req, res) => {
   } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
 });
 
+app.delete('/api/messages/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query('DELETE FROM messages WHERE id=$1', [id]);
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    res.status(204).end();
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
+});
+
 app.get('/api/songs', async (_req, res) => {
   try {
     const result = await pool.query('SELECT id, title, artist, lyrics, date, created_at FROM songs ORDER BY created_at DESC');
@@ -387,6 +396,15 @@ app.post('/api/songs', async (req, res) => {
     );
     const r = result.rows[0];
     res.status(201).json({ id: r.id, title: r.title, artist: r.artist, lyrics: r.lyrics, date: r.date, createdAt: r.created_at });
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
+});
+
+app.delete('/api/songs/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query('DELETE FROM songs WHERE id=$1', [id]);
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    res.status(204).end();
   } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
 });
 
