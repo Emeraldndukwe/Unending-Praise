@@ -1,6 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import videojs from "video.js";
-import "video.js/dist/video-js.css";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import SongList from "./SongList";
 import LiveChat from "./LiveChat";
@@ -10,123 +8,7 @@ const NAV_HEIGHT = 72;
 export default function HeroSection() {
   const [showLiveVideo, setShowLiveVideo] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [playerError, setPlayerError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"songs" | "livechat">("songs");
-
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const playerRef = useRef<any>(null);
-
-  // Callback ref that gets called when video element is mounted/unmounted
-  const setVideoRef = useCallback((element: HTMLVideoElement | null) => {
-    videoRef.current = element;
-    
-    // If element is unmounted, dispose player
-    if (!element && playerRef.current) {
-      console.log("[HeroSection] Video element unmounted, disposing player");
-      try {
-        playerRef.current.dispose();
-        playerRef.current = null;
-      } catch (err) {
-        console.error("[HeroSection] Error disposing player on unmount:", err);
-      }
-      return;
-    }
-    
-    // If element is mounted and we want to show video, initialize player
-    if (element && showLiveVideo && !playerRef.current) {
-      console.log("[HeroSection] Video element mounted, initializing player");
-      setIsLoading(true);
-      setPlayerError(null);
-      
-      const streamSrc = "https://vcpout-ams01.internetmultimediaonline.org/lmampraise/stream1/playlist.m3u8";
-
-      const playerOptions = {
-        controls: true,
-        autoplay: true,
-        muted: true,
-        preload: "auto" as const,
-        // Force the player to fill its container instead of keeping aspect via fluid
-        fluid: false,
-        width: "100%",
-        height: "100%",
-        html5: {
-          vhs: {
-            withCredentials: false,
-            overrideNative: true,
-          },
-        },
-        sources: [
-          {
-            src: streamSrc,
-            type: "application/x-mpegURL",
-          },
-        ],
-      } as const;
-
-      try {
-        playerRef.current = videojs(element, playerOptions, () => {
-          console.log("[HeroSection] Video.js player ready");
-          setIsLoading(false);
-          // Ensure wrapper fills container
-          try { playerRef.current.addClass('vjs-fill'); } catch {}
-          try {
-            const tech = (playerRef.current.el()?.getElementsByClassName('vjs-tech')?.[0] as HTMLVideoElement | undefined);
-            if (tech) {
-              tech.style.width = '100%';
-              tech.style.height = '100%';
-              tech.style.objectFit = 'cover';
-              tech.style.backgroundColor = 'black';
-            }
-          } catch {}
-
-          playerRef.current.play().catch((err: Error) => {
-            console.error("[HeroSection] Autoplay failed:", err);
-          });
-
-          playerRef.current.on("loadstart", () => {
-            console.log("[HeroSection] Stream loadstart");
-            setIsLoading(true);
-            setPlayerError(null);
-          });
-
-          playerRef.current.on("waiting", () => {
-            console.log("[HeroSection] Stream buffering");
-            setIsLoading(true);
-          });
-
-          playerRef.current.on("canplay", () => {
-            console.log("[HeroSection] Stream can play");
-            setIsLoading(false);
-          });
-
-          playerRef.current.on("playing", () => {
-            console.log("[HeroSection] Stream playing");
-            setIsLoading(false);
-            setPlayerError(null);
-          });
-
-          playerRef.current.on("error", (e: any) => {
-            console.error("[HeroSection] Player error:", e);
-            const errorMsg = playerRef.current.error();
-            console.error("[HeroSection] Error details:", errorMsg);
-            setPlayerError(
-              errorMsg?.message || "Failed to load the live stream. Please check your connection or try refreshing."
-            );
-            setIsLoading(false);
-          });
-
-          playerRef.current.on("ended", () => {
-            console.log("[HeroSection] Stream ended");
-          });
-        });
-      } catch (err) {
-        console.error("[HeroSection] Failed to initialize Video.js:", err);
-        setPlayerError("Failed to initialize video player. Please refresh the page.");
-        setIsLoading(false);
-      }
-    }
-  }, [showLiveVideo]);
 
   // Track screen size
   useEffect(() => {
@@ -134,46 +16,6 @@ export default function HeroSection() {
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  // Cleanup player on unmount or when hiding video
-  useEffect(() => {
-    return () => {
-      console.log("[HeroSection] Cleaning up player on unmount");
-      if (playerRef.current) {
-        try {
-          playerRef.current.dispose();
-          playerRef.current = null;
-        } catch (err) {
-          console.error("[HeroSection] Error disposing player:", err);
-        }
-      }
-    };
-  }, []);
-
-  // Dispose player when hiding video
-  useEffect(() => {
-    if (!showLiveVideo && playerRef.current) {
-      console.log("[HeroSection] Disposing player");
-      try {
-        playerRef.current.dispose();
-        playerRef.current = null;
-      } catch (err) {
-        console.error("[HeroSection] Error disposing player:", err);
-      }
-      setPlayerError(null);
-      setIsLoading(false);
-    }
-  }, [showLiveVideo]);
-
-  const handleCloseVideo = useCallback(() => {
-    console.log("[HeroSection] Closing live video");
-    setShowLiveVideo(false);
-  }, []);
-
-  const handleWatchLive = useCallback(() => {
-    console.log("[HeroSection] Watch Live clicked");
-    setShowLiveVideo(true);
   }, []);
 
   return (
@@ -226,7 +68,7 @@ export default function HeroSection() {
                     <motion.button
                       whileHover={{ scale: 1.04 }}
                       whileTap={{ scale: 0.98 }}
-                      onClick={handleWatchLive}
+                      onClick={() => setShowLiveVideo(true)}
                       className="bg-[#54037C]/70 hover:bg-purple-800 text-white px-6 py-3 rounded-xl font-semibold shadow-md"
                     >
                       Watch Live →
@@ -235,59 +77,23 @@ export default function HeroSection() {
                 </motion.div>
               ) : (
                 <motion.div
-                  key="hls"
+                  key="youtube"
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -12 }}
                   transition={{ duration: 0.35 }}
                   className="absolute inset-0 rounded-3xl overflow-hidden relative bg-black"
                 >
-                  {/* Solid black background to avoid white flash */}
-                  <div className="absolute inset-0 bg-black" />
-                  <video
-                    ref={setVideoRef}
-                    className="video-js vjs-default-skin w-full h-full rounded-3xl bg-black"
-                    playsInline
-                    data-setup="{}"
+                  <iframe
+                    src="https://www.youtube.com/embed/live_stream?autoplay=1&mute=1"
+                    className="w-full h-full rounded-3xl"
+                    allow="autoplay; encrypted-media"
+                    allowFullScreen
+                    frameBorder="0"
                   />
 
-                  {/* Loading overlay */}
-                  {isLoading && (
-                    <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-10">
-                      <div className="text-white text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
-                        <p className="text-sm">Loading live stream...</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Error overlay */}
-                  {playerError && (
-                    <div className="absolute inset-0 bg-black/90 flex items-center justify-center z-10">
-                      <div className="text-white text-center p-4 max-w-sm">
-                        <h3 className="text-lg font-semibold mb-2">Stream Error</h3>
-                        <p className="text-sm mb-4">{playerError}</p>
-                        <button
-                          onClick={() => {
-                            console.log("[HeroSection] Retry stream clicked");
-                            setPlayerError(null);
-                            setIsLoading(true);
-                            if (playerRef.current) {
-                              playerRef.current.load();
-                              playerRef.current.play().catch(() => {});
-                            }
-                          }}
-                          className="bg-[#54037C]/70 hover:bg-purple-800 text-white px-4 py-2 rounded-lg font-semibold"
-                        >
-                          Retry
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Close button */}
                   <button
-                    onClick={handleCloseVideo}
+                    onClick={() => setShowLiveVideo(false)}
                     className="absolute top-4 right-4 bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700 z-20 transition-colors"
                     aria-label="Close live stream"
                   >
