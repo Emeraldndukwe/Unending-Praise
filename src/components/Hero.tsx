@@ -70,6 +70,15 @@ export default function HeroSection() {
           setIsLoading(false);
           // Ensure wrapper fills container
           try { playerRef.current.addClass('vjs-fill'); } catch {}
+          try {
+            const tech = (playerRef.current.el()?.getElementsByClassName('vjs-tech')?.[0] as HTMLVideoElement | undefined);
+            if (tech) {
+              tech.style.width = '100%';
+              tech.style.height = '100%';
+              tech.style.objectFit = 'cover';
+              tech.style.backgroundColor = 'black';
+            }
+          } catch {}
 
           playerRef.current.play().catch((err: Error) => {
             console.error("[HeroSection] Autoplay failed:", err);
@@ -231,8 +240,10 @@ export default function HeroSection() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -12 }}
                   transition={{ duration: 0.35 }}
-                  className="absolute inset-0 rounded-3xl overflow-hidden relative"
+                  className="absolute inset-0 rounded-3xl overflow-hidden relative bg-black"
                 >
+                  {/* Solid black background to avoid white flash */}
+                  <div className="absolute inset-0 bg-black" />
                   <video
                     ref={setVideoRef}
                     className="video-js vjs-default-skin w-full h-full rounded-3xl bg-black"
