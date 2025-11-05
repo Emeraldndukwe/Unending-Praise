@@ -7,6 +7,7 @@ import jwt from 'jsonwebtoken';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { Readable } from 'stream';
 import { Pool } from 'pg';
 // Optional email notifications (nodemailer is optional)
 let nodemailer = null;
@@ -177,6 +178,39 @@ function requireSuperAdmin(req, res, next) {
 // Health
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true });
+});
+
+// HLS reverse proxy to bypass CORS for livestream
+// Proxies everything under /api/hls/* to the origin base path
+const HLS_ORIGIN_BASE = 'https://vcpout-ams01.internetmultimediaonline.org/lmampraise/stream1';
+app.get('/api/hls/*', async (req, res) => {
+  try {
+    const suffix = req.params[0] || '';
+    const targetUrl = `${HLS_ORIGIN_BASE}/${suffix}`;
+    const upstream = await fetch(targetUrl);
+
+    // Pass through content type or infer basic ones
+    const ct = upstream.headers.get('content-type')
+      || (targetUrl.endsWith('.m3u8') ? 'application/vnd.apple.mpegURL' : undefined)
+      || (targetUrl.endsWith('.ts') ? 'video/MP2T' : undefined)
+      || 'application/octet-stream';
+
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Content-Type', ct);
+    // Allow caching short-term to smooth playback (tweak as needed)
+    res.setHeader('Cache-Control', targetUrl.endsWith('.ts') ? 'public, max-age=30' : 'no-cache');
+    res.status(upstream.status);
+
+    if (upstream.body) {
+      // Node 18+: convert Web stream to Node stream
+      Readable.fromWeb(upstream.body).pipe(res);
+    } else {
+      res.end();
+    }
+  } catch (e) {
+    console.error('HLS proxy error', e);
+    res.status(502).json({ error: 'Upstream fetch failed' });
+  }
 });
 
 // Auth: register, login (backed by Postgres)

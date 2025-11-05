@@ -35,7 +35,7 @@ export default function HeroSection() {
       return;
     }
 
-    const src = "https://vcpout-ams01.internetmultimediaonline.org/lmampraise/stream1/playlist.m3u8";
+    const src = "/api/hls/playlist.m3u8";
     const video = videoRef.current;
     if (!video) return;
 
