@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import Hls from "hls.js";
+import videojs from "video.js";
+import "video.js/dist/video-js.css";
 import { motion, AnimatePresence } from "framer-motion";
 import SongList from "./SongList";
 import LiveChat from "./LiveChat";
@@ -11,7 +12,7 @@ export default function HeroSection() {
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<"songs" | "livechat">("songs");
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const hlsRef = useRef<any>(null);
+  const playerRef = useRef<any>(null);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
@@ -20,7 +21,7 @@ export default function HeroSection() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // ✅ HLS Playback Handler
+  // ✅ Video.js Playback Handler
   useEffect(() => {
     const video = videoRef.current;
     const stream = "https://vcpout-ams01.internetmultimediaonline.org/lmampraise/stream1/playlist.m3u8";
@@ -31,59 +32,46 @@ export default function HeroSection() {
         video.removeAttribute("src");
         video.load();
       }
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
+      if (playerRef.current) {
+        try { playerRef.current.dispose(); } catch {}
+        playerRef.current = null;
       }
       return;
     }
 
     if (!video) return () => {};
 
-    // ✅ Native support (Safari / iOS)
-    if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = stream;
-      video.play().catch(() => {});
-      return;
-    }
+    // Initialize Video.js (VHS under the hood handles HLS)
+    const player = videojs(video, {
+      controls: true,
+      autoplay: true,
+      muted: true,
+      preload: 'auto',
+      fluid: true,
+      html5: { vhs: { withCredentials: false } },
+      sources: [{ src: stream, type: 'application/x-mpegURL' }],
+    });
+    playerRef.current = player;
 
-    // ✅ Hls.js fallback for Chrome, Android & desktop browsers
-    if (Hls.isSupported()) {
-      const hls = new Hls({
-        enableWorker: true,
-        lowLatencyMode: true,
-      });
+    player.on('error', () => {
+      const p: any = playerRef.current || player;
+      const err = p && typeof p.error === 'function' ? p.error() : undefined;
+      // eslint-disable-next-line no-console
+      console.error('Video.js error', err);
+    });
+    player.ready(() => {
+      const p: any = playerRef.current || player;
+      if (p && typeof p.play === 'function') {
+        p.play().catch(() => {});
+      }
+    });
 
-      hls.loadSource(stream);
-      hls.attachMedia(video);
-      hlsRef.current = hls;
-
-      hls.on(Hls.Events.ERROR, (_e: any, data: any) => {
-        console.error("HLS Error:", data);
-      });
-
-      return () => {
-        try {
-          hls.destroy();
-        } catch {}
-        if (video) {
-          try {
-            video.pause();
-            video.removeAttribute("src");
-            video.load();
-          } catch {}
-        }
-      };
-    }
-
-    // ✅ Very old browser fallback
-    video.src = stream;
     return () => {
       try {
-        if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; }
+        if (playerRef.current) { playerRef.current.dispose(); playerRef.current = null; }
         if (video) {
           video.pause();
-          video.removeAttribute("src");
+          video.removeAttribute('src');
           video.load();
         }
       } catch {}
@@ -159,9 +147,7 @@ export default function HeroSection() {
                 >
                   <video
                     ref={videoRef}
-                    className="w-full h-full rounded-3xl bg-black"
-                    controls
-                    autoPlay
+                    className="video-js vjs-default-skin vjs-big-play-centered w-full h-full rounded-3xl bg-black"
                     playsInline
                     muted
                   />
