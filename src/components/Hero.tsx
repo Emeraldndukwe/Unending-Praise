@@ -215,7 +215,7 @@ export default function HeroSection() {
                   className="absolute inset-0"
                 >
                   <img
-                    src="/images/hero-bg.jpg"
+                    src="/Unending_Praise-1.jpg"
                     alt="Unending Praise"
                     className="absolute inset-0 w-full h-full object-cover rounded-3xl"
                   />
