@@ -14,81 +14,31 @@ export default function HeroSection() {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"songs" | "livechat">("songs");
 
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const playerRef = useRef<any>(null);
 
-  // Track screen size
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 1024);
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  // Cleanup player on unmount or when hiding video
-  useEffect(() => {
-    return () => {
-      console.log("[HeroSection] Cleaning up player on unmount");
-      if (playerRef.current) {
-        try {
-          playerRef.current.dispose();
-          playerRef.current = null;
-        } catch (err) {
-          console.error("[HeroSection] Error disposing player:", err);
-        }
-      }
-    };
-  }, []);
-
-  // Initialize or dispose player based on showLiveVideo
-  useEffect(() => {
-    console.log("[HeroSection] showLiveVideo changed to:", showLiveVideo);
+  // Callback ref that gets called when video element is mounted/unmounted
+  const setVideoRef = useCallback((element: HTMLVideoElement | null) => {
+    videoRef.current = element;
     
-    if (!showLiveVideo) {
-      // Dispose player when switching away
-      if (playerRef.current) {
-        console.log("[HeroSection] Disposing player");
-        try {
-          playerRef.current.dispose();
-          playerRef.current = null;
-        } catch (err) {
-          console.error("[HeroSection] Error disposing player:", err);
-        }
+    // If element is unmounted, dispose player
+    if (!element && playerRef.current) {
+      console.log("[HeroSection] Video element unmounted, disposing player");
+      try {
+        playerRef.current.dispose();
+        playerRef.current = null;
+      } catch (err) {
+        console.error("[HeroSection] Error disposing player on unmount:", err);
       }
-      setPlayerError(null);
-      setIsLoading(false);
       return;
     }
-
-    // Wait for DOM to settle and video element to be mounted
-    let attempts = 0;
-    const maxAttempts = 20; // Try for up to 2 seconds (20 * 100ms)
-    const timers: ReturnType<typeof setTimeout>[] = [];
     
-    const tryInit = () => {
-      const videoEl = videoRef.current;
-      if (!videoEl) {
-        attempts++;
-        if (attempts < maxAttempts) {
-          const timer = setTimeout(tryInit, 100);
-          timers.push(timer);
-          return;
-        }
-        console.warn("[HeroSection] Video element never became available");
-        setPlayerError("Video element not available. Please try again.");
-        setIsLoading(false);
-        return;
-      }
-
-      if (playerRef.current) {
-        console.warn("[HeroSection] Player already exists");
-        return;
-      }
-
-      console.log("[HeroSection] Initializing Video.js player");
+    // If element is mounted and we want to show video, initialize player
+    if (element && showLiveVideo && !playerRef.current) {
+      console.log("[HeroSection] Video element mounted, initializing player");
       setIsLoading(true);
       setPlayerError(null);
-
+      
       const streamSrc = "https://vcpout-ams01.internetmultimediaonline.org/lmampraise/stream1/playlist.m3u8";
 
       const playerOptions = {
@@ -96,12 +46,12 @@ export default function HeroSection() {
         autoplay: true,
         muted: true,
         preload: "auto" as const,
-        fluid: true, // Let it fill the container responsively
+        fluid: true,
         responsive: true,
         html5: {
           vhs: {
             withCredentials: false,
-            overrideNative: true, // Force Video.js HLS handling
+            overrideNative: true,
           },
         },
         sources: [
@@ -113,17 +63,14 @@ export default function HeroSection() {
       };
 
       try {
-        playerRef.current = videojs(videoEl, playerOptions, () => {
+        playerRef.current = videojs(element, playerOptions, () => {
           console.log("[HeroSection] Video.js player ready");
           setIsLoading(false);
 
-          // Attempt to play
           playerRef.current.play().catch((err: Error) => {
             console.error("[HeroSection] Autoplay failed:", err);
-            // Don't set error for autoplay policy issues; user can click play
           });
 
-          // Event listeners for logging and error handling
           playerRef.current.on("loadstart", () => {
             console.log("[HeroSection] Stream loadstart");
             setIsLoading(true);
@@ -165,15 +112,45 @@ export default function HeroSection() {
         setPlayerError("Failed to initialize video player. Please refresh the page.");
         setIsLoading(false);
       }
-    };
+    }
+  }, [showLiveVideo]);
 
-    // Start trying to initialize after a short delay
-    const timer = setTimeout(tryInit, 200);
-    timers.push(timer);
+  // Track screen size
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 1024);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
+  // Cleanup player on unmount or when hiding video
+  useEffect(() => {
     return () => {
-      timers.forEach(t => clearTimeout(t));
+      console.log("[HeroSection] Cleaning up player on unmount");
+      if (playerRef.current) {
+        try {
+          playerRef.current.dispose();
+          playerRef.current = null;
+        } catch (err) {
+          console.error("[HeroSection] Error disposing player:", err);
+        }
+      }
     };
+  }, []);
+
+  // Dispose player when hiding video
+  useEffect(() => {
+    if (!showLiveVideo && playerRef.current) {
+      console.log("[HeroSection] Disposing player");
+      try {
+        playerRef.current.dispose();
+        playerRef.current = null;
+      } catch (err) {
+        console.error("[HeroSection] Error disposing player:", err);
+      }
+      setPlayerError(null);
+      setIsLoading(false);
+    }
   }, [showLiveVideo]);
 
   const handleCloseVideo = useCallback(() => {
@@ -253,7 +230,7 @@ export default function HeroSection() {
                   className="absolute inset-0 rounded-3xl overflow-hidden relative"
                 >
                   <video
-                    ref={videoRef}
+                    ref={setVideoRef}
                     className="video-js vjs-default-skin w-full h-full rounded-3xl bg-black"
                     playsInline
                     data-setup="{}"
