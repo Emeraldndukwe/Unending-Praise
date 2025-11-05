@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from "react";
+import videojs from "video.js";
+import "video.js/dist/video-js.css";
 import { motion, AnimatePresence } from "framer-motion";
 import SongList from "./SongList";
 import LiveChat from "./LiveChat";
@@ -10,6 +12,7 @@ export default function HeroSection() {
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<"songs" | "livechat">("songs");
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const playerRef = useRef<videojs.Player | null>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [debugLines, setDebugLines] = useState<string[]>([]);
 
@@ -20,7 +23,7 @@ export default function HeroSection() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Initialize HLS playback when the live video is shown
+  // Initialize Video.js HLS playback when the live video is shown
   useEffect(() => {
     if (!showLiveVideo) {
       const video = videoRef.current;
@@ -32,6 +35,10 @@ export default function HeroSection() {
         } catch {}
       }
       setVideoError(null);
+      if (playerRef.current) {
+        try { playerRef.current.dispose(); } catch {}
+        playerRef.current = null;
+      }
       return;
     }
 
@@ -102,68 +109,41 @@ export default function HeroSection() {
       }
     })();
 
-    // Native HLS on Safari/iOS
-    if (video.canPlayType("application/vnd.apple.mpegURL")) {
-      log("native-hls: supported");
-      video.src = src;
-      video.play().catch(() => {
-        setVideoError("Autoplay blocked — press play to start.");
-        log("native-hls: autoplay blocked");
+    // Initialize Video.js (VHS handles HLS across browsers)
+    try {
+      const player = videojs(video, {
+        controls: true,
+        autoplay: true,
+        muted: true,
+        preload: 'auto',
+        fluid: true,
+        html5: {
+          vhs: { withCredentials: false },
+        },
+        sources: [
+          { src, type: 'application/x-mpegURL' },
+        ],
       });
-      return;
+      playerRef.current = player;
+      player.on('error', () => {
+        const e = player.error();
+        log('video.js error', e);
+        setVideoError('Playback error. Please try again.');
+      });
+      player.on('loadedmetadata', () => log('video.js loadedmetadata'));
+      player.ready(() => {
+        player.play().catch(() => {
+          setVideoError('Autoplay blocked — press play to start.');
+          log('video.js: autoplay blocked');
+        });
+      });
+    } catch (e) {
+      log('video.js init failed', String((e as Error)?.message || e));
     }
 
-    let hlsInstance: any;
-    let cancelled = false;
-
-    import("hls.js")
-      .then(({ default: Hls }) => {
-        if (cancelled) return;
-        if (Hls.isSupported()) {
-          log("hls.js: supported");
-          hlsInstance = new Hls({ enableWorker: true });
-          hlsInstance.attachMedia(video);
-          hlsInstance.loadSource(src);
-          const tryPlay = () => {
-            video.play().catch(() => {
-              setVideoError("Autoplay blocked — press play to start.");
-              log("hls.js: autoplay blocked");
-            });
-          };
-          hlsInstance.on(Hls.Events.MANIFEST_PARSED, (_e: any, data: any) => {
-            log("hls.js: manifest parsed", data?.levels?.map((l: any) => l?.height));
-            tryPlay();
-          });
-          hlsInstance.on(Hls.Events.LEVEL_LOADED, (_e: any, data: any) => {
-            log("hls.js: level loaded", { details: data?.details?.fragments?.length });
-            tryPlay();
-          });
-          hlsInstance.on(Hls.Events.ERROR, (_e: any, data: any) => {
-            log("hls.js: error", data);
-            // Surface meaningful network/cors/media errors to the UI
-            if (data?.fatal) {
-              if (data.type === "networkError") {
-                setVideoError("Network/CORS error loading stream.");
-              } else if (data.type === "mediaError") {
-                setVideoError("Media error — stream format not supported.");
-              } else {
-                setVideoError("Fatal error occurred in video playback.");
-              }
-            }
-          });
-        } else {
-          log("hls.js: not supported in this browser");
-        }
-      })
-      .catch(() => {
-        // no-op; fallback already attempted
-        log("hls.js: dynamic import failed");
-      });
-
     return () => {
-      cancelled = true;
       try {
-        if (hlsInstance) hlsInstance.destroy();
+        if (playerRef.current) { playerRef.current.dispose(); playerRef.current = null; }
         videoEventHandlers.forEach(([evt, handler]) => video.removeEventListener(evt, handler));
         if (video) {
           video.pause();
@@ -251,10 +231,7 @@ export default function HeroSection() {
                   )}
                   <video
                     ref={videoRef}
-                    className="w-full h-full rounded-3xl bg-black pointer-events-auto z-10"
-                    controls
-                    autoPlay
-                    muted
+                    className="video-js vjs-default-skin vjs-big-play-centered w-full h-full rounded-3xl bg-black pointer-events-auto z-10"
                     playsInline
                     crossOrigin="anonymous"
                     poster="/images/hero-bg.jpg"
