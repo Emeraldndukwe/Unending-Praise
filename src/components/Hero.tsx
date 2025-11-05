@@ -8,71 +8,67 @@ import LiveChat from "./LiveChat";
 const NAV_HEIGHT = 72;
 
 export default function HeroSection() {
-  const [showLiveVideo, setShowLiveVideo] = useState<boolean>(false);
-  const [isMobile, setIsMobile] = useState<boolean>(false);
+  const [showLiveVideo, setShowLiveVideo] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const [activeTab, setActiveTab] = useState<"songs" | "livechat">("songs");
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<any>(null);
 
+  // ✅ Track screen size
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 1024);
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    const resize = () => setIsMobile(window.innerWidth < 1024);
+    resize();
+    window.addEventListener("resize", resize);
+    return () => window.removeEventListener("resize", resize);
   }, []);
 
-  // ✅ Video.js Playback Handler
+  // ✅ Handle HLS & Video.js setup / cleanup
   useEffect(() => {
     const video = videoRef.current;
-    const stream = "https://vcpout-ams01.internetmultimediaonline.org/lmampraise/stream1/playlist.m3u8";
+    const streamSrc =
+      "https://vcpout-ams01.internetmultimediaonline.org/lmampraise/stream1/playlist.m3u8";
 
     if (!showLiveVideo) {
-      if (video) {
-        video.pause();
-        video.removeAttribute("src");
-        video.load();
-      }
+      // Cleanup when user switches away
       if (playerRef.current) {
-        try { playerRef.current.dispose(); } catch {}
+        try {
+          playerRef.current.dispose();
+        } catch {}
         playerRef.current = null;
       }
       return;
     }
 
-    if (!video) return () => {};
+    if (!video) return;
 
-    // Initialize Video.js (VHS under the hood handles HLS)
-    const player = videojs(video, {
-      controls: true,
-      autoplay: true,
-      muted: true,
-      preload: 'auto',
-      fluid: true,
-      html5: { vhs: { withCredentials: false } },
-      sources: [{ src: stream, type: 'application/x-mpegURL' }],
-    });
-    playerRef.current = player;
+    // Prevent duplicate players
+    if (!playerRef.current) {
+      playerRef.current = videojs(video, {
+        controls: true,
+        autoplay: true,
+        muted: true,
+        preload: "auto",
+        fluid: true,
+        html5: { vhs: { withCredentials: false } },
+        sources: [{ src: streamSrc, type: "application/x-mpegURL" }],
+      });
 
-    player.on('error', () => {
-      const p: any = playerRef.current || player;
-      const err = p && typeof p.error === 'function' ? p.error() : undefined;
-      // eslint-disable-next-line no-console
-      console.error('Video.js error', err);
-    });
-    player.ready(() => {
-      const p: any = playerRef.current || player;
-      if (p && typeof p.play === 'function') {
-        p.play().catch(() => {});
-      }
-    });
+      playerRef.current.on("error", () => {
+        // eslint-disable-next-line no-console
+        console.error("Video.js failed to load stream", playerRef.current?.error());
+      });
+
+      playerRef.current.ready(() => {
+        playerRef.current?.play().catch(() => {});
+      });
+    }
 
     return () => {
       try {
-        if (playerRef.current) { playerRef.current.dispose(); playerRef.current = null; }
-        if (video) {
-          video.pause();
-          video.removeAttribute('src');
-          video.load();
+        if (playerRef.current) {
+          playerRef.current.dispose();
+          playerRef.current = null;
         }
       } catch {}
     };
@@ -83,7 +79,7 @@ export default function HeroSection() {
       <section
         id="home"
         className="relative w-full min-h-[90vh] px-4 md:px-10 pt-27 pb-10 bg-white
-                 flex flex-col lg:flex-row lg:items-start gap-6"
+        flex flex-col lg:flex-row lg:items-start gap-6"
       >
         {/* LEFT SIDE */}
         <div
@@ -130,7 +126,7 @@ export default function HeroSection() {
                       whileHover={{ scale: 1.04 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={() => setShowLiveVideo(true)}
-                      className=" bg-[#54037C]/70 hover:bg-purple-800 text-white px-6 py-3 rounded-xl font-semibold shadow-md"
+                      className="bg-[#54037C]/70 hover:bg-purple-800 text-white px-6 py-3 rounded-xl font-semibold shadow-md"
                     >
                       Watch Live →
                     </motion.button>
@@ -164,7 +160,7 @@ export default function HeroSection() {
           </div>
         </div>
 
-        {/* RIGHT SIDE (TABS + CONTENT) */}
+        {/* RIGHT SIDE */}
         <div className="w-full lg:w-[35%] flex justify-center">
           <div
             className="w-full max-w-sm rounded-xl overflow-hidden bg-white shadow-md flex flex-col"
@@ -174,14 +170,14 @@ export default function HeroSection() {
                 : "34rem",
             }}
           >
-            {/* Centered Tabs */}
-            <div className="flex justify-center gap-3 py-3 ">
+            {/* Tabs */}
+            <div className="flex justify-center gap-3 py-3">
               <div className="px-1 py-1 rounded-full bg-black/5">
                 <button
                   onClick={() => setActiveTab("songs")}
                   className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${
                     activeTab === "songs"
-                      ? " bg-[#54037C]/70 text-white"
+                      ? "bg-[#54037C]/70 text-white"
                       : "text-black/60"
                   }`}
                 >
@@ -192,7 +188,7 @@ export default function HeroSection() {
                   onClick={() => setActiveTab("livechat")}
                   className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${
                     activeTab === "livechat"
-                      ? " bg-[#54037C]/70 text-white"
+                      ? "bg-[#54037C]/70 text-white"
                       : "text-black/60"
                   }`}
                 >
@@ -201,7 +197,7 @@ export default function HeroSection() {
               </div>
             </div>
 
-            {/* Scrollable Content */}
+            {/* Content */}
             <div className="flex-1 overflow-y-auto px-4 pb-4">
               {activeTab === "songs" ? <SongList /> : <LiveChat />}
             </div>
@@ -209,7 +205,6 @@ export default function HeroSection() {
         </div>
       </section>
 
-      {/* Divider Animation */}
       <motion.div
         className="h-[2px] bg-black/30 rounded-full w-[88%] mx-auto mt-6"
         initial={{ scaleX: 0 }}
