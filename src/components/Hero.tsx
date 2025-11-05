@@ -10,6 +10,7 @@ export default function HeroSection() {
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<"songs" | "livechat">("songs");
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [videoError, setVideoError] = useState<string | null>(null);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
@@ -29,6 +30,7 @@ export default function HeroSection() {
           video.load();
         } catch {}
       }
+      setVideoError(null);
       return;
     }
 
@@ -39,7 +41,9 @@ export default function HeroSection() {
     // Native HLS on Safari/iOS
     if (video.canPlayType("application/vnd.apple.mpegURL")) {
       video.src = src;
-      video.play().catch(() => {});
+      video.play().catch(() => {
+        setVideoError("Autoplay blocked — press play to start.");
+      });
       return;
     }
 
@@ -51,13 +55,27 @@ export default function HeroSection() {
         if (cancelled) return;
         if (Hls.isSupported()) {
           hlsInstance = new Hls({ enableWorker: true });
-          hlsInstance.loadSource(src);
           hlsInstance.attachMedia(video);
+          hlsInstance.loadSource(src);
           const tryPlay = () => {
-            video.play().catch(() => {});
+            video.play().catch(() => {
+              setVideoError("Autoplay blocked — press play to start.");
+            });
           };
           hlsInstance.on(Hls.Events.MANIFEST_PARSED, tryPlay);
           hlsInstance.on(Hls.Events.LEVEL_LOADED, tryPlay);
+          hlsInstance.on(Hls.Events.ERROR, (_e: any, data: any) => {
+            // Surface meaningful network/cors/media errors to the UI
+            if (data?.fatal) {
+              if (data.type === "networkError") {
+                setVideoError("Network/CORS error loading stream.");
+              } else if (data.type === "mediaError") {
+                setVideoError("Media error — stream format not supported.");
+              } else {
+                setVideoError("Fatal error occurred in video playback.");
+              }
+            }
+          });
         }
       })
       .catch(() => {
@@ -151,8 +169,22 @@ export default function HeroSection() {
                     autoPlay
                     muted
                     playsInline
+                    crossOrigin="anonymous"
                     poster="/images/hero-bg.jpg"
                   />
+                  {videoError && (
+                    <div className="absolute inset-x-0 bottom-0 m-4 p-3 rounded-lg bg-black/70 text-white text-sm">
+                      <p>{videoError}</p>
+                      <a
+                        href="https://vcpout-ams01.internetmultimediaonline.org/lmampraise/stream1/playlist.m3u8"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline"
+                      >
+                        Open stream in new tab
+                      </a>
+                    </div>
+                  )}
                   <button
                     onClick={() => setShowLiveVideo(false)}
                     className="absolute top-4 right-4 bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700"
