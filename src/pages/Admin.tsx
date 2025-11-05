@@ -265,11 +265,7 @@ export default function AdminPage() {
             <button className="w-full px-4 py-3 bg-[#54037C] hover:bg-[#54037C]/90 text-white font-semibold rounded-xl transition shadow-md">
               {mode === "login" ? "Login" : "Register"}
             </button>
-            {mode === "login" && (
-              <p className="text-xs text-center text-gray-500 mt-4">
-                Default: admin@unendingpraise.com / admin123
-              </p>
-            )}
+            {/* Removed default admin credentials hint */}
           </form>
         </div>
       </div>

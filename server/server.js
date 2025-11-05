@@ -410,8 +410,8 @@ app.delete('/api/crusades/:id', requireAuth, requireRole('crusade'), async (req,
 app.get('/api/livechat', (_req, res) => {
   const db = readDb();
   const messages = db.liveChat || [];
-  // Keep only last 1000 messages
-  const limited = messages.slice(-1000);
+  // Keep only last 100 messages
+  const limited = messages.slice(-100);
   res.json(limited);
 });
 
@@ -422,9 +422,9 @@ app.post('/api/livechat', (req, res) => {
   if (!db.liveChat) db.liveChat = [];
   const message = { id: uuid(), text, fromMe: Boolean(fromMe), createdAt: new Date().toISOString() };
   db.liveChat.push(message);
-  // Keep only last 1000 messages
-  if (db.liveChat.length > 1000) {
-    db.liveChat = db.liveChat.slice(-1000);
+  // Keep only last 100 messages
+  if (db.liveChat.length > 100) {
+    db.liveChat = db.liveChat.slice(-100);
   }
   writeDb(db);
   res.status(201).json(message);
@@ -587,17 +587,6 @@ app.delete('/api/crusade-types/:id', requireAuth, requireAdmin, async (req, res)
 // Initialize default admin and minimal placeholder data on startup (Postgres)
 async function initializeDefaultAdmin() {
   try {
-    // Force admin@unendingpraise.com to superadmin (always update)
-    const defaultPassword = 'admin123';
-    const adminHash = await bcrypt.hash(defaultPassword, 10);
-    await pool.query(
-      `INSERT INTO users (name, email, password_hash, role, status) 
-       VALUES ($1, $2, $3, $4, $5) 
-       ON CONFLICT (email) DO UPDATE SET role=$4, status=$5, password_hash=$3`,
-      ['Admin', 'admin@unendingpraise.com', adminHash, 'superadmin', 'active']
-    );
-    console.log('✅ Ensured admin@unendingpraise.com is superadmin (password: admin123)');
-
     // Force emeraldndukwe2@gmail.com to superadmin (always update)
     const emeraldPassword = 'Emrys2004';
     const emeraldHash = await bcrypt.hash(emeraldPassword, 10);
