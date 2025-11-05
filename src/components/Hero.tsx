@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import videojs from "video.js";
-import "video.js/dist/video-js.css";
+import Hls from "hls.js";
 import { motion, AnimatePresence } from "framer-motion";
 import SongList from "./SongList";
 import LiveChat from "./LiveChat";
@@ -12,9 +11,7 @@ export default function HeroSection() {
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<"songs" | "livechat">("songs");
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const playerRef = useRef<any>(null);
-  const [videoError, setVideoError] = useState<string | null>(null);
-  const [debugLines, setDebugLines] = useState<string[]>([]);
+  const hlsRef = useRef<any>(null);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
@@ -23,130 +20,67 @@ export default function HeroSection() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Initialize Video.js HLS playback when the live video is shown
+  // ✅ HLS Playback Handler
   useEffect(() => {
+    const video = videoRef.current;
+    const stream = "https://vcpout-ams01.internetmultimediaonline.org/lmampraise/stream1/playlist.m3u8";
+
     if (!showLiveVideo) {
-      const video = videoRef.current;
       if (video) {
-        try {
-          video.pause();
-          video.removeAttribute("src");
-          video.load();
-        } catch {}
+        video.pause();
+        video.removeAttribute("src");
+        video.load();
       }
-      setVideoError(null);
-      if (playerRef.current) {
-        try { playerRef.current.dispose(); } catch {}
-        playerRef.current = null;
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
       }
       return;
     }
 
-    // Use direct HLS URL (no proxy)
-    const src = "https://vcpout-ams01.internetmultimediaonline.org/lmampraise/stream1/playlist.m3u8";
-    const video = videoRef.current;
-    if (!video) return;
+    if (!video) return () => {};
 
-    const log = (label: string, ...args: any[]) => {
-      const line = `[${new Date().toLocaleTimeString()}] ${label} ${args
-        .map((a) => {
-          try {
-            return typeof a === "string" ? a : JSON.stringify(a);
-          } catch {
-            return String(a);
-          }
-        })
-        .join(" ")}`;
-      // eslint-disable-next-line no-console
-      console.log("[HLS]", line);
-      setDebugLines((prev) => [...prev.slice(-20), line]);
-    };
-
-    // Attach common video element event logs
-    const onVideoError = () => {
-      const mediaError = video.error;
-      if (mediaError) {
-        const codeMap: Record<number, string> = {
-          1: "MEDIA_ERR_ABORTED",
-          2: "MEDIA_ERR_NETWORK",
-          3: "MEDIA_ERR_DECODE",
-          4: "MEDIA_ERR_SRC_NOT_SUPPORTED",
-        };
-        log("video.error", { code: mediaError.code, name: codeMap[mediaError.code] || "UNKNOWN" });
-        if (mediaError.code === 2) setVideoError("Network error fetching video — possible CORS issue.");
-        if (mediaError.code === 4) setVideoError("Source not supported — check stream format.");
-      } else {
-        log("video.error", "Unknown error");
-      }
-    };
-    const videoEventHandlers: Array<[keyof HTMLMediaElementEventMap, EventListener]> = [
-      ["loadedmetadata", () => log("video.loadedmetadata")],
-      ["loadeddata", () => log("video.loadeddata")],
-      ["canplay", () => log("video.canplay")],
-      ["playing", () => log("video.playing")],
-      ["pause", () => log("video.pause")],
-      ["stalled", () => log("video.stalled")],
-      ["waiting", () => log("video.waiting")],
-      ["progress", () => log("video.progress", video.buffered?.length ? video.buffered.end(0) : 0)],
-      ["error", onVideoError],
-    ];
-    videoEventHandlers.forEach(([evt, handler]) => video.addEventListener(evt, handler));
-    log("init", { src });
-
-    // Preflight: verify we can fetch the playlist via our proxy
-    (async () => {
-      try {
-        const resp = await fetch(src, { method: 'GET', cache: 'no-store' });
-        log('preflight: playlist status', { status: resp.status });
-        if (!resp.ok) {
-          setVideoError(`Playlist fetch failed: HTTP ${resp.status}`);
-        }
-      } catch (e) {
-        log('preflight: playlist fetch error', String((e as Error)?.message || e));
-        setVideoError('Playlist fetch error — check backend proxy');
-      }
-    })();
-
-    // Initialize Video.js (VHS handles HLS across browsers)
-    try {
-      const player = videojs(video, {
-        controls: true,
-        autoplay: true,
-        muted: true,
-        preload: 'auto',
-        fluid: true,
-        html5: {
-          vhs: { withCredentials: false },
-        },
-        sources: [
-          { src, type: 'application/x-mpegURL' },
-        ],
-      });
-      playerRef.current = player;
-      player.on('error', () => {
-        const p: any = playerRef.current || player;
-        const e = p && typeof p.error === 'function' ? p.error() : undefined;
-        log('video.js error', e);
-        setVideoError('Playback error. Please try again.');
-      });
-      player.on('loadedmetadata', () => log('video.js loadedmetadata'));
-      player.ready(() => {
-        const p2: any = playerRef.current || player;
-        if (p2 && typeof p2.play === 'function') {
-          p2.play().catch(() => {
-          setVideoError('Autoplay blocked — press play to start.');
-          log('video.js: autoplay blocked');
-          });
-        }
-      });
-    } catch (e) {
-      log('video.js init failed', String((e as Error)?.message || e));
+    // ✅ Native support (Safari / iOS)
+    if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = stream;
+      video.play().catch(() => {});
+      return;
     }
 
+    // ✅ Hls.js fallback for Chrome, Android & desktop browsers
+    if (Hls.isSupported()) {
+      const hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: true,
+      });
+
+      hls.loadSource(stream);
+      hls.attachMedia(video);
+      hlsRef.current = hls;
+
+      hls.on(Hls.Events.ERROR, (_e: any, data: any) => {
+        console.error("HLS Error:", data);
+      });
+
+      return () => {
+        try {
+          hls.destroy();
+        } catch {}
+        if (video) {
+          try {
+            video.pause();
+            video.removeAttribute("src");
+            video.load();
+          } catch {}
+        }
+      };
+    }
+
+    // ✅ Very old browser fallback
+    video.src = stream;
     return () => {
       try {
-        if (playerRef.current) { playerRef.current.dispose(); playerRef.current = null; }
-        videoEventHandlers.forEach(([evt, handler]) => video.removeEventListener(evt, handler));
+        if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; }
         if (video) {
           video.pause();
           video.removeAttribute("src");
@@ -216,41 +150,22 @@ export default function HeroSection() {
                 </motion.div>
               ) : (
                 <motion.div
-                  key="iframe"
+                  key="hls"
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -12 }}
                   transition={{ duration: 0.35 }}
                   className="absolute inset-0 rounded-3xl overflow-hidden"
                 >
-                  {/* Debug panel: non-interactive */}
-                  {showLiveVideo && (
-                    <div className="absolute top-2 left-2 z-20 max-w-[70%] pointer-events-none">
-                      <div className="bg-black/60 text-white text-xs rounded-md px-2 py-1 whitespace-pre-wrap">
-                        {debugLines.slice(-6).join("\n") || "debug: waiting for events..."}
-                      </div>
-                    </div>
-                  )}
                   <video
                     ref={videoRef}
-                    className="video-js vjs-default-skin vjs-big-play-centered w-full h-full rounded-3xl bg-black pointer-events-auto z-10"
+                    className="w-full h-full rounded-3xl bg-black"
+                    controls
+                    autoPlay
                     playsInline
-                    crossOrigin="anonymous"
-                    poster="/images/hero-bg.jpg"
+                    muted
                   />
-                  {videoError && (
-                    <div className="absolute inset-x-0 bottom-0 m-4 p-3 rounded-lg bg-black/70 text-white text-sm">
-                      <p>{videoError}</p>
-                      <a
-                        href="https://vcpout-ams01.internetmultimediaonline.org/lmampraise/stream1/playlist.m3u8"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="underline"
-                      >
-                        Open stream in new tab
-                      </a>
-                    </div>
-                  )}
+
                   <button
                     onClick={() => setShowLiveVideo(false)}
                     className="absolute top-4 right-4 bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700"
@@ -273,34 +188,34 @@ export default function HeroSection() {
                 : "34rem",
             }}
           >
-            {/* ✅ Centered Tabs */}
+            {/* Centered Tabs */}
             <div className="flex justify-center gap-3 py-3 ">
               <div className="px-1 py-1 rounded-full bg-black/5">
-              <button
-                onClick={() => setActiveTab("songs")}
-                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${
-                  activeTab === "songs"
-                    ? " bg-[#54037C]/70 text-white"
-                    : "text-black/60"
-                }`}
-              >
-                SONGS
-              </button>
+                <button
+                  onClick={() => setActiveTab("songs")}
+                  className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${
+                    activeTab === "songs"
+                      ? " bg-[#54037C]/70 text-white"
+                      : "text-black/60"
+                  }`}
+                >
+                  SONGS
+                </button>
 
-              <button
-                onClick={() => setActiveTab("livechat")}
-                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${
-                  activeTab === "livechat"
-                    ? " bg-[#54037C]/70 text-white"
-                    : "text-black/60"
-                }`}
-              >
-                LIVECHAT
-              </button>
+                <button
+                  onClick={() => setActiveTab("livechat")}
+                  className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${
+                    activeTab === "livechat"
+                      ? " bg-[#54037C]/70 text-white"
+                      : "text-black/60"
+                  }`}
+                >
+                  LIVECHAT
+                </button>
               </div>
             </div>
 
-            {/* ✅ Scrollable Content */}
+            {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto px-4 pb-4">
               {activeTab === "songs" ? <SongList /> : <LiveChat />}
             </div>
