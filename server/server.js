@@ -91,6 +91,45 @@ async function ensureSchema() {
         videos JSONB DEFAULT '[]'::jsonb,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+
+      -- Messages (persistent)
+      CREATE TABLE IF NOT EXISTS messages (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        name TEXT,
+        email TEXT,
+        phone TEXT,
+        subject TEXT,
+        message TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+
+      -- Songs (persistent)
+      CREATE TABLE IF NOT EXISTS songs (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        title TEXT,
+        artist TEXT,
+        lyrics TEXT,
+        date TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+
+      -- Live chat (persistent, capped on read to last 100)
+      CREATE TABLE IF NOT EXISTS livechat (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        text TEXT NOT NULL,
+        from_me BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+
+      -- Comments (persistent)
+      CREATE TABLE IF NOT EXISTS comments (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        entity_type TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        comment TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
     `);
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';`);
     await client.query('COMMIT');
@@ -314,9 +353,42 @@ function makeListRoute(key, roleForWrite) {
   });
 }
 
-// Entities: messages, songs (testimonies and crusades handled separately)
-makeListRoute('messages', 'messages');
-makeListRoute('songs', 'songs');
+// Entities: messages, songs now backed by Postgres
+app.get('/api/messages', async (_req, res) => {
+  try {
+    const result = await pool.query('SELECT id, name, email, phone, subject, message, created_at FROM messages ORDER BY created_at DESC');
+    res.json(result.rows.map(r => ({ id: r.id, name: r.name, email: r.email, phone: r.phone, subject: r.subject, message: r.message, createdAt: r.created_at })));
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
+});
+app.post('/api/messages', async (req, res) => {
+  const { name, email, phone, subject, message } = req.body || {};
+  try {
+    const result = await pool.query(
+      'INSERT INTO messages (name, email, phone, subject, message) VALUES ($1,$2,$3,$4,$5) RETURNING id, name, email, phone, subject, message, created_at',
+      [name || null, email || null, phone || null, subject || null, message || null]
+    );
+    const r = result.rows[0];
+    res.status(201).json({ id: r.id, name: r.name, email: r.email, phone: r.phone, subject: r.subject, message: r.message, createdAt: r.created_at });
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
+});
+
+app.get('/api/songs', async (_req, res) => {
+  try {
+    const result = await pool.query('SELECT id, title, artist, lyrics, date, created_at FROM songs ORDER BY created_at DESC');
+    res.json(result.rows.map(r => ({ id: r.id, title: r.title, artist: r.artist, lyrics: r.lyrics, date: r.date, createdAt: r.created_at })));
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
+});
+app.post('/api/songs', async (req, res) => {
+  const { title, artist, lyrics, date } = req.body || {};
+  try {
+    const result = await pool.query(
+      'INSERT INTO songs (title, artist, lyrics, date) VALUES ($1,$2,$3,$4) RETURNING id, title, artist, lyrics, date, created_at',
+      [title || null, artist || null, lyrics || null, date || null]
+    );
+    const r = result.rows[0];
+    res.status(201).json({ id: r.id, title: r.title, artist: r.artist, lyrics: r.lyrics, date: r.date, createdAt: r.created_at });
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
+});
 
 // Testimonies routes (Postgres)
 app.get('/api/testimonies', async (_req, res) => {
@@ -408,63 +480,51 @@ app.delete('/api/crusades/:id', requireAuth, requireRole('crusade'), async (req,
 });
 
 // LiveChat API with 1000 message limit
-app.get('/api/livechat', (_req, res) => {
-  const db = readDb();
-  const messages = db.liveChat || [];
-  // Keep only last 100 messages
-  const limited = messages.slice(-100);
-  res.json(limited);
+app.get('/api/livechat', async (_req, res) => {
+  try {
+    const result = await pool.query('SELECT id, text, from_me, created_at FROM livechat ORDER BY created_at DESC LIMIT 100');
+    const rows = result.rows.reverse().map(r => ({ id: r.id, text: r.text, fromMe: r.from_me, createdAt: r.created_at }));
+    res.json(rows);
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
 });
 
-app.post('/api/livechat', (req, res) => {
+app.post('/api/livechat', async (req, res) => {
   const { text, fromMe } = req.body || {};
   if (!text) return res.status(400).json({ error: 'Missing text' });
-  const db = readDb();
-  if (!db.liveChat) db.liveChat = [];
-  const message = { id: uuid(), text, fromMe: Boolean(fromMe), createdAt: new Date().toISOString() };
-  db.liveChat.push(message);
-  // Keep only last 100 messages
-  if (db.liveChat.length > 100) {
-    db.liveChat = db.liveChat.slice(-100);
-  }
-  writeDb(db);
-  res.status(201).json(message);
+  try {
+    const result = await pool.query('INSERT INTO livechat (text, from_me) VALUES ($1,$2) RETURNING id, text, from_me, created_at', [text, Boolean(fromMe)]);
+    const r = result.rows[0];
+    res.status(201).json({ id: r.id, text: r.text, fromMe: r.from_me, createdAt: r.created_at });
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
 });
 
 // Comments API
-app.get('/api/comments/:entityType/:entityId', (req, res) => {
+app.get('/api/comments/:entityType/:entityId', async (req, res) => {
   const { entityType, entityId } = req.params;
-  const db = readDb();
-  if (!db.comments) db.comments = {};
-  const key = `${entityType}_${entityId}`;
-  res.json(db.comments[key] || []);
+  try {
+    const result = await pool.query('SELECT id, name, comment, created_at FROM comments WHERE entity_type=$1 AND entity_id=$2 ORDER BY created_at ASC', [entityType, entityId]);
+    res.json(result.rows.map(r => ({ id: r.id, name: r.name, comment: r.comment, createdAt: r.created_at })));
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
 });
 
-app.post('/api/comments/:entityType/:entityId', (req, res) => {
+app.post('/api/comments/:entityType/:entityId', async (req, res) => {
   const { entityType, entityId } = req.params;
   const { name, comment } = req.body || {};
   if (!name || !comment) return res.status(400).json({ error: 'Missing fields' });
-  const db = readDb();
-  if (!db.comments) db.comments = {};
-  const key = `${entityType}_${entityId}`;
-  if (!db.comments[key]) db.comments[key] = [];
-  const newComment = { id: uuid(), name, comment, createdAt: new Date().toISOString() };
-  db.comments[key].push(newComment);
-  writeDb(db);
-  res.status(201).json(newComment);
+  try {
+    const result = await pool.query('INSERT INTO comments (entity_type, entity_id, name, comment) VALUES ($1,$2,$3,$4) RETURNING id, name, comment, created_at', [entityType, entityId, name, comment]);
+    const r = result.rows[0];
+    res.status(201).json({ id: r.id, name: r.name, comment: r.comment, createdAt: r.created_at });
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
 });
 
-app.delete('/api/comments/:entityType/:entityId/:commentId', requireAuth, requireRole('testimony','crusade'), (req, res) => {
-  const { entityType, entityId, commentId } = req.params;
-  const db = readDb();
-  if (!db.comments) db.comments = {};
-  const key = `${entityType}_${entityId}`;
-  if (!db.comments[key]) return res.status(404).json({ error: 'Not found' });
-  const before = db.comments[key].length;
-  db.comments[key] = db.comments[key].filter(c => c.id !== commentId);
-  if (db.comments[key].length === before) return res.status(404).json({ error: 'Not found' });
-  writeDb(db);
-  res.status(204).end();
+app.delete('/api/comments/:entityType/:entityId/:commentId', requireAuth, requireRole('testimony','crusade'), async (req, res) => {
+  const { commentId } = req.params;
+  try {
+    const result = await pool.query('DELETE FROM comments WHERE id=$1', [commentId]);
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    res.status(204).end();
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
 });
 
 // Approve endpoint for testimonies (admin)
@@ -617,28 +677,29 @@ try {
 if (WebSocketServer) {
   const wss = new WebSocketServer({ server, path: '/ws/livechat' });
   wss.on('connection', (ws) => {
-    try {
-      const db = readDb();
-      const recent = (db.liveChat || []).slice(-100);
-      ws.send(JSON.stringify({ type: 'init', messages: recent }));
-    } catch {}
+    (async () => {
+      try {
+        const result = await pool.query('SELECT id, text, from_me, created_at FROM livechat ORDER BY created_at DESC LIMIT 100');
+        const recent = result.rows.reverse().map(r => ({ id: r.id, text: r.text, fromMe: r.from_me, createdAt: r.created_at }));
+        ws.send(JSON.stringify({ type: 'init', messages: recent }));
+      } catch {}
+    })();
 
     ws.on('message', (data) => {
-      try {
-        const parsed = JSON.parse(data.toString());
-        if (parsed && typeof parsed.text === 'string' && parsed.text.trim()) {
-          const db = readDb();
-          if (!db.liveChat) db.liveChat = [];
-          const message = { id: uuid(), text: parsed.text.trim(), fromMe: !!parsed.fromMe, createdAt: new Date().toISOString() };
-          db.liveChat.push(message);
-          if (db.liveChat.length > 100) db.liveChat = db.liveChat.slice(-100);
-          writeDb(db);
-          const payload = JSON.stringify({ type: 'new_message', message });
-          wss.clients.forEach((client) => {
-            try { client.readyState === 1 && client.send(payload); } catch {}
-          });
-        }
-      } catch {}
+      (async () => {
+        try {
+          const parsed = JSON.parse(data.toString());
+          if (parsed && typeof parsed.text === 'string' && parsed.text.trim()) {
+            const ins = await pool.query('INSERT INTO livechat (text, from_me) VALUES ($1,$2) RETURNING id, text, from_me, created_at', [parsed.text.trim(), !!parsed.fromMe]);
+            const r = ins.rows[0];
+            const message = { id: r.id, text: r.text, fromMe: r.from_me, createdAt: r.created_at };
+            const payload = JSON.stringify({ type: 'new_message', message });
+            wss.clients.forEach((client) => {
+              try { client.readyState === 1 && client.send(payload); } catch {}
+            });
+          }
+        } catch {}
+      })();
     });
   });
 }
