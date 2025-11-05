@@ -6,11 +6,10 @@ import LiveChat from "./LiveChat";
 const NAV_HEIGHT = 72;
 
 export default function HeroSection() {
-  const [showLiveVideo, setShowLiveVideo] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const [showLiveVideo, setShowLiveVideo] = useState<boolean>(false);
+  const [isMobile, setIsMobile] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<"songs" | "livechat">("songs");
 
-  // Track screen size
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
     handleResize();
@@ -22,7 +21,8 @@ export default function HeroSection() {
     <>
       <section
         id="home"
-        className="relative w-full min-h-[90vh] px-4 md:px-10 pt-27 pb-10 bg-white flex flex-col lg:flex-row lg:items-start gap-6"
+        className="relative w-full min-h-[90vh] px-4 md:px-10 pt-27 pb-10 bg-white
+                 flex flex-col lg:flex-row lg:items-start gap-6"
       >
         {/* LEFT SIDE */}
         <div
@@ -69,7 +69,7 @@ export default function HeroSection() {
                       whileHover={{ scale: 1.04 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={() => setShowLiveVideo(true)}
-                      className="bg-[#54037C]/70 hover:bg-purple-800 text-white px-6 py-3 rounded-xl font-semibold shadow-md"
+                      className=" bg-[#54037C]/70 hover:bg-purple-800 text-white px-6 py-3 rounded-xl font-semibold shadow-md"
                     >
                       Watch Live →
                     </motion.button>
@@ -77,26 +77,22 @@ export default function HeroSection() {
                 </motion.div>
               ) : (
                 <motion.div
-                  key="youtube"
+                  key="iframe"
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -12 }}
                   transition={{ duration: 0.35 }}
-                  className="absolute inset-0 rounded-3xl overflow-hidden relative bg-black"
+                  className="absolute inset-0 rounded-3xl overflow-hidden"
                 >
                   <iframe
-                    src="https://www.youtube.com/embed/live_stream?autoplay=1&mute=1"
-                    className="absolute inset-0 w-full h-full rounded-3xl"
-                    allow="autoplay; encrypted-media"
+                    src="https://www.youtube.com/embed/YOUR_VIDEO_ID"
+                    title="Live stream"
+                    className="w-full h-full rounded-3xl"
                     allowFullScreen
-                    frameBorder="0"
-                    style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }}
                   />
-
                   <button
                     onClick={() => setShowLiveVideo(false)}
-                    className="absolute top-4 right-4 bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700 z-20 transition-colors"
-                    aria-label="Close live stream"
+                    className="absolute top-4 right-4 bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700"
                   >
                     Close
                   </button>
@@ -106,7 +102,7 @@ export default function HeroSection() {
           </div>
         </div>
 
-        {/* RIGHT SIDE */}
+        {/* RIGHT SIDE (TABS + CONTENT) */}
         <div className="w-full lg:w-[35%] flex justify-center">
           <div
             className="w-full max-w-sm rounded-xl overflow-hidden bg-white shadow-md flex flex-col"
@@ -116,34 +112,34 @@ export default function HeroSection() {
                 : "34rem",
             }}
           >
-            {/* Tabs */}
-            <div className="flex justify-center gap-3 py-3">
+            {/* ✅ Centered Tabs */}
+            <div className="flex justify-center gap-3 py-3 ">
               <div className="px-1 py-1 rounded-full bg-black/5">
-                <button
-                  onClick={() => setActiveTab("songs")}
-                  className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${
-                    activeTab === "songs"
-                      ? "bg-[#54037C]/70 text-white"
-                      : "text-black/60"
-                  }`}
-                >
-                  SONGS
-                </button>
+              <button
+                onClick={() => setActiveTab("songs")}
+                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${
+                  activeTab === "songs"
+                    ? " bg-[#54037C]/70 text-white"
+                    : "text-black/60"
+                }`}
+              >
+                SONGS
+              </button>
 
-                <button
-                  onClick={() => setActiveTab("livechat")}
-                  className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${
-                    activeTab === "livechat"
-                      ? "bg-[#54037C]/70 text-white"
-                      : "text-black/60"
-                  }`}
-                >
-                  LIVECHAT
-                </button>
+              <button
+                onClick={() => setActiveTab("livechat")}
+                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${
+                  activeTab === "livechat"
+                    ? " bg-[#54037C]/70 text-white"
+                    : "text-black/60"
+                }`}
+              >
+                LIVECHAT
+              </button>
               </div>
             </div>
 
-            {/* Content */}
+            {/* ✅ Scrollable Content */}
             <div className="flex-1 overflow-y-auto px-4 pb-4">
               {activeTab === "songs" ? <SongList /> : <LiveChat />}
             </div>
@@ -151,6 +147,7 @@ export default function HeroSection() {
         </div>
       </section>
 
+      {/* Divider Animation */}
       <motion.div
         className="h-[2px] bg-black/30 rounded-full w-[88%] mx-auto mt-6"
         initial={{ scaleX: 0 }}
