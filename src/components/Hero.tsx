@@ -11,6 +11,7 @@ export default function HeroSection() {
   const [showLiveVideo, setShowLiveVideo] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [activeTab, setActiveTab] = useState<"songs" | "livechat">("songs");
+  const [debugLines, setDebugLines] = useState<string[]>([]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<any>(null);
@@ -22,6 +23,15 @@ export default function HeroSection() {
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
   }, []);
+
+  const log = (label: string, data?: any) => {
+    const line = `[${new Date().toLocaleTimeString()}] ${label} ${
+      data !== undefined ? (typeof data === "string" ? data : JSON.stringify(data)) : ""
+    }`;
+    // eslint-disable-next-line no-console
+    console.log("[LIVE]", line);
+    setDebugLines((prev) => [...prev.slice(-10), line]);
+  };
 
   // ✅ Handle HLS & Video.js setup / cleanup
   useEffect(() => {
@@ -49,20 +59,24 @@ export default function HeroSection() {
         autoplay: true,
         muted: true,
         preload: "auto",
-        fluid: false,
-        width: "100%",
-        height: "100%",
+        fill: true,
         html5: { vhs: { withCredentials: false } },
         sources: [{ src: streamSrc, type: "application/x-mpegURL" }],
       });
 
-      playerRef.current.on("error", () => {
-        // eslint-disable-next-line no-console
-        console.error("Video.js failed to load stream", playerRef.current?.error());
-      });
+      const p = playerRef.current;
+      p.on("loadstart", () => log("loadstart"));
+      p.on("loadedmetadata", () => log("loadedmetadata"));
+      p.on("loadeddata", () => log("loadeddata"));
+      p.on("canplay", () => log("canplay"));
+      p.on("playing", () => log("playing"));
+      p.on("waiting", () => log("waiting"));
+      p.on("stalled", () => log("stalled"));
+      p.on("error", () => log("error", p.error?.()));
 
-      playerRef.current.ready(() => {
-        playerRef.current?.play().catch(() => {});
+      p.ready(() => {
+        log("player.ready");
+        p.play().catch(() => log("autoplay blocked"));
       });
     }, 100);
 
