@@ -11,6 +11,7 @@ export default function HeroSection() {
   const [activeTab, setActiveTab] = useState<"songs" | "livechat">("songs");
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
+  const [debugLines, setDebugLines] = useState<string[]>([]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
@@ -39,8 +40,18 @@ export default function HeroSection() {
     if (!video) return;
 
     const log = (label: string, ...args: any[]) => {
+      const line = `[${new Date().toLocaleTimeString()}] ${label} ${args
+        .map((a) => {
+          try {
+            return typeof a === "string" ? a : JSON.stringify(a);
+          } catch {
+            return String(a);
+          }
+        })
+        .join(" ")}`;
       // eslint-disable-next-line no-console
-      console.log(`[HLS] ${label}`, ...args);
+      console.log("[HLS]", line);
+      setDebugLines((prev) => [...prev.slice(-20), line]);
     };
 
     // Attach common video element event logs
@@ -213,9 +224,17 @@ export default function HeroSection() {
                   transition={{ duration: 0.35 }}
                   className="absolute inset-0 rounded-3xl overflow-hidden"
                 >
+                  {/* Debug panel: non-interactive */}
+                  {showLiveVideo && (
+                    <div className="absolute top-2 left-2 z-20 max-w-[70%] pointer-events-none">
+                      <div className="bg-black/60 text-white text-xs rounded-md px-2 py-1 whitespace-pre-wrap">
+                        {debugLines.slice(-6).join("\n") || "debug: waiting for events..."}
+                      </div>
+                    </div>
+                  )}
                   <video
                     ref={videoRef}
-                    className="w-full h-full rounded-3xl bg-black"
+                    className="w-full h-full rounded-3xl bg-black pointer-events-auto z-10"
                     controls
                     autoPlay
                     muted
