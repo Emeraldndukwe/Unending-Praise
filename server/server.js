@@ -236,7 +236,14 @@ app.get('/api/hls/*', async (req, res) => {
     const suffix = req.params[0] || '';
     const targetUrl = `${HLS_ORIGIN_BASE}/${suffix}`;
     console.log(`[HLS PROXY] ${req.method} ${req.originalUrl} -> ${targetUrl}`);
-    const upstream = await fetch(targetUrl);
+    // Forward minimal useful headers (some origins require Range/UA/Referer)
+    const fwdHeaders = new Headers();
+    const range = req.headers['range'];
+    if (typeof range === 'string') fwdHeaders.set('Range', range);
+    fwdHeaders.set('User-Agent', req.headers['user-agent'] || 'Mozilla/5.0 (compatible; UnendingPraise/1.0)');
+    if (req.headers['referer']) fwdHeaders.set('Referer', String(req.headers['referer']));
+    if (req.headers['origin']) fwdHeaders.set('Origin', String(req.headers['origin']));
+    const upstream = await fetch(targetUrl, { headers: fwdHeaders, cache: 'no-store' });
 
     // Pass through content type or infer basic ones
     const ct = upstream.headers.get('content-type')
@@ -249,6 +256,9 @@ app.get('/api/hls/*', async (req, res) => {
     // Allow caching short-term to smooth playback (tweak as needed)
     res.setHeader('Cache-Control', targetUrl.endsWith('.ts') ? 'public, max-age=30' : 'no-cache');
     res.status(upstream.status);
+    // Keep stream alive for long-lived transfers
+    try { req.socket.setTimeout(0); res.setTimeout(0); } catch {}
+    try { if (typeof res.flushHeaders === 'function') res.flushHeaders(); } catch {}
 
     if (upstream.body) {
       // Node 18+: convert Web stream to Node stream
