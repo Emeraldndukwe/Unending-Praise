@@ -46,8 +46,10 @@ export default function HeroSection() {
         autoplay: true,
         muted: true,
         preload: "auto" as const,
-        fluid: true,
-        responsive: true,
+        // Force the player to fill its container instead of keeping aspect via fluid
+        fluid: false,
+        width: "100%",
+        height: "100%",
         html5: {
           vhs: {
             withCredentials: false,
@@ -60,12 +62,14 @@ export default function HeroSection() {
             type: "application/x-mpegURL",
           },
         ],
-      };
+      } as const;
 
       try {
         playerRef.current = videojs(element, playerOptions, () => {
           console.log("[HeroSection] Video.js player ready");
           setIsLoading(false);
+          // Ensure wrapper fills container
+          try { playerRef.current.addClass('vjs-fill'); } catch {}
 
           playerRef.current.play().catch((err: Error) => {
             console.error("[HeroSection] Autoplay failed:", err);
