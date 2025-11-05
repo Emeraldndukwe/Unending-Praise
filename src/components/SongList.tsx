@@ -32,7 +32,7 @@ export default function SongList() {
   };
 
   return (
-    <div className="rounded-2xl p-4 md:p-5 backdrop-blur-sm bg-white/70 h-full">
+    <div className="rounded-2xl p-4 md:p-5 backdrop-blur-sm bg-white/70">
       <h2 className="text-center text-lg md:text-xl font-bold mb-4 text-gray-900">
         Song of the Day
       </h2>
@@ -70,7 +70,7 @@ export default function SongList() {
                   transition={{ duration: 0.3 }}
                   className="overflow-hidden mt-2"
                 >
-                  <p className="text-sm text-gray-700 leading-relaxed border-t pt-2">{song.lyrics}</p>
+                  <p className="text-sm text-gray-700 leading-relaxed border-t pt-2 whitespace-pre-wrap break-words">{song.lyrics}</p>
                 </motion.div>
               )}
             </AnimatePresence>
