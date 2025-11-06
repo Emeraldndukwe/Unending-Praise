@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { CalendarDays, Users, Images } from "lucide-react";
+import { CalendarDays, Users, Images, Globe } from "lucide-react";
 
 interface CrusadeListCardProps {
   id: string | number;
@@ -8,6 +8,7 @@ interface CrusadeListCardProps {
   date: string;
   mediaCount: string;
   attendance?: number;
+  zone?: string;
   image: string;
 }
 
@@ -18,6 +19,7 @@ export default function CrusadeListCard({
   date,
   mediaCount,
   attendance,
+  zone,
   image,
 }: CrusadeListCardProps) {
   return (
@@ -43,6 +45,12 @@ export default function CrusadeListCard({
             <div className="flex items-center gap-1">
               <Users size={14} className="md:w-4 md:h-4" />
               <span>{attendance.toLocaleString()} attendees</span>
+            </div>
+          )}
+          {zone && (
+            <div className="flex items-center gap-1">
+              <Globe size={14} className="md:w-4 md:h-4" />
+              <span>Zone: {zone}</span>
             </div>
           )}
         </div>

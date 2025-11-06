@@ -6,6 +6,7 @@ type Crusade = {
   id: string;
   title?: string;
   attendance?: number;
+  zone?: string;
   date?: string;
   previewImage?: string;
   summary?: string;
@@ -80,6 +81,7 @@ export default function CrusadeListPage() {
                 date={c.date || "Date TBD"}
                 mediaCount={totalMedia > 0 ? `${totalMedia} image${totalMedia !== 1 ? 's' : ''} and video${totalMedia !== 1 ? 's' : ''}` : "No media"}
                 attendance={c.attendance}
+                zone={c.zone}
                 image={c.previewImage || "https://images.unsplash.com/photo-1497435332909-251e61e4e502?w=400&h=300&fit=crop"}
           />
             );

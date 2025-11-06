@@ -23,6 +23,7 @@ type Crusade = {
   summary?: string;
   date?: string;
   attendance?: number;
+  zone?: string;
   type?: string;
   images?: string[];
   videos?: string[];
@@ -95,6 +96,7 @@ export default function AdminPage() {
     summary: row.summary,
     date: row.date,
     attendance: row.attendance ? parseInt(row.attendance) : undefined,
+    zone: row.zone,
     images: row.images,
     videos: row.videos,
     previewImage: row.previewImage ?? row.preview_image,
@@ -813,6 +815,7 @@ function CrusadeItem({ crusade, onDelete, onUpdate }: {
   const [title, setTitle] = useState(crusade.title || "");
   const [date, setDate] = useState(crusade.date || "");
   const [attendance, setAttendance] = useState(crusade.attendance?.toString() || "");
+  const [zone, setZone] = useState(crusade.zone || "");
   const [description, setDescription] = useState(crusade.description || "");
   const [summary, setSummary] = useState(crusade.summary || "");
 
@@ -823,6 +826,9 @@ function CrusadeItem({ crusade, onDelete, onUpdate }: {
           <Input label="Title" value={title} onChange={setTitle} />
           <Input label="Date" value={date} onChange={setDate} />
           <Input label="Attendance" value={attendance} onChange={setAttendance} type="number" />
+        </div>
+        <div className="mb-4">
+          <Input label="Zone" value={zone} onChange={setZone} placeholder="e.g., Zone A, Lagos Zone" />
         </div>
         <div className="mb-4">
           <label className="text-sm font-medium text-gray-700 mb-1 block">Description</label>
@@ -844,7 +850,7 @@ function CrusadeItem({ crusade, onDelete, onUpdate }: {
           <button
             className="px-4 py-2 bg-[#54037C] text-white rounded-xl"
             onClick={() => {
-              onUpdate({ title, date, attendance: attendance ? parseInt(attendance) : undefined, description, summary }).then(() => setEditing(false));
+              onUpdate({ title, date, attendance: attendance ? parseInt(attendance) : undefined, zone, description, summary }).then(() => setEditing(false));
             }}
           >
             Save
@@ -867,7 +873,8 @@ function CrusadeItem({ crusade, onDelete, onUpdate }: {
           <h3 className="font-bold text-lg mb-2">{crusade.title || "Untitled"}</h3>
           <div className="text-sm text-gray-600 mb-2">
             {crusade.attendance && <span className="mr-4">👥 {crusade.attendance.toLocaleString()} attendees</span>}
-            {crusade.date && <span>📅 {crusade.date}</span>}
+            {crusade.date && <span className="mr-4">📅 {crusade.date}</span>}
+            {crusade.zone && <span>🌍 Zone: {crusade.zone}</span>}
           </div>
           {crusade.previewVideo ? (
             <video src={crusade.previewVideo} className="w-32 h-20 object-cover rounded-lg mb-2" controls />
@@ -894,6 +901,7 @@ function CrusadeForm({ onSubmit, crusadeTypes = [] }: { onSubmit: (payload: Part
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
   const [attendance, setAttendance] = useState("");
+  const [zone, setZone] = useState("");
   const [description, setDescription] = useState("");
   const [summary, setSummary] = useState("");
   const [type, setType] = useState<string>("");
@@ -932,10 +940,11 @@ function CrusadeForm({ onSubmit, crusadeTypes = [] }: { onSubmit: (payload: Part
       onSubmit={(e) => {
         e.preventDefault();
           const finalType = newType.trim() ? newType.trim() : type;
-          onSubmit({ title, date, attendance: attendance ? parseInt(attendance) : undefined, description, summary, type: finalType, images, videos, previewImage, previewVideo }).then(() => {
+          onSubmit({ title, date, attendance: attendance ? parseInt(attendance) : undefined, zone, description, summary, type: finalType, images, videos, previewImage, previewVideo }).then(() => {
           setTitle("");
           setDate("");
             setAttendance("");
+            setZone("");
           setDescription("");
             setSummary("");
             setType("");
@@ -951,6 +960,7 @@ function CrusadeForm({ onSubmit, crusadeTypes = [] }: { onSubmit: (payload: Part
           <Input label="Title *" value={title} onChange={setTitle} placeholder="e.g., A Day of Blessings" />
           <Input label="Date *" value={date} onChange={setDate} placeholder="YYYY-MM-DD or Dec 2023" />
           <Input label="Attendance *" value={attendance} onChange={setAttendance} type="number" placeholder="e.g., 5000" />
+          <Input label="Zone" value={zone} onChange={setZone} placeholder="e.g., Zone A, Lagos Zone" />
           <label className="text-sm">
             <div className="mb-1 font-medium text-gray-700">Crusade Type * (select existing or add new)</div>
             <div className="grid grid-cols-2 gap-2">

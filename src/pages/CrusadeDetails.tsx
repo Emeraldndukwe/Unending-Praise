@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from "react";
 import { useParams, Navigate, Link } from "react-router-dom";
-import { CalendarDays, Users, Camera } from "lucide-react";
+import { CalendarDays, Users, Camera, Globe } from "lucide-react";
 import ImageCarousel, { type ImageCarouselRef, type MediaItem } from "../components/shared/ImageCarousel";
 import CommentSection from "../components/shared/CommentSection";
 import { motion } from "framer-motion";
@@ -10,6 +10,7 @@ type Crusade = {
   title?: string;
   subtitle?: string;
   attendance?: number;
+  zone?: string;
   date?: string;
   description?: string;
   images?: string[];
@@ -132,6 +133,11 @@ export default function CrusadeDetails() {
             {crusade.attendance && (
             <div className="flex items-center gap-2">
               <Users size={16} /> {crusade.attendance.toLocaleString()} attendees
+            </div>
+            )}
+            {crusade.zone && (
+            <div className="flex items-center gap-2">
+              <Globe size={16} /> Zone: {crusade.zone}
             </div>
             )}
             <div className="flex items-center gap-2">

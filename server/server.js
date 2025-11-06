@@ -82,6 +82,7 @@ async function ensureSchema() {
         title TEXT,
         date TEXT,
         attendance INTEGER,
+        zone TEXT,
         description TEXT,
         summary TEXT,
         type TEXT,
@@ -476,16 +477,16 @@ app.get('/api/crusades', async (_req, res) => {
 
 app.put('/api/crusades/:id', requireAuth, requireRole('crusade'), async (req, res) => {
   const { id } = req.params;
-  const { title, date, attendance, description, summary, type, previewImage, previewVideo, images, videos } = req.body || {};
+  const { title, date, attendance, zone, description, summary, type, previewImage, previewVideo, images, videos } = req.body || {};
   try {
     const result = await pool.query(
       `UPDATE crusades SET
-        title=COALESCE($1,title), date=COALESCE($2,date), attendance=COALESCE($3,attendance),
-        description=COALESCE($4,description), summary=COALESCE($5,summary), type=COALESCE($6,type),
-        preview_image=COALESCE($7,preview_image), preview_video=COALESCE($8,preview_video),
-        images=COALESCE($9,images), videos=COALESCE($10,videos)
-       WHERE id=$11 RETURNING *`,
-      [title, date, attendance ? parseInt(attendance) : null, description, summary, type, previewImage, previewVideo, images ? JSON.stringify(images) : null, videos ? JSON.stringify(videos) : null, id]
+        title=COALESCE($1,title), date=COALESCE($2,date), attendance=COALESCE($3,attendance), zone=COALESCE($4,zone),
+        description=COALESCE($5,description), summary=COALESCE($6,summary), type=COALESCE($7,type),
+        preview_image=COALESCE($8,preview_image), preview_video=COALESCE($9,preview_video),
+        images=COALESCE($10,images), videos=COALESCE($11,videos)
+       WHERE id=$12 RETURNING *`,
+      [title, date, attendance ? parseInt(attendance) : null, zone, description, summary, type, previewImage, previewVideo, images ? JSON.stringify(images) : null, videos ? JSON.stringify(videos) : null, id]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
     res.json(result.rows[0]);
@@ -608,10 +609,10 @@ app.post('/api/crusades', async (req, res) => {
   const videos = Array.isArray(body.videos) ? body.videos : [];
   try {
     const result = await pool.query(
-      `INSERT INTO crusades (title, date, attendance, description, summary, type, preview_image, preview_video, images, videos)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      `INSERT INTO crusades (title, date, attendance, zone, description, summary, type, preview_image, preview_video, images, videos)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
        RETURNING *`,
-      [body.title || null, body.date || null, body.attendance ? parseInt(body.attendance) : null, body.description || null, body.summary || null, body.type || null, body.previewImage || null, body.previewVideo || null, JSON.stringify(images), JSON.stringify(videos)]
+      [body.title || null, body.date || null, body.attendance ? parseInt(body.attendance) : null, body.zone || null, body.description || null, body.summary || null, body.type || null, body.previewImage || null, body.previewVideo || null, JSON.stringify(images), JSON.stringify(videos)]
     );
     const created = result.rows[0];
     // notify crusade admins and superadmins

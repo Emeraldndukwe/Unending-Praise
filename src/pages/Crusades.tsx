@@ -9,6 +9,7 @@ type Crusade = {
   id: string;
   title?: string;
   attendance?: number;
+  zone?: string;
   date?: string;
   previewImage?: string;
   summary?: string;
