@@ -43,7 +43,6 @@ export default function Crusades() {
   }, []);
 
   // Dynamically generate sections based on crusade types
-  // If no types exist, show default sections (prison and online)
   const getCrusadesByType = (typeName: string) => {
     if (!typeName || typeName.toLowerCase() === 'prison') {
       // For prison or undefined, show crusades without type or with prison type
@@ -52,13 +51,8 @@ export default function Crusades() {
     return allCrusades.filter((c) => c.type && c.type.toLowerCase() === typeName.toLowerCase()).slice(0, 3);
   };
 
-  // Get all unique types from crusades, or use default types
-  const activeTypes = crusadeTypes.length > 0 
-    ? crusadeTypes 
-    : [
-        { id: 'default-prison', name: 'Prison', description: 'Crusades held in correctional facilities' },
-        { id: 'default-online', name: 'Online', description: 'Virtual crusades and online events' }
-      ];
+  // Get all unique types from crusades - only show types that exist in admin
+  const activeTypes = crusadeTypes.length > 0 ? crusadeTypes : [];
 
   if (loading) {
     return <div className="p-8 text-center text-gray-600">Loading crusades…</div>;
@@ -97,8 +91,14 @@ export default function Crusades() {
           THE CRUSADES
         </h3>
 
-        {/* Dynamically generate sections for each crusade type */}
-        {activeTypes.map((crusadeType, index) => {
+        {/* Show message if no crusade types exist */}
+        {activeTypes.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">
+            <p>No crusade types have been set up yet. Check back soon!</p>
+          </div>
+        ) : (
+          /* Dynamically generate sections for each crusade type */
+          activeTypes.map((crusadeType, index) => {
           const typeCrusades = getCrusadesByType(crusadeType.name);
           const typeSlug = crusadeType.name.toLowerCase().replace(/\s+/g, '-');
           
@@ -144,7 +144,7 @@ export default function Crusades() {
               )}
             </div>
           );
-        })}
+        }))}
       </div>
     </div>
   );
