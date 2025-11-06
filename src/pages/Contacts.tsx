@@ -122,13 +122,6 @@ const Contacts: React.FC = () => {
               Pastor Chris Live Unending Praise Worship Time Slot Selection
             </h2>
 
-            <p className="text-gray-700 text-sm leading-relaxed mb-6 text-center">
-              Pastor Chris Live Unending Praise is a nonstop global worship movement...
-              For inquiries contact Kingschat:
-              <span className="font-semibold"> @uepcommunications</span> or call{" "}
-              <span className="font-semibold"> +234 810 459 7366</span>
-            </p>
-
             <form onSubmit={handleBookingSubmit} className="space-y-4">
               <select
                 name="participatingMinistries"
@@ -255,7 +248,7 @@ const Contacts: React.FC = () => {
             <div className="bg-[#F5F1DD] p-8 rounded-lg shadow-md">
               <h3 className="text-sm text-gray-600 mb-1">For More Inquiries...</h3>
               <h2 className="text-xl font-semibold text-gray-800 mb-6">
-                SEND YOUR MESSAGE
+                SEND US A MESSAGE
               </h2>
 
               <form onSubmit={handleMessageSubmit} className="space-y-4">
