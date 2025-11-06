@@ -111,7 +111,7 @@ function CrusadesSection() {
             <img
                       src={getImageUrl(idx)}
                       alt={crusade.title || `Crusade ${idx + 1}`}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover rounded-2xl"
                     />
                   </Link>
                 ))}
@@ -123,7 +123,7 @@ function CrusadesSection() {
                     key={idx}
                     src={getImageUrl(idx)}
                     alt={`Crusade ${idx + 1}`}
-                    className={`absolute object-cover shadow-md ${
+                    className={`absolute object-cover shadow-md rounded-2xl ${
                       idx === 0 ? 'top-0 left-0 w-24 h-24 sm:w-28 sm:h-28 rotate-[-8deg]' :
                       idx === 1 ? 'top-0 right-0 w-24 h-24 sm:w-28 sm:h-28 rotate-[10deg]' :
                       idx === 2 ? 'bottom-10 left-0 w-24 h-24 sm:w-28 sm:h-28 rotate-[5deg]' :
@@ -134,7 +134,7 @@ function CrusadesSection() {
                 ))}
               </>
             )}
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center bg-[#FAF9F6]/95 backdrop-blur-sm px-4 sm:px-5 py-4 sm:py-6 rounded-2xl shadow-lg">
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center bg-white backdrop-blur-sm px-4 sm:px-5 py-4 sm:py-6 rounded-4xl">
               <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">
                 CRUSADES
               </h3>
