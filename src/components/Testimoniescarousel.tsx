@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, animate } from "framer-motion";
 import { ChevronLeft, ChevronRight, ArrowUpRight } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 const defaultTestimonies = [
   { id: "1", name: "JOHN THOMAS", text: "We have gone round the world for crusades, sharing the word of God with our Man Of God Rev. Chris Oyakhilome.", image: "https://images.unsplash.com/photo-1497435332909-251e61e4e502?w=400&h=300&fit=crop", color: "rgb(155, 89, 214)" },
@@ -18,6 +18,7 @@ function lightenColor(rgbString: string, percent: number) {
 }
 
 export default function TestimoniesCarousel() {
+  const navigate = useNavigate();
   const [testimonies, setTestimonies] = useState<Array<{ id: string; name: string; text: string; image: string; color: string }>>(defaultTestimonies);
   const [active, setActive] = useState(1);
   const [baseColor, setBaseColor] = useState(testimonies[1]?.color || "rgb(155, 89, 214)");
@@ -176,7 +177,10 @@ export default function TestimoniesCarousel() {
             return (
               <motion.div
                 key={item.id}
-                onClick={() => setActive(index)}
+                onClick={() => {
+                  // Navigate to testimony details
+                  navigate(`/testimonies/${item.id}`);
+                }}
                 initial={{ y: 200, opacity: 0 }}
                 animate={{
                   x: offset * offsetDistance,
@@ -198,8 +202,8 @@ export default function TestimoniesCarousel() {
                 <div className="w-full flex justify-center mt-5">
                   <img src={item.image} className={`w-[85%] ${isMobile ? "h-[120px]" : "h-[160px]"} object-cover rounded-xl`} />
                 </div>
-                <p className="px-5 mt-4 text-sm leading-relaxed">{isActive ? item.text : shorten(item.text)}</p>
-                <p className="font-bold text-xs mt-4">{item.name}</p>
+                <p className="font-bold text-xs mt-4 px-5">{item.name}</p>
+                <p className="px-5 mt-2 text-sm leading-relaxed">{isActive ? item.text : shorten(item.text)}</p>
               </motion.div>
             );
           })}

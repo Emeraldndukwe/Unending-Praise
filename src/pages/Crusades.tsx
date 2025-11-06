@@ -113,17 +113,11 @@ export default function Crusades() {
                 style={{ transformOrigin: "left" }}
               />
 
-              {crusadeType.description ? (
+              {crusadeType.description && crusadeType.description.trim() ? (
                 <p className="text-justify leading-8 text-gray-700 indent-8 max-w-5xl mt-10 mx-auto">
                   {crusadeType.description}
                 </p>
-              ) : (
-                <p className="text-justify leading-8 text-gray-700 indent-8 max-w-5xl mt-10 mx-auto">
-                  We have gone round the world for crusades, sharing the word of God
-                  with our Man of God Rev. Chris Oyakhilome. Join us and look at our
-                  journey so far...
-                </p>
-              )}
+              ) : null}
 
               {typeCrusades.length > 0 ? (
                 <>
