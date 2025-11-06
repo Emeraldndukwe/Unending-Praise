@@ -196,7 +196,7 @@ export default function TestimoniesCarousel() {
                   damping: 22,
                   backgroundColor: { duration: 0.6, ease: "easeInOut" },
                 }}
-                className="absolute rounded-3xl cursor-pointer text-white shadow-2xl overflow-hidden"
+                className="absolute rounded-3xl cursor-pointer text-white shadow-2xl overflow-hidden transition-transform duration-300 hover:scale-110"
                 style={{ width: cardWidth, height: cardHeight }}
               >
                 <div className="w-full flex justify-center mt-5">

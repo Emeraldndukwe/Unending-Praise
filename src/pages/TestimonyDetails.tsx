@@ -143,7 +143,8 @@ export default function TestimonyDetails() {
       </div>
 
         
-        {/* Media header with underline style */}
+        {/* Media - Only show if there's more than one media item */}
+        {media.length > 1 && (
         <div className="relative w-full flex flex-col items-start mt-8">
           {/* Media header */}
           <h2 className="text-2xl font-semibold mb-2 px-4 md:px-12">
@@ -172,6 +173,8 @@ export default function TestimonyDetails() {
           </div>
 
           <ImageCarousel ref={carouselRef} media={media} />
+        </div>
+        )}
 
       {/* ✅ COMMENTS */}
       {id && <CommentSection entityType="testimony" entityId={id} />}

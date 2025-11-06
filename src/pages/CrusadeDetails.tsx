@@ -160,7 +160,8 @@ export default function CrusadeDetails() {
         </p>
       </motion.div>
 
-      {/* MEDIA */}
+      {/* MEDIA - Only show if there's more than one media item */}
+      {media.length > 1 && (
       <motion.div
         initial={{ opacity: 0, y: 50 }}
         animate={inView ? { opacity: 1, y: 0 } : {}}
@@ -195,12 +196,11 @@ export default function CrusadeDetails() {
         </div>
 
         {/* Image carousel */}
-        {media.length > 0 && (
         <div className="mt-6">
             <ImageCarousel ref={carouselRef} media={media} />
         </div>
-        )}
       </motion.div>
+      )}
 
       {/* COMMENTS */}
       <motion.div

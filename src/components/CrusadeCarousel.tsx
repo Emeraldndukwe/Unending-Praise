@@ -82,7 +82,7 @@ export default function CrusadeCarousel({ data }: CrusadeCarouselProps) {
           return (
             <div
               key={item.id}
-              className="absolute transition-all duration-500 ease-in-out"
+              className="absolute transition-all duration-500 ease-in-out hover:scale-105"
               style={{
                 transform: `translateX(${translateOffset}px) scale(${index === active ? 1.08 : 0.9})`,
                 opacity: Math.abs(realOffset) <= 2 ? 1 : 0,
