@@ -145,35 +145,36 @@ export default function TestimonyDetails() {
         
         {/* Media - Only show if there's more than one media item */}
         {media.length > 1 && (
-        <div className="relative w-full flex flex-col items-start mt-8">
-          {/* Media header */}
-          <h2 className="text-2xl font-semibold mb-2 px-4 md:px-12">
-            Media
-          </h2>
+          <>
+            {/* Media header with underline style */}
+            <div className="relative w-full flex flex-col items-start mt-8">
+              {/* Media header */}
+              <h2 className="text-2xl font-semibold mb-2 px-4 md:px-12">
+                Media
+              </h2>
 
-          {/* Divider line as underline */}
-          <motion.div
-            className="h-[2px] bg-black/30 rounded-full w-full"
-            initial={{ scaleX: 0 }}
-            animate={{ scaleX: 1 }}
-            transition={{ duration: 1.2, ease: "easeInOut" }}
-            style={{ transformOrigin: "left" }}
-          />
-        </div>
+              {/* Divider line as underline */}
+              <motion.div
+                className="h-[2px] bg-black/30 rounded-full w-full"
+                initial={{ scaleX: 0 }}
+                animate={{ scaleX: 1 }}
+                transition={{ duration: 1.2, ease: "easeInOut" }}
+                style={{ transformOrigin: "left" }}
+              />
+            </div>
 
-        {/* View all button */}
-        <div className="mt-4 mb-5 flex justify-end px-4 md:px-12">
-          <button
-            onClick={() => carouselRef.current?.openGallery()}
-            className="text-sm text-gray-700 hover:text-black flex items-center gap-1"
-          >
-            VIEW ALL →
+            {/* View all button */}
+            <div className="mt-4 mb-5 flex justify-end px-4 md:px-12">
+              <button
+                onClick={() => carouselRef.current?.openGallery()}
+                className="text-sm text-gray-700 hover:text-black flex items-center gap-1"
+              >
+                VIEW ALL →
+              </button>
+            </div>
 
-            </button>
-          </div>
-
-          <ImageCarousel ref={carouselRef} media={media} />
-        </div>
+            <ImageCarousel ref={carouselRef} media={media} />
+          </>
         )}
 
       {/* ✅ COMMENTS */}
