@@ -278,7 +278,7 @@ export default function HeroSection() {
         {/* RIGHT SIDE (TABS + CONTENT) */}
         <div className="w-full lg:w-[35%] flex justify-center">
           <div
-            className="w-full max-w-sm rounded-xl overflow-hidden bg-white shadow-md flex flex-col"
+            className="w-full max-w-sm rounded-xl overflow-hidden flex flex-col"
             style={{
               height: isMobile
                 ? `calc(100vh - ${NAV_HEIGHT + 24}px)`

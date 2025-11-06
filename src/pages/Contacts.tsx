@@ -117,7 +117,7 @@ const Contacts: React.FC = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
           {/* LEFT FORM */}
-          <div className="bg-[#F5F1DD] p-8 rounded-lg shadow-md">
+          <div className="bg-[#F5F1DD] px-8 pt-8 pb-6 rounded-lg shadow-md">
             <h2 className="text-xl font-semibold text-gray-800 text-center mb-4">
               Pastor Chris Live Unending Praise Worship Time Slot Selection
             </h2>
