@@ -89,12 +89,11 @@ export default function CrusadeCarousel({ data }: CrusadeCarouselProps) {
                 key={item.id}
                 className="absolute transition-all duration-500 ease-in-out"
                 style={{
-                  transform: 'translateX(0) scale(1)',
+                  transform: 'translateX(-50%)',
                   opacity: 1,
                   zIndex: 10,
                   left: '50%',
                   transformOrigin: 'center',
-                  marginLeft: isMobile ? '-110px' : '-160px',
                 }}
               >
                 <CrusadeCard 
