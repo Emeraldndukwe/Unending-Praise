@@ -6,6 +6,7 @@ export default function CrusadeForm() {
     name: "",
     phone: "",
     email: "",
+    kingschat: "",
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -18,7 +19,7 @@ export default function CrusadeForm() {
       const payload = {
         name: formData.name,
         email: formData.email,
-        message: `Crusade request from ${formData.name}. Phone: ${formData.phone || 'N/A'}`,
+        message: `Crusade request from ${formData.name}. Phone: ${formData.phone || 'N/A'}. KingsChat: ${formData.kingschat || 'N/A'}`,
         subject: 'Crusade Request',
       };
       const res = await fetch('/api/messages', {
@@ -28,7 +29,7 @@ export default function CrusadeForm() {
       });
       if (!res.ok) throw new Error('Failed to submit request');
       alert('Your crusade request has been submitted!');
-      setFormData({ name: "", phone: "", email: "" });
+      setFormData({ name: "", phone: "", email: "", kingschat: "" });
     } catch (err) {
       alert('Could not submit request. Please try again later.');
     }
@@ -42,16 +43,19 @@ export default function CrusadeForm() {
       className="bg-[#f8f4ea] rounded-lg p-6 shadow-md"
     >
       <h3 className="font-bold text-xl mb-4 text-center">ORGANIZE A CRUSADE</h3>
+      <p className="text-sm text-gray-700 mb-4 text-center">
+        Want to organize a crusade? Kindly fill the form below and we will reach out to you.
+      </p>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <div>
           <label htmlFor="name" className="block text-sm font-semibold text-gray-700 mb-1">
-            Name
+            Full Name
           </label>
           <input
             id="name"
             name="name"
-            placeholder="Name"
+            placeholder="Full Name"
             value={formData.name}
             onChange={handleChange}
             required
@@ -83,6 +87,19 @@ export default function CrusadeForm() {
             value={formData.email}
             onChange={handleChange}
             required
+            className="border border-gray-300 rounded px-3 py-2 w-full"
+          />
+        </div>
+        <div>
+          <label htmlFor="kingschat" className="block text-sm font-semibold text-gray-700 mb-1">
+            KingsChat Username
+          </label>
+          <input
+            id="kingschat"
+            name="kingschat"
+            placeholder="KingsChat Username"
+            value={formData.kingschat}
+            onChange={handleChange}
             className="border border-gray-300 rounded px-3 py-2 w-full"
           />
         </div>
