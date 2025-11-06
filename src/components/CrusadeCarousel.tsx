@@ -4,7 +4,7 @@ import CrusadeCard from "./CrusadeCard";
 interface Crusade {
   id: string | number;
   title?: string;
-  location?: string;
+  attendance?: number;
   date?: string;
   image?: string;
   previewImage?: string;
@@ -15,10 +15,10 @@ interface CrusadeCarouselProps {
 }
 
 const placeholderData: Crusade[] = [
-  { id: "1", title: "A Day of Blessings", location: "Lekki Prison, Lagos", date: "23 Oct, 2025", image: "https://images.unsplash.com/photo-1497435332909-251e61e4e502?w=400&h=300&fit=crop" },
-  { id: "2", title: "Night of Miracles", location: "Port Harcourt", date: "14 Nov, 2025", image: "https://images.unsplash.com/photo-1548554448-087ebf1e11e3?w=400&h=300&fit=crop" },
-  { id: "3", title: "Healing Crusade", location: "Abuja National Stadium", date: "30 Dec, 2025", image: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=400&h=300&fit=crop" },
-  { id: "4", title: "Faith Revival", location: "Enugu Civic Centre", date: "10 Jan, 2026", image: "https://images.unsplash.com/photo-1505373877841-8d25f7d46678?w=400&h=300&fit=crop" },
+  { id: "1", title: "A Day of Blessings", attendance: 5000, date: "23 Oct, 2025", image: "https://images.unsplash.com/photo-1497435332909-251e61e4e502?w=400&h=300&fit=crop" },
+  { id: "2", title: "Night of Miracles", attendance: 3500, date: "14 Nov, 2025", image: "https://images.unsplash.com/photo-1548554448-087ebf1e11e3?w=400&h=300&fit=crop" },
+  { id: "3", title: "Healing Crusade", attendance: 8000, date: "30 Dec, 2025", image: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=400&h=300&fit=crop" },
+  { id: "4", title: "Faith Revival", attendance: 6000, date: "10 Jan, 2026", image: "https://images.unsplash.com/photo-1505373877841-8d25f7d46678?w=400&h=300&fit=crop" },
 ];
 
 export default function CrusadeCarousel({ data }: CrusadeCarouselProps) {
@@ -92,7 +92,7 @@ export default function CrusadeCarousel({ data }: CrusadeCarouselProps) {
               <CrusadeCard 
                 id={item.id}
                 title={item.title || "Crusade"}
-                location={item.location || "Location TBD"}
+                attendance={item.attendance}
                 date={item.date || "Date TBD"}
                 image={item.previewImage || item.image || "https://images.unsplash.com/photo-1497435332909-251e61e4e502?w=400&h=300&fit=crop"}
               />

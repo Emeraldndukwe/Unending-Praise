@@ -8,7 +8,7 @@ import { ArrowUpRight } from "lucide-react";
 type Crusade = {
   id: string;
   title?: string;
-  location?: string;
+  attendance?: number;
   date?: string;
   previewImage?: string;
   summary?: string;

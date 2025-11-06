@@ -1,15 +1,15 @@
 import { Link } from "react-router-dom";
-import { CalendarDays, MapPin, Image as ImageIcon, ArrowUpRight } from "lucide-react";
+import { CalendarDays, Users, Image as ImageIcon, ArrowUpRight } from "lucide-react";
 
 interface CrusadeCardProps {
   id: string | number;
   title: string;
-  location: string;
+  attendance?: number;
   date: string;
   image: string;
 }
 
-export default function CrusadeCard({ id, title, location, date, image }: CrusadeCardProps) {
+export default function CrusadeCard({ id, title, attendance, date, image }: CrusadeCardProps) {
   return (
     <div className="bg-[#9146A8] text-white rounded-[22px] shadow-xl w-[250px] md:w-[320px] flex flex-col transition-transform hover:scale-[1.03] duration-300">
       
@@ -45,11 +45,13 @@ export default function CrusadeCard({ id, title, location, date, image }: Crusad
           </div>
         </div>
 
-        {/* Location */}
-        <div className="flex items-center justify-center mt-2.5 text-[11px] md:text-[13px]">
-          <MapPin size={13} className="md:w-[15px] md:h-[15px] mr-1" />
-          <span>{location}</span>
-        </div>
+        {/* Attendance */}
+        {attendance && (
+          <div className="flex items-center justify-center mt-2.5 text-[11px] md:text-[13px]">
+            <Users size={13} className="md:w-[15px] md:h-[15px] mr-1" />
+            <span>{attendance.toLocaleString()} attendees</span>
+          </div>
+        )}
 
         {/* Read More Link */}
         <Link

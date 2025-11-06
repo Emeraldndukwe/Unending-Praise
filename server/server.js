@@ -81,7 +81,7 @@ async function ensureSchema() {
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         title TEXT,
         date TEXT,
-        location TEXT,
+        attendance INTEGER,
         description TEXT,
         summary TEXT,
         type TEXT,
@@ -476,16 +476,16 @@ app.get('/api/crusades', async (_req, res) => {
 
 app.put('/api/crusades/:id', requireAuth, requireRole('crusade'), async (req, res) => {
   const { id } = req.params;
-  const { title, date, location, description, summary, type, previewImage, previewVideo, images, videos } = req.body || {};
+  const { title, date, attendance, description, summary, type, previewImage, previewVideo, images, videos } = req.body || {};
   try {
     const result = await pool.query(
       `UPDATE crusades SET
-        title=COALESCE($1,title), date=COALESCE($2,date), location=COALESCE($3,location),
+        title=COALESCE($1,title), date=COALESCE($2,date), attendance=COALESCE($3,attendance),
         description=COALESCE($4,description), summary=COALESCE($5,summary), type=COALESCE($6,type),
         preview_image=COALESCE($7,preview_image), preview_video=COALESCE($8,preview_video),
         images=COALESCE($9,images), videos=COALESCE($10,videos)
        WHERE id=$11 RETURNING *`,
-      [title, date, location, description, summary, type, previewImage, previewVideo, images ? JSON.stringify(images) : null, videos ? JSON.stringify(videos) : null, id]
+      [title, date, attendance ? parseInt(attendance) : null, description, summary, type, previewImage, previewVideo, images ? JSON.stringify(images) : null, videos ? JSON.stringify(videos) : null, id]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
     res.json(result.rows[0]);
@@ -608,10 +608,10 @@ app.post('/api/crusades', async (req, res) => {
   const videos = Array.isArray(body.videos) ? body.videos : [];
   try {
     const result = await pool.query(
-      `INSERT INTO crusades (title, date, location, description, summary, type, preview_image, preview_video, images, videos)
+      `INSERT INTO crusades (title, date, attendance, description, summary, type, preview_image, preview_video, images, videos)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
        RETURNING *`,
-      [body.title || null, body.date || null, body.location || null, body.description || null, body.summary || null, body.type || null, body.previewImage || null, body.previewVideo || null, JSON.stringify(images), JSON.stringify(videos)]
+      [body.title || null, body.date || null, body.attendance ? parseInt(body.attendance) : null, body.description || null, body.summary || null, body.type || null, body.previewImage || null, body.previewVideo || null, JSON.stringify(images), JSON.stringify(videos)]
     );
     const created = result.rows[0];
     // notify crusade admins and superadmins

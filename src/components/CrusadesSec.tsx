@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 type Crusade = {
   id: string;
   title?: string;
-  location?: string;
+  attendance?: number;
   date?: string;
   previewImage?: string;
   summary?: string;
