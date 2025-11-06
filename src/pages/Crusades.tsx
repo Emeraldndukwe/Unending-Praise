@@ -33,8 +33,13 @@ export default function Crusades() {
       fetch('/api/crusades').then(res => res.json()),
       fetch('/api/crusade-types').then(res => res.json()).catch(() => [])
     ])
-      .then(([crusades, types]: [Crusade[], CrusadeType[]]) => {
-        setAllCrusades(crusades);
+      .then(([crusades, types]: [any[], CrusadeType[]]) => {
+        // Convert snake_case to camelCase for previewImage
+        const convertedCrusades = crusades.map((c: any) => ({
+          ...c,
+          previewImage: c.previewImage || c.preview_image,
+        }));
+        setAllCrusades(convertedCrusades);
         setCrusadeTypes(types);
         setLoading(false);
       })
@@ -105,9 +110,9 @@ export default function Crusades() {
           
           return (
             <div key={crusadeType.id} className={index < activeTypes.length - 1 ? "mb-20" : ""}>
-              <h2 className="text-3xl font-semibold">{crusadeType.name} Crusades</h2>
+              <h2 className="text-3xl font-semibold mb-3">{crusadeType.name} Crusades</h2>
               <motion.div
-                className="h-[2px] bg-black/30 rounded-full w-full mt-3"
+                className="h-[2px] bg-black/30 rounded-full w-full mb-8"
                 initial={{ scaleX: 0 }}
                 animate={{ scaleX: 1 }}
                 transition={{ duration: 1.2, ease: "easeInOut", delay: index * 0.1 }}

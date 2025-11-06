@@ -23,7 +23,8 @@ const placeholderData: Crusade[] = [
 
 export default function CrusadeCarousel({ data }: CrusadeCarouselProps) {
   const list = data && data.length > 0 ? data : placeholderData;
-  const [active, setActive] = useState(1);
+  // Center the first card if there's only one, otherwise start at index 1
+  const [active, setActive] = useState(list.length === 1 ? 0 : Math.min(1, list.length - 1));
   const [isMobile, setIsMobile] = useState(false);
   const touchStartX = useRef<number | null>(null);
 
@@ -35,10 +36,21 @@ export default function CrusadeCarousel({ data }: CrusadeCarouselProps) {
   }, []);
 
   useEffect(() => {
+    // Only auto-rotate if there's more than one card
+    if (list.length <= 1) return;
     const interval = setInterval(() => {
       setActive((prev) => (prev + 1) % list.length);
     }, 7000);
     return () => clearInterval(interval);
+  }, [list.length]);
+  
+  // Update active when list changes (e.g., if it becomes single card)
+  useEffect(() => {
+    if (list.length === 1) {
+      setActive(0);
+    } else {
+      setActive(Math.min(1, list.length - 1));
+    }
   }, [list.length]);
 
   // Touch swipe handlers
@@ -64,11 +76,38 @@ export default function CrusadeCarousel({ data }: CrusadeCarouselProps) {
     <div className="w-full flex flex-col items-center">
       {/* CARDS */}
       <div 
-        className="relative w-full md:h-[420px] h-[300px] flex justify-center overflow-visible mt-3 px-2"
+        className="relative w-full md:h-[420px] h-[300px] flex justify-center overflow-hidden mt-8 mb-8 px-2"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
+        style={{ paddingTop: '30px', paddingBottom: '30px' }}
       >
         {list.map((item, index) => {
+          // For single card, center it
+          if (list.length === 1) {
+            return (
+              <div
+                key={item.id}
+                className="absolute transition-all duration-500 ease-in-out"
+                style={{
+                  transform: 'translateX(0) scale(1)',
+                  opacity: 1,
+                  zIndex: 10,
+                  left: '50%',
+                  transformOrigin: 'center',
+                  marginLeft: isMobile ? '-110px' : '-160px',
+                }}
+              >
+                <CrusadeCard 
+                  id={item.id}
+                  title={item.title || "Crusade"}
+                  attendance={item.attendance}
+                  date={item.date || "Date TBD"}
+                  image={item.previewImage || item.image || "https://images.unsplash.com/photo-1497435332909-251e61e4e502?w=400&h=300&fit=crop"}
+                />
+              </div>
+            );
+          }
+
           const offset = index - active;
 
           const realOffset =
@@ -82,11 +121,12 @@ export default function CrusadeCarousel({ data }: CrusadeCarouselProps) {
           return (
             <div
               key={item.id}
-              className="absolute transition-all duration-500 ease-in-out hover:scale-105"
+              className="absolute transition-all duration-500 ease-in-out"
               style={{
                 transform: `translateX(${translateOffset}px) scale(${index === active ? 1.08 : 0.9})`,
                 opacity: Math.abs(realOffset) <= 2 ? 1 : 0,
                 zIndex: index === active ? 50 : 10,
+                transformOrigin: 'center',
               }}
             >
               <CrusadeCard 
