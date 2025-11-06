@@ -163,12 +163,17 @@ export default function AdminPage() {
   };
 
   const createCrusade = async (payload: Partial<Crusade>) => {
-    await api<Crusade>(`/api/crusades`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    refresh();
+    try {
+      await api<Crusade>(`/api/crusades`, {
+        method: "POST",
+        headers: Object.assign({}, headers as Record<string, string>, { "content-type": "application/json" }),
+        body: JSON.stringify(payload),
+      });
+      refresh();
+    } catch (err: any) {
+      alert(err?.message || "Failed to create crusade");
+      throw err;
+    }
   };
 
   const createTestimony = async (payload: Partial<Testimony>) => {
@@ -937,23 +942,30 @@ function CrusadeForm({ onSubmit, crusadeTypes = [] }: { onSubmit: (payload: Part
       <p className="text-sm text-gray-600 mb-4">Fill in all the details below to create a comprehensive crusade entry</p>
     <form
         className="space-y-4"
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
+        if (!title.trim() || !date.trim() || !attendance || (!type && !newType.trim())) {
+          alert("Please fill in all required fields: Title, Date, Attendance, and Crusade Type");
+          return;
+        }
+        try {
           const finalType = newType.trim() ? newType.trim() : type;
-          onSubmit({ title, date, attendance: attendance ? parseInt(attendance) : undefined, zone, description, summary, type: finalType, images, videos, previewImage, previewVideo }).then(() => {
+          await onSubmit({ title, date, attendance: attendance ? parseInt(attendance) : undefined, zone, description, summary, type: finalType, images, videos, previewImage, previewVideo });
           setTitle("");
           setDate("");
-            setAttendance("");
-            setZone("");
+          setAttendance("");
+          setZone("");
           setDescription("");
-            setSummary("");
-            setType("");
-            setNewType("");
-            setImages([]);
-            setVideos([]);
-            setPreviewImage("");
-            setPreviewVideo("");
-        });
+          setSummary("");
+          setType("");
+          setNewType("");
+          setImages([]);
+          setVideos([]);
+          setPreviewImage("");
+          setPreviewVideo("");
+        } catch (err) {
+          // Error already handled in createCrusade
+        }
       }}
     >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1074,7 +1086,7 @@ function CrusadeForm({ onSubmit, crusadeTypes = [] }: { onSubmit: (payload: Part
             </div>
           )}
         </div>
-        <button className="w-full px-4 py-3 bg-[#54037C] hover:bg-[#54037C]/90 text-white font-semibold rounded-xl transition shadow-md">
+        <button type="submit" className="w-full px-4 py-3 bg-[#54037C] hover:bg-[#54037C]/90 text-white font-semibold rounded-xl transition shadow-md">
           Create Crusade
         </button>
     </form>
