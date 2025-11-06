@@ -164,14 +164,20 @@ export default function AdminPage() {
 
   const createCrusade = async (payload: Partial<Crusade>) => {
     try {
-      await api<Crusade>(`/api/crusades`, {
+      const res = await fetch(`/api/crusades`, {
         method: "POST",
         headers: Object.assign({}, headers as Record<string, string>, { "content-type": "application/json" }),
         body: JSON.stringify(payload),
       });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || data?.details || `HTTP ${res.status}: Failed to create crusade`);
+      }
       refresh();
     } catch (err: any) {
-      alert(err?.message || "Failed to create crusade");
+      const errorMsg = err?.message || err?.error || err?.details || "Failed to create crusade";
+      alert(errorMsg);
+      console.error('Create crusade error:', err);
       throw err;
     }
   };

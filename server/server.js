@@ -132,7 +132,9 @@ async function ensureSchema() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
-    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';`);
+    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
+      ALTER TABLE crusades ADD COLUMN IF NOT EXISTS zone TEXT;
+      ALTER TABLE crusades ADD COLUMN IF NOT EXISTS attendance INTEGER;`);
     await client.query('COMMIT');
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {});
@@ -620,8 +622,9 @@ app.post('/api/crusades', async (req, res) => {
       'A new crusade was added.').catch(() => {});
     res.status(201).json(created);
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: 'Server error' });
+    console.error('Error creating crusade:', e);
+    console.error('Error details:', e.message, e.code, e.detail);
+    res.status(500).json({ error: 'Server error', details: e.message || String(e) });
   }
 });
 
