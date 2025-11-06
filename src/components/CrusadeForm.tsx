@@ -42,12 +42,6 @@ export default function CrusadeForm() {
       className="bg-[#f8f4ea] rounded-lg p-6 shadow-md"
     >
       <h3 className="font-bold text-xl mb-4 text-center">ORGANIZE A CRUSADE</h3>
-      <p className="text-sm text-gray-700 mb-3 text-center">
-        Kindly get in touch with a preferred worship session around your area to plan a crusade.
-      </p>
-      <p className="text-sm text-gray-700 mb-4 text-center font-semibold">
-        Call: +234 909 4756 126
-      </p>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <div>
