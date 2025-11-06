@@ -128,7 +128,7 @@ export default function TestimoniesCarousel() {
     }
     touchStartX.current = null;
   };
-  const shorten = (text: string) => (text.length > 50 ? text.slice(0, 50) + "..." : text);
+  const shorten = (text: string) => (text.length > (isMobile ? 40 : 50) ? text.slice(0, isMobile ? 40 : 50) + "..." : text);
 
   const visibleCards = isMobile ? 3 : testimonies.length;
   const cardWidth = isMobile ? 220 : 320;
@@ -203,7 +203,9 @@ export default function TestimoniesCarousel() {
                   <img src={item.image} className={`w-[85%] ${isMobile ? "h-[120px]" : "h-[160px]"} object-cover rounded-xl`} />
                 </div>
                 <p className="font-bold text-xs mt-4 px-5">{item.name}</p>
-                <p className="px-5 mt-2 text-sm leading-relaxed">{isActive ? item.text : shorten(item.text)}</p>
+                <p className={`px-5 mt-2 pb-4 ${isMobile ? 'text-xs' : 'text-sm'} leading-relaxed ${isActive ? '' : 'line-clamp-3'} overflow-hidden`} style={{ maxHeight: isActive ? 'none' : (isMobile ? '60px' : '80px') }}>
+                  {isActive ? item.text : shorten(item.text)}
+                </p>
               </motion.div>
             );
           })}

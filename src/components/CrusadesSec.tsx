@@ -17,14 +17,21 @@ function CrusadesSection() {
   useEffect(() => {
     fetch('/api/crusades')
       .then(res => res.json())
-      .then((data: Crusade[]) => {
-        setCrusades(data.slice(0, 5)); // Show first 5
+      .then((data: any[]) => {
+        // Convert snake_case to camelCase and show first 5
+        const converted = data.map((c: any) => ({
+          ...c,
+          previewImage: c.previewImage || c.preview_image,
+        }));
+        setCrusades(converted.slice(0, 5));
       })
       .catch(() => {});
   }, []);
 
   const getImageUrl = (idx: number) => {
+    // Use placeholder images for now
     if (crusades[idx]?.previewImage) return crusades[idx].previewImage;
+    // Placeholder images - user will replace these with actual images later
     return `https://images.unsplash.com/photo-${idx === 0 ? '1497435332909-251e61e4e502' : idx === 1 ? '1548554448-087ebf1e11e3' : idx === 2 ? '1511795409834-ef04bbd61622' : idx === 3 ? '1505373877841-8d25f7d46678' : '1568808163202-efd7e7d63d77'}?w=300&h=200&fit=crop`;
   };
 

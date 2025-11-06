@@ -410,7 +410,8 @@ export default function AdminPage() {
               {crusades.map((c) => (
                 <CrusadeItem 
                   key={c.id} 
-                  crusade={c} 
+                  crusade={c}
+                  crusadeTypes={crusadeTypes}
                   onDelete={() => deleteItem("crusades", c.id)}
                   onUpdate={async (payload) => {
                     await api<Crusade>(`/api/crusades/${c.id}`, {
@@ -817,10 +818,11 @@ function TestimonyItem({ testimony, onApprove, onDelete, onUpdate }: {
   );
 }
 
-function CrusadeItem({ crusade, onDelete, onUpdate }: { 
+function CrusadeItem({ crusade, onDelete, onUpdate, crusadeTypes = [] }: { 
   crusade: Crusade; 
   onDelete: () => void;
   onUpdate: (payload: Partial<Crusade>) => Promise<void>;
+  crusadeTypes?: Array<{id:string; name:string; description?:string;}>;
 }) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(crusade.title || "");
@@ -829,6 +831,8 @@ function CrusadeItem({ crusade, onDelete, onUpdate }: {
   const [zone, setZone] = useState(crusade.zone || "");
   const [description, setDescription] = useState(crusade.description || "");
   const [summary, setSummary] = useState(crusade.summary || "");
+  const [type, setType] = useState(crusade.type || "");
+  const [newType, setNewType] = useState("");
 
   if (editing) {
     return (
@@ -840,6 +844,34 @@ function CrusadeItem({ crusade, onDelete, onUpdate }: {
         </div>
         <div className="mb-4">
           <Input label="Zone" value={zone} onChange={setZone} placeholder="e.g., Zone A, Lagos Zone" />
+        </div>
+        <div className="mb-4">
+          <label className="text-sm font-medium text-gray-700 mb-1 block">Crusade Type (select existing or add new)</label>
+          <div className="grid grid-cols-2 gap-2">
+            <select value={type} onChange={(e) => {
+              setType(e.target.value);
+              setNewType("");
+            }} className="w-full border border-gray-300 rounded-xl px-4 py-2">
+              <option value="">— Select Type —</option>
+              {crusadeTypes.map((t) => (
+                <option key={t.id} value={t.name}>{t.name}</option>
+              ))}
+            </select>
+            <input
+              placeholder="or create new type name"
+              className="w-full border border-gray-300 rounded-xl px-4 py-2"
+              value={newType}
+              onChange={(e) => {
+                setNewType(e.target.value);
+                setType("");
+              }}
+            />
+          </div>
+          {type && crusadeTypes.find(t => t.name === type)?.description && (
+            <div className="mt-2 text-xs text-gray-600 bg-blue-50 p-2 rounded-lg border border-blue-200">
+              <strong className="text-[#54037C]">{crusadeTypes.find(t => t.name === type)?.name}:</strong> {crusadeTypes.find(t => t.name === type)?.description}
+            </div>
+          )}
         </div>
         <div className="mb-4">
           <label className="text-sm font-medium text-gray-700 mb-1 block">Description</label>
@@ -861,7 +893,11 @@ function CrusadeItem({ crusade, onDelete, onUpdate }: {
           <button
             className="px-4 py-2 bg-[#54037C] text-white rounded-xl"
             onClick={() => {
-              onUpdate({ title, date, attendance: attendance ? parseInt(attendance) : undefined, zone, description, summary }).then(() => setEditing(false));
+              const finalType = newType.trim() ? newType.trim() : type;
+              onUpdate({ title, date, attendance: attendance ? parseInt(attendance) : undefined, zone, type: finalType, description, summary }).then(() => {
+                setEditing(false);
+                setNewType("");
+              });
             }}
           >
             Save
@@ -892,6 +928,7 @@ function CrusadeItem({ crusade, onDelete, onUpdate }: {
           ) : crusade.previewImage && (
             <img src={crusade.previewImage} alt="Preview" className="w-32 h-20 object-cover rounded-lg mb-2" />
           )}
+          {crusade.type && <div className="text-xs text-gray-600 mb-1">Type: <span className="font-semibold">{crusade.type}</span></div>}
           <p className="text-sm text-gray-700 mb-2">{crusade.summary || crusade.description?.substring(0, 100)}...</p>
           <div className="text-xs text-gray-500">{new Date(crusade.createdAt).toLocaleString()}</div>
         </div>
