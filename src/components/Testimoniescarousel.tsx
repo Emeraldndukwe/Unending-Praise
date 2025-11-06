@@ -3,16 +3,6 @@ import { motion, animate } from "framer-motion";
 import { ChevronLeft, ChevronRight, ArrowUpRight } from "lucide-react";
 import { Link } from "react-router-dom";
 
-type Testimony = {
-  id: string;
-  name?: string;
-  title?: string;
-  summary?: string;
-  content?: string;
-  previewImage?: string;
-  approved?: boolean;
-};
-
 const defaultTestimonies = [
   { id: "1", name: "JOHN THOMAS", text: "We have gone round the world for crusades, sharing the word of God with our Man Of God Rev. Chris Oyakhilome.", image: "https://images.unsplash.com/photo-1497435332909-251e61e4e502?w=400&h=300&fit=crop", color: "rgb(155, 89, 214)" },
   { id: "2", name: "SARAH KINGS", text: "The experience has been amazing and life-changing. Lives are touched everywhere.", image: "https://images.unsplash.com/photo-1548554448-087ebf1e11e3?w=400&h=300&fit=crop", color: "rgb(179, 123, 233)" },
