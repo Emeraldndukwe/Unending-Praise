@@ -24,7 +24,6 @@ export default function CrusadeDetails() {
   const carouselRef = useRef<ImageCarouselRef>(null);
   const [crusade, setCrusade] = useState<Crusade | null>(null);
   const [loading, setLoading] = useState(true);
-  const [inView, setInView] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -39,18 +38,6 @@ export default function CrusadeDetails() {
       })
       .catch(() => setLoading(false));
   }, [id]);
-
-  useEffect(() => {
-    const onScroll = () => {
-      const section = document.getElementById("crusade-details");
-      if (!section) return;
-      const rect = section.getBoundingClientRect();
-      if (rect.top < window.innerHeight - 100) setInView(true);
-    };
-    window.addEventListener("scroll", onScroll);
-    onScroll(); // initial check
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
 
   if (loading) {
     return <div className="max-w-6xl mx-auto px-4 pt-24 pb-10 text-center">Loading...</div>;
@@ -91,7 +78,7 @@ export default function CrusadeDetails() {
       {/* HERO SECTION */}
       <motion.div
         initial={{ opacity: 0, y: 50 }}
-        animate={inView ? { opacity: 1, y: 0 } : {}}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: "easeOut" }}
         className="relative w-full overflow-hidden rounded-xl shadow-md"
       >
@@ -150,7 +137,7 @@ export default function CrusadeDetails() {
       {/* ABOUT */}
       <motion.div
         initial={{ opacity: 0, y: 50 }}
-        animate={inView ? { opacity: 1, y: 0 } : {}}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
         className="mt-10"
       >
@@ -164,7 +151,7 @@ export default function CrusadeDetails() {
       {media.length > 1 && (
       <motion.div
         initial={{ opacity: 0, y: 50 }}
-        animate={inView ? { opacity: 1, y: 0 } : {}}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: "easeOut", delay: 0.4 }}
         className="mt-14"
       >
@@ -205,7 +192,7 @@ export default function CrusadeDetails() {
       {/* COMMENTS */}
       <motion.div
         initial={{ opacity: 0, y: 50 }}
-        animate={inView ? { opacity: 1, y: 0 } : {}}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: "easeOut", delay: 0.6 }}
         className="mt-12"
       >
