@@ -50,6 +50,11 @@ export default function Testimonies() {
           src="https://christembassy.org/wp-content/uploads/2019/01/christembassy_comments.jpg"
           alt="Testimonies Banner"
           className="object-cover w-full h-full"
+          onError={(e) => {
+            // Fallback to a default image if the external image fails to load
+            const target = e.target as HTMLImageElement;
+            target.src = "https://images.unsplash.com/photo-1497435332909-251e61e4e502?w=1200&h=400&fit=crop&auto=format";
+          }}
         />
         <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
           <h1 className="text-white text-2xl sm:text-3xl md:text-4xl font-bold">TESTIMONIES</h1>

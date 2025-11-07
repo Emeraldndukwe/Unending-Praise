@@ -444,7 +444,7 @@ app.put('/api/testimonies/:id', requireAuth, requireRole('testimony'), async (re
         images=COALESCE($9,images), videos=COALESCE($10,videos),
         approved=COALESCE($11,approved)
        WHERE id=$12 RETURNING *`,
-      [name, title, email, phone, content, summary, previewImage, previewVideo, images ? JSON.stringify(images) : null, videos ? JSON.stringify(videos) : null, approved, id]
+      [name, title, email, phone, content, summary, previewImage, previewVideo, images && Array.isArray(images) ? JSON.stringify(images) : null, videos && Array.isArray(videos) ? JSON.stringify(videos) : null, approved, id]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
     res.json(result.rows[0]);
@@ -488,7 +488,7 @@ app.put('/api/crusades/:id', requireAuth, requireRole('crusade'), async (req, re
         preview_image=COALESCE($8,preview_image), preview_video=COALESCE($9,preview_video),
         images=COALESCE($10,images), videos=COALESCE($11,videos)
        WHERE id=$12 RETURNING *`,
-      [title, date, attendance ? parseInt(attendance) : null, zone, description, summary, type, previewImage, previewVideo, images ? JSON.stringify(images) : null, videos ? JSON.stringify(videos) : null, id]
+      [title, date, attendance ? parseInt(attendance) : null, zone, description, summary, type, previewImage, previewVideo, images && Array.isArray(images) ? JSON.stringify(images) : null, videos && Array.isArray(videos) ? JSON.stringify(videos) : null, id]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
     res.json(result.rows[0]);
@@ -590,7 +590,7 @@ app.post('/api/testimonies', async (req, res) => {
       `INSERT INTO testimonies (name, title, email, phone, content, summary, preview_image, preview_video, images, videos, approved)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
        RETURNING *`,
-      [body.name || null, body.title || null, body.email || null, body.phone || null, body.content || null, body.summary || null, body.previewImage || null, body.previewVideo || null, JSON.stringify(images), JSON.stringify(videos), Boolean(body.approved)]
+      [body.name || null, body.title || null, body.email || null, body.phone || null, body.content || null, body.summary || null, body.previewImage || null, body.previewVideo || null, Array.isArray(images) ? JSON.stringify(images) : '[]', Array.isArray(videos) ? JSON.stringify(videos) : '[]', Boolean(body.approved)]
     );
     const created = result.rows[0];
     // notify testimony admins and superadmins
@@ -614,7 +614,7 @@ app.post('/api/crusades', async (req, res) => {
       `INSERT INTO crusades (title, date, attendance, zone, description, summary, type, preview_image, preview_video, images, videos)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
        RETURNING *`,
-      [body.title || null, body.date || null, body.attendance ? parseInt(body.attendance) : null, body.zone || null, body.description || null, body.summary || null, body.type || null, body.previewImage || null, body.previewVideo || null, JSON.stringify(images), JSON.stringify(videos)]
+      [body.title || null, body.date || null, body.attendance ? parseInt(body.attendance) : null, body.zone || null, body.description || null, body.summary || null, body.type || null, body.previewImage || null, body.previewVideo || null, Array.isArray(images) ? JSON.stringify(images) : '[]', Array.isArray(videos) ? JSON.stringify(videos) : '[]']
     );
     const created = result.rows[0];
     // notify crusade admins and superadmins
@@ -631,7 +631,7 @@ app.post('/api/crusades', async (req, res) => {
 // Crusade Types CRUD (Postgres)
 app.get('/api/crusade-types', async (_req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM crusade_types ORDER BY name ASC');
+    const result = await pool.query('SELECT * FROM crusade_types ORDER BY created_at ASC');
     res.json(result.rows);
   } catch (e) {
     console.error(e);

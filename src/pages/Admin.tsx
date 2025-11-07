@@ -74,35 +74,80 @@ export default function AdminPage() {
   const [managedComments, setManagedComments] = useState<Comment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
 
-  const toCamelTestimony = (row: any): Testimony => ({
-    id: row.id,
-    name: row.name,
-    title: row.title,
-    content: row.content,
-    summary: row.summary,
-    approved: row.approved,
-    images: row.images,
-    videos: row.videos,
-    previewImage: row.previewImage ?? row.preview_image,
-    previewVideo: row.previewVideo ?? row.preview_video,
-    createdAt: row.createdAt ?? row.created_at ?? new Date().toISOString(),
-    email: row.email,
-    phone: row.phone,
-  });
-  const toCamelCrusade = (row: any): Crusade => ({
-    id: row.id,
-    title: row.title,
-    description: row.description,
-    summary: row.summary,
-    date: row.date,
-    attendance: row.attendance ? parseInt(row.attendance) : undefined,
-    zone: row.zone,
-    images: row.images,
-    videos: row.videos,
-    previewImage: row.previewImage ?? row.preview_image,
-    previewVideo: row.previewVideo ?? row.preview_video,
-    createdAt: row.createdAt ?? row.created_at ?? new Date().toISOString(),
-  });
+  const toCamelTestimony = (row: any): Testimony => {
+    let images = [];
+    let videos = [];
+    try {
+      if (typeof row.images === 'string') {
+        images = JSON.parse(row.images);
+      } else if (Array.isArray(row.images)) {
+        images = row.images;
+      }
+    } catch (e) {
+      console.error('Error parsing images:', e);
+    }
+    try {
+      if (typeof row.videos === 'string') {
+        videos = JSON.parse(row.videos);
+      } else if (Array.isArray(row.videos)) {
+        videos = row.videos;
+      }
+    } catch (e) {
+      console.error('Error parsing videos:', e);
+    }
+    return {
+      id: row.id,
+      name: row.name,
+      title: row.title,
+      content: row.content,
+      summary: row.summary,
+      approved: row.approved,
+      images: images,
+      videos: videos,
+      previewImage: row.previewImage ?? row.preview_image,
+      previewVideo: row.previewVideo ?? row.preview_video,
+      createdAt: row.createdAt ?? row.created_at ?? new Date().toISOString(),
+      email: row.email,
+      phone: row.phone,
+    };
+  };
+  const toCamelCrusade = (row: any): Crusade => {
+    let images = [];
+    let videos = [];
+    try {
+      if (typeof row.images === 'string') {
+        images = JSON.parse(row.images);
+      } else if (Array.isArray(row.images)) {
+        images = row.images;
+      }
+    } catch (e) {
+      console.error('Error parsing images:', e);
+    }
+    try {
+      if (typeof row.videos === 'string') {
+        videos = JSON.parse(row.videos);
+      } else if (Array.isArray(row.videos)) {
+        videos = row.videos;
+      }
+    } catch (e) {
+      console.error('Error parsing videos:', e);
+    }
+    return {
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      summary: row.summary,
+      date: row.date,
+      attendance: row.attendance ? parseInt(row.attendance) : undefined,
+      zone: row.zone,
+      type: row.type,
+      images: images,
+      videos: videos,
+      previewImage: row.previewImage ?? row.preview_image,
+      previewVideo: row.previewVideo ?? row.preview_video,
+      createdAt: row.createdAt ?? row.created_at ?? new Date().toISOString(),
+    };
+  };
 
   const refreshCrusadeTypes = async () => {
     try {
@@ -730,6 +775,44 @@ function TestimonyItem({ testimony, onApprove, onDelete, onUpdate }: {
   const [title, setTitle] = useState(testimony.title || "");
   const [content, setContent] = useState(testimony.content || "");
   const [summary, setSummary] = useState(testimony.summary || "");
+  const [images, setImages] = useState<string[]>(Array.isArray(testimony.images) ? testimony.images : []);
+  const [videos, setVideos] = useState<string[]>(Array.isArray(testimony.videos) ? testimony.videos : []);
+  const [previewImage, setPreviewImage] = useState(testimony.previewImage || "");
+  const [previewVideo, setPreviewVideo] = useState(testimony.previewVideo || "");
+
+  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    for (const file of Array.from(files)) {
+      try {
+        if (file.type.startsWith("image/")) {
+          const compressed = await compressImage(file);
+          setImages(prev => [...prev, compressed]);
+          if (!previewImage && !previewVideo) setPreviewImage(compressed);
+        } else if (file.type.startsWith("video/")) {
+          const compressed = await compressVideo(file);
+          setVideos(prev => [...prev, compressed]);
+          if (!previewImage && !previewVideo) setPreviewVideo(compressed);
+        }
+      } catch (err: any) {
+        alert(`Error processing ${file.name}: ${err.message}`);
+      }
+    }
+  };
+
+  const removeImage = (index: number) => {
+    const newImages = [...images];
+    const removed = newImages.splice(index, 1)[0];
+    setImages(newImages);
+    if (previewImage === removed) setPreviewImage(newImages[0] || "");
+  };
+
+  const removeVideo = (index: number) => {
+    const newVideos = [...videos];
+    const removed = newVideos.splice(index, 1)[0];
+    setVideos(newVideos);
+    if (previewVideo === removed) setPreviewVideo(newVideos[0] || "");
+  };
 
   if (editing) {
     return (
@@ -754,18 +837,104 @@ function TestimonyItem({ testimony, onApprove, onDelete, onUpdate }: {
             onChange={(e) => setSummary(e.target.value)}
           />
         </div>
+        <div className="mb-4">
+          <label className="text-sm font-medium text-gray-700 mb-2 block">Media (Images & Videos)</label>
+          <input
+            type="file"
+            accept="image/*,video/*"
+            multiple
+            onChange={handleMediaUpload}
+            className="w-full border border-gray-300 rounded-xl px-4 py-2 text-sm"
+          />
+          {(images.length > 0 || videos.length > 0) && (
+            <div className="mt-4 space-y-4">
+              {images.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-gray-600 mb-2">Images:</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {images.map((img, idx) => (
+                      <div key={`img-${idx}`} className="relative">
+                        <img src={img} alt={`Preview ${idx}`} className="w-full h-24 object-cover rounded-lg border-2 border-gray-200" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPreviewImage(img);
+                            setPreviewVideo("");
+                          }}
+                          className={`absolute top-1 right-1 text-xs px-2 py-1 rounded ${
+                            previewImage === img ? 'bg-[#54037C] text-white' : 'bg-white/80 text-gray-700'
+                          }`}
+                        >
+                          {previewImage === img ? '✓ Preview' : 'Set'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeImage(idx)}
+                          className="absolute top-1 left-1 text-xs px-2 py-1 rounded bg-red-500 text-white"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {videos.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-gray-600 mb-2">Videos:</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {videos.map((vid, idx) => (
+                      <div key={`vid-${idx}`} className="relative">
+                        <video src={vid} className="w-full h-24 object-cover rounded-lg border-2 border-gray-200" muted />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPreviewVideo(vid);
+                            setPreviewImage("");
+                          }}
+                          className={`absolute top-1 right-1 text-xs px-2 py-1 rounded ${
+                            previewVideo === vid ? 'bg-[#54037C] text-white' : 'bg-white/80 text-gray-700'
+                          }`}
+                        >
+                          {previewVideo === vid ? '✓ Preview' : 'Set'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeVideo(idx)}
+                          className="absolute top-1 left-1 text-xs px-2 py-1 rounded bg-red-500 text-white"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         <div className="flex gap-2">
           <button
             className="px-4 py-2 bg-[#54037C] text-white rounded-xl"
             onClick={() => {
-              onUpdate({ name, title, content, summary }).then(() => setEditing(false));
+              onUpdate({ name, title, content, summary, images, videos, previewImage, previewVideo }).then(() => setEditing(false));
             }}
           >
             Save
           </button>
           <button
             className="px-4 py-2 bg-gray-200 text-gray-700 rounded-xl"
-            onClick={() => setEditing(false)}
+            onClick={() => {
+              setEditing(false);
+              setName(testimony.name || "");
+              setTitle(testimony.title || "");
+              setContent(testimony.content || "");
+              setSummary(testimony.summary || "");
+              setImages(Array.isArray(testimony.images) ? testimony.images : []);
+              setVideos(Array.isArray(testimony.videos) ? testimony.videos : []);
+              setPreviewImage(testimony.previewImage || "");
+              setPreviewVideo(testimony.previewVideo || "");
+            }}
           >
             Cancel
           </button>
@@ -833,6 +1002,44 @@ function CrusadeItem({ crusade, onDelete, onUpdate, crusadeTypes = [] }: {
   const [summary, setSummary] = useState(crusade.summary || "");
   const [type, setType] = useState(crusade.type || "");
   const [newType, setNewType] = useState("");
+  const [images, setImages] = useState<string[]>(Array.isArray(crusade.images) ? crusade.images : []);
+  const [videos, setVideos] = useState<string[]>(Array.isArray(crusade.videos) ? crusade.videos : []);
+  const [previewImage, setPreviewImage] = useState(crusade.previewImage || "");
+  const [previewVideo, setPreviewVideo] = useState(crusade.previewVideo || "");
+
+  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    for (const file of Array.from(files)) {
+      try {
+        if (file.type.startsWith("image/")) {
+          const compressed = await compressImage(file);
+          setImages(prev => [...prev, compressed]);
+          if (!previewImage && !previewVideo) setPreviewImage(compressed);
+        } else if (file.type.startsWith("video/")) {
+          const compressed = await compressVideo(file);
+          setVideos(prev => [...prev, compressed]);
+          if (!previewImage && !previewVideo) setPreviewVideo(compressed);
+        }
+      } catch (err: any) {
+        alert(`Error processing ${file.name}: ${err.message}`);
+      }
+    }
+  };
+
+  const removeImage = (index: number) => {
+    const newImages = [...images];
+    const removed = newImages.splice(index, 1)[0];
+    setImages(newImages);
+    if (previewImage === removed) setPreviewImage(newImages[0] || "");
+  };
+
+  const removeVideo = (index: number) => {
+    const newVideos = [...videos];
+    const removed = newVideos.splice(index, 1)[0];
+    setVideos(newVideos);
+    if (previewVideo === removed) setPreviewVideo(newVideos[0] || "");
+  };
 
   if (editing) {
     return (
@@ -889,12 +1096,88 @@ function CrusadeItem({ crusade, onDelete, onUpdate, crusadeTypes = [] }: {
             onChange={(e) => setSummary(e.target.value)}
           />
         </div>
+        <div className="mb-4">
+          <label className="text-sm font-medium text-gray-700 mb-2 block">Media (Images & Videos)</label>
+          <input
+            type="file"
+            accept="image/*,video/*"
+            multiple
+            onChange={handleMediaUpload}
+            className="w-full border border-gray-300 rounded-xl px-4 py-2 text-sm"
+          />
+          {(images.length > 0 || videos.length > 0) && (
+            <div className="mt-4 space-y-4">
+              {images.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-gray-600 mb-2">Images:</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {images.map((img, idx) => (
+                      <div key={`img-${idx}`} className="relative">
+                        <img src={img} alt={`Preview ${idx}`} className="w-full h-24 object-cover rounded-lg border-2 border-gray-200" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPreviewImage(img);
+                            setPreviewVideo("");
+                          }}
+                          className={`absolute top-1 right-1 text-xs px-2 py-1 rounded ${
+                            previewImage === img ? 'bg-[#54037C] text-white' : 'bg-white/80 text-gray-700'
+                          }`}
+                        >
+                          {previewImage === img ? '✓ Preview' : 'Set'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeImage(idx)}
+                          className="absolute top-1 left-1 text-xs px-2 py-1 rounded bg-red-500 text-white"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {videos.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-gray-600 mb-2">Videos:</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {videos.map((vid, idx) => (
+                      <div key={`vid-${idx}`} className="relative">
+                        <video src={vid} className="w-full h-24 object-cover rounded-lg border-2 border-gray-200" muted />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPreviewVideo(vid);
+                            setPreviewImage("");
+                          }}
+                          className={`absolute top-1 right-1 text-xs px-2 py-1 rounded ${
+                            previewVideo === vid ? 'bg-[#54037C] text-white' : 'bg-white/80 text-gray-700'
+                          }`}
+                        >
+                          {previewVideo === vid ? '✓ Preview' : 'Set'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeVideo(idx)}
+                          className="absolute top-1 left-1 text-xs px-2 py-1 rounded bg-red-500 text-white"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         <div className="flex gap-2">
           <button
             className="px-4 py-2 bg-[#54037C] text-white rounded-xl"
             onClick={() => {
               const finalType = newType.trim() ? newType.trim() : type;
-              onUpdate({ title, date, attendance: attendance ? parseInt(attendance) : undefined, zone, type: finalType, description, summary }).then(() => {
+              onUpdate({ title, date, attendance: attendance ? parseInt(attendance) : undefined, zone, type: finalType, description, summary, images, videos, previewImage, previewVideo }).then(() => {
                 setEditing(false);
                 setNewType("");
               });
@@ -904,7 +1187,21 @@ function CrusadeItem({ crusade, onDelete, onUpdate, crusadeTypes = [] }: {
           </button>
           <button
             className="px-4 py-2 bg-gray-200 text-gray-700 rounded-xl"
-            onClick={() => setEditing(false)}
+            onClick={() => {
+              setEditing(false);
+              setTitle(crusade.title || "");
+              setDate(crusade.date || "");
+              setAttendance(crusade.attendance?.toString() || "");
+              setZone(crusade.zone || "");
+              setDescription(crusade.description || "");
+              setSummary(crusade.summary || "");
+              setType(crusade.type || "");
+              setNewType("");
+              setImages(Array.isArray(crusade.images) ? crusade.images : []);
+              setVideos(Array.isArray(crusade.videos) ? crusade.videos : []);
+              setPreviewImage(crusade.previewImage || "");
+              setPreviewVideo(crusade.previewVideo || "");
+            }}
           >
             Cancel
           </button>

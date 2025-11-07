@@ -79,8 +79,8 @@ export default function About() {
       <section className="w-full py-10 flex justify-center">
         <div className="w-[90%] md:w-[80%] lg:w-[70%] overflow-hidden rounded-3xl shadow-lg">
           <img
-            src="/map-image.jpg"
-            alt="Map showing mission locations"
+            src="/Unending_Praise-1.jpg"
+            alt="Unending Praise"
             className="w-full h-[300px] md:h-[400px] object-cover"
           />
         </div>
