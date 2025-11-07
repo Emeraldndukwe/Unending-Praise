@@ -32,7 +32,7 @@ interface ImageCarouselProps {
 }
 
 const ImageCarousel = forwardRef<ImageCarouselRef, ImageCarouselProps>(
-  ({ media, autoPlay = true, interval = 8000 }, ref) => {
+  ({ media, autoPlay = true, interval = 4000 }, ref) => {
     // Filter to only show images in preview, but keep all media for gallery
     const previewMedia = media.filter(item => item.type === "image");
     const [active, setActive] = useState(0);
@@ -93,7 +93,7 @@ const ImageCarousel = forwardRef<ImageCarouselRef, ImageCarouselProps>(
           <div className="relative w-full flex justify-center h-[400px] overflow-visible">
             <Swiper
               modules={[Navigation, Pagination, Autoplay]}
-              spaceBetween={30}
+              spaceBetween={15}
               slidesPerView={3}
               centeredSlides={true}
               loop={previewMedia.length > 3}
@@ -114,9 +114,9 @@ const ImageCarousel = forwardRef<ImageCarouselRef, ImageCarouselProps>(
               threshold={10}
               allowTouchMove={true}
               breakpoints={{
-                640: { slidesPerView: 3, spaceBetween: 30 },
-                768: { slidesPerView: 3, spaceBetween: 30 },
-                1024: { slidesPerView: 5, spaceBetween: 30 },
+                640: { slidesPerView: 3, spaceBetween: 15 },
+                768: { slidesPerView: 3, spaceBetween: 15 },
+                1024: { slidesPerView: 5, spaceBetween: 15 },
               }}
               className="w-full h-full"
             >
