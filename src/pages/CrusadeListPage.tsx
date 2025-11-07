@@ -25,7 +25,6 @@ type CrusadeType = {
 export default function CrusadeListPage() {
   const { type: typeSlug } = useParams(); // e.g., "prison", "online", "prison-crusades", etc.
   const [crusades, setCrusades] = useState<Crusade[]>([]);
-  const [crusadeTypes, setCrusadeTypes] = useState<CrusadeType[]>([]);
   const [loading, setLoading] = useState(true);
   const [typeName, setTypeName] = useState<string>("");
 
@@ -40,8 +39,6 @@ export default function CrusadeListPage() {
           ...c,
           previewImage: c.previewImage || c.preview_image,
         }));
-        
-        setCrusadeTypes(typesData);
         
         if (!typeSlug) {
           setCrusades([]);
