@@ -83,9 +83,12 @@ export default function Crusades() {
         <div className="lg:col-span-2 text-gray-700 leading-relaxed">
           <h2 className="font-bold text-2xl mb-4">What Our Crusades Are About</h2>
           <p className="mb-3">
-            We have gone round the world for crusades, sharing the word of God...
+            At the beginning of 2025 — the Year of Completeness, our Man of God, Rev. Dr. Chris Oyakhilome DSc., DSc., D.D., gave us a divine mandate to complete the full preaching of the Gospel to every nation, tribe, and tongue.
           </p>
-          <p>Join us and look at our journey so far!</p>
+          <p className="mb-3">
+            Riding on this heavenly instruction, the Pastor Chris Live Unending Praise Crusades was birthed — a movement dedicated to soul winning and soul development through ceaseless worship. From prisons to orphanages, hospitals to communities, every gathering becomes an opportunity to share the love of Jesus Christ.
+          </p>
+          <p>This is the heartbeat of the Pastor Chris Live Unending Praise — taking the Gospel through worship to the ends of the earth.</p>
         </div>
 
         <CrusadeForm />
