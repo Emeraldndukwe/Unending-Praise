@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useLayoutEffect } from "react";
 import CrusadeCard from "./CrusadeCard";
 
 interface Crusade {
@@ -26,7 +26,9 @@ export default function CrusadeCarousel({ data }: CrusadeCarouselProps) {
   // Center the first card if there's only one, otherwise start at index 1
   const [active, setActive] = useState(list.length === 1 ? 0 : Math.min(1, list.length - 1));
   const [isMobile, setIsMobile] = useState(false);
+  const [dynamicHeight, setDynamicHeight] = useState<number>(0);
   const touchStartX = useRef<number | null>(null);
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -72,16 +74,32 @@ export default function CrusadeCarousel({ data }: CrusadeCarouselProps) {
     touchStartX.current = null;
   };
 
+  useLayoutEffect(() => {
+    const currentItem = list[active];
+    if (!currentItem) return;
+    const node = cardRefs.current[String(currentItem.id)];
+    if (!node) return;
+
+    const topPadding = isMobile ? 32 : 48;
+    const bottomPadding = isMobile ? 52 : 64;
+    setDynamicHeight(node.offsetHeight + topPadding + bottomPadding);
+  }, [active, list, isMobile]);
+
+  const topPadding = isMobile ? 32 : 48;
+  const bottomPadding = isMobile ? 52 : 64;
+  const computedMinHeight = dynamicHeight || (isMobile ? 420 : 540);
+
   return (
     <div className="w-full flex flex-col items-center">
       {/* CARDS */}
       <div 
-        className="relative w-full flex justify-center overflow-visible mt-8 px-2 min-h-[360px] md:min-h-[480px]"
+        className="relative w-full flex justify-center overflow-visible mt-8 px-2"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
         style={{ 
-          paddingTop: '40px', 
-          paddingBottom: '80px', // Extra padding to ensure cards don't cover pagination
+          minHeight: computedMinHeight,
+          paddingTop: topPadding,
+          paddingBottom: bottomPadding,
         }}
       >
         {list.map((item, index) => {
@@ -92,11 +110,15 @@ export default function CrusadeCarousel({ data }: CrusadeCarouselProps) {
                 key={item.id}
                 className="absolute transition-all duration-500 ease-in-out"
                 style={{
-                  transform: 'translateX(-50%)',
+                  left: '50%',
+                  top: '50%',
+                  transform: 'translate(-50%, -50%)',
                   opacity: 1,
                   zIndex: 10,
-                  left: '50%',
                   transformOrigin: 'center',
+                }}
+                ref={(el) => {
+                  cardRefs.current[String(item.id)] = el;
                 }}
               >
                 <CrusadeCard 
@@ -125,10 +147,14 @@ export default function CrusadeCarousel({ data }: CrusadeCarouselProps) {
               key={item.id}
               className="absolute transition-all duration-500 ease-in-out"
               style={{
-                transform: `translateX(${translateOffset}px) scale(${index === active ? 1.08 : 0.9})`,
+                top: '50%',
+                transform: `translateX(${translateOffset}px) translateY(-50%) scale(${index === active ? 1.08 : 0.9})`,
                 opacity: Math.abs(realOffset) <= 2 ? 1 : 0,
                 zIndex: index === active ? 50 : 10,
                 transformOrigin: 'center',
+              }}
+              ref={(el) => {
+                cardRefs.current[String(item.id)] = el;
               }}
             >
               <CrusadeCard 
@@ -144,7 +170,7 @@ export default function CrusadeCarousel({ data }: CrusadeCarouselProps) {
       </div>
 
       {/* DOTS */}
-      <div className="flex gap-2 mt-4 mb-4 relative z-10">
+      <div className="flex gap-2 mt-3 md:mt-4 mb-4 relative z-10">
         {list.map((_, i) => (
           <button
             key={i}
