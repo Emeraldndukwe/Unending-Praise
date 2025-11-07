@@ -1807,13 +1807,78 @@ function TestimonyForm({ onSubmit }: { onSubmit: (payload: Partial<Testimony>) =
         </div>
         <div>
           <label className="text-sm font-medium text-gray-700 mb-2 block">Media (Images & Videos)</label>
-          <input
-            type="file"
-            accept="image/*,video/*"
-            multiple
-            onChange={handleMediaUpload}
-            className="w-full border border-gray-300 rounded-xl px-4 py-2 text-sm"
-          />
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-gray-600 mb-1 block">Upload Files:</label>
+              <input
+                type="file"
+                accept="image/*,video/*"
+                multiple
+                onChange={handleMediaUpload}
+                className="w-full border border-gray-300 rounded-xl px-4 py-2 text-sm"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs text-gray-600 mb-1 block">Add Image URL:</label>
+                <div className="flex gap-1">
+                  <input
+                    type="text"
+                    placeholder="https://example.com/image.jpg"
+                    className="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        handleUrlAdd(e.currentTarget.value, 'image');
+                        e.currentTarget.value = '';
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      const input = (e.target as HTMLElement).previousElementSibling as HTMLInputElement;
+                      if (input) {
+                        handleUrlAdd(input.value, 'image');
+                        input.value = '';
+                      }
+                    }}
+                    className="px-3 py-2 bg-[#54037C] text-white rounded-xl text-sm hover:bg-[#54037C]/90"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-gray-600 mb-1 block">Add Video URL:</label>
+                <div className="flex gap-1">
+                  <input
+                    type="text"
+                    placeholder="https://example.com/video.mp4"
+                    className="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        handleUrlAdd(e.currentTarget.value, 'video');
+                        e.currentTarget.value = '';
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      const input = (e.target as HTMLElement).previousElementSibling as HTMLInputElement;
+                      if (input) {
+                        handleUrlAdd(input.value, 'video');
+                        input.value = '';
+                      }
+                    }}
+                    className="px-3 py-2 bg-[#54037C] text-white rounded-xl text-sm hover:bg-[#54037C]/90"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
           {(images.length > 0 || videos.length > 0) && (
             <div className="mt-4 space-y-4">
               {images.length > 0 && (
