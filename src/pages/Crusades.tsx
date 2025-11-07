@@ -48,6 +48,11 @@ export default function Crusades() {
       });
   }, []);
 
+  const formatTypeHeading = (name: string) => {
+    if (!name) return "Crusades";
+    return /crusade/i.test(name.trim()) ? name : `${name} Crusades`;
+  };
+
   // Dynamically generate sections based on crusade types
   const getCrusadesByType = (typeName: string) => {
     const normalize = (value?: string) => value?.toLowerCase() ?? "";
@@ -129,7 +134,7 @@ export default function Crusades() {
           
           return (
             <div key={crusadeType.id} className={index < activeTypes.length - 1 ? "mb-20" : ""}>
-              <h2 className="text-3xl font-semibold mb-3">{crusadeType.name} Crusades</h2>
+              <h2 className="text-3xl font-semibold mb-3">{formatTypeHeading(crusadeType.name)}</h2>
               <motion.div
                 className="h-[2px] bg-black/30 rounded-full w-full mb-8"
                 initial={{ scaleX: 0 }}
