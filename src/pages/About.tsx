@@ -101,15 +101,19 @@ export default function About() {
 
         <div className="max-w-5xl mx-auto mt-8 sm:mt-12 md:mt-16 flex flex-col gap-6 sm:gap-8">
           <p className="text-justify leading-6 sm:leading-7 md:leading-8 text-sm sm:text-base md:text-lg text-gray-700 indent-4 sm:indent-6 md:indent-8 px-4 sm:px-0">
-            We have gone round the world for crusades, sharing the word of God
-            with our Man of God Rev. Chris Oyakhilome. Join us and look at our
-            journey so far. We have gone round the world for crusades, sharing
-            the word of God with our Man of God Rev. Chris Oyakhilome. Join us
-            and look at our journey so far. We have gone round the world for
-            crusades, sharing the word of God with our Man of God Rev. Chris
-            Oyakhilome. Join us and look at our journey so far. We have gone
-            round the world for crusades, sharing the word of God with our Man
-            of God Rev. Chris Oyakhilome. Join us and look at our journey so far.
+            Pastor Chris Live Unending Praise is a nonstop, global worship movement led by the Man of God, Rev. Dr. Chris Oyakhilome DSc. DSc. D.D., and members of the Pastor Chris Live Unending Praise Worship Network.
+          </p>
+          <p className="text-justify leading-6 sm:leading-7 md:leading-8 text-sm sm:text-base md:text-lg text-gray-700 indent-4 sm:indent-6 md:indent-8 px-4 sm:px-0">
+            What began as a special one-month session in June 2022 has grown into a divine, never-ending flow of praise. From March 27th, 2023, Christians from every nation have united in an unbroken chain of worship—lifting heartfelt praise to God in 30-minute segments, every hour of every day.
+          </p>
+          <p className="text-justify leading-6 sm:leading-7 md:leading-8 text-sm sm:text-base md:text-lg text-gray-700 indent-4 sm:indent-6 md:indent-8 px-4 sm:px-0">
+            Through this ceaseless offering of worship, voices rise continually across languages, nations, and generations, fulfilling the scriptures in John 4:23–24(KJV):
+          </p>
+          <p className="text-justify leading-6 sm:leading-7 md:leading-8 text-sm sm:text-base md:text-lg text-gray-700 indent-4 sm:indent-6 md:indent-8 px-4 sm:px-0 italic">
+            "But the hour cometh, and now is, when the true worshippers shall worship the Father in spirit and in truth: for the Father seeketh such to worship him. God is a Spirit: and they that worship him must worship him in spirit and in truth."
+          </p>
+          <p className="text-justify leading-6 sm:leading-7 md:leading-8 text-sm sm:text-base md:text-lg text-gray-700 indent-4 sm:indent-6 md:indent-8 px-4 sm:px-0">
+            In this divine move of the Spirit, we are fulfilling God's desire for true worshippers—those who live to praise Him without ceasing. Pastor Chris Live Unending Praise is not just a program; it is a lifestyle of worship, and Unending Praise to our Lord Jesus Christ.
           </p>
         </div>
       </section>
