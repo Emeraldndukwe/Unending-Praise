@@ -69,7 +69,7 @@ export default function Crusades() {
       {/* Banner */}
       <div className="relative h-60 md:h-72 w-full">
         <img
-          src="https://images.unsplash.com/photo-1497435332909-251e61e4e502?w=1200&h=400&fit=crop&auto=format"
+          src="https://tse2.mm.bing.net/th/id/OIP.nDOAT7QDp1Hc1A07uK4iJgHaE8?rs=1&pid=ImgDetMain&o=7&rm=3"
           alt="Crusades Banner"
           className="object-cover w-full h-full"
         />

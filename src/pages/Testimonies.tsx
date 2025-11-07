@@ -47,8 +47,8 @@ export default function Testimonies() {
       {/* Header Section */}
       <div className="relative h-48 sm:h-60 md:h-72 w-full">
         <img
-          src="https://images.unsplash.com/photo-1497435332909-251e61e4e502?w=1200&h=400&fit=crop&auto=format"
-          alt="Banner"
+          src="https://christembassy.org/wp-content/uploads/2019/01/christembassy_comments.jpg"
+          alt="Testimonies Banner"
           className="object-cover w-full h-full"
         />
         <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
