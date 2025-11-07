@@ -86,7 +86,10 @@ export default function Crusades() {
             At the beginning of the Year 2025 — the Year of Completeness — our Man of God, Rev. Dr. Chris Oyakhilome DSc. DSc. D.D., gave us a divine mandate: to complete the full preaching of the Gospel to every nation, tribe, and tongue. He charged each one of us to go out and win souls, and make disciples of men — as though we were the only ones entrusted with this sacred responsibility.
           </p>
           <p className="mb-4">
-            Riding on this divine mandate, the Pastor Chris Live Unending Praise Crusade was born. These crusades are all about soul winning and soul development — this is what we live for. It is our primary responsibility on earth, and everything we do is channeled towards fulfilling this divine mandate. Matthew 28:19–20 - "Go ye therefore, and teach all nations, baptizing them in the name of the Father, and of the Son, and of the Holy Ghost. Teaching them to observe all things whatsoever I have commanded you: and, lo, I am with you always, even unto the end of the world. Amen."
+            Riding on this divine mandate, the Pastor Chris Live Unending Praise Crusade was born. These crusades are all about soul winning and soul development — this is what we live for. It is our primary responsibility on earth, and everything we do is channeled towards fulfilling this divine mandate.
+          </p>
+          <p className="mb-4 italic">
+            Matthew 28:19–20 - "Go ye therefore, and teach all nations, baptizing them in the name of the Father, and of the Son, and of the Holy Ghost. Teaching them to observe all things whatsoever I have commanded you: and, lo, I am with you always, even unto the end of the world. Amen."
           </p>
           <p className="mb-4">
             While The Pastor Chris Live Unending Praise is a platform of continuous worship — where endless praise is offered to our Lord and Savior, Jesus Christ — it is also a powerful discipleship platform. Through it, we carry the message of Christ and the beauty of worship to every place: orphanages, prisons, hospitals, schools, communities etc.
