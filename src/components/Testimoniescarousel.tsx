@@ -153,7 +153,7 @@ export default function TestimoniesCarousel() {
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        <div className={`relative flex justify-center items-center ${isMobile ? "w-[700px]" : "w-[1000px]"}`}>
+        <div className={`relative flex justify-center items-center ${isMobile ? "w-full max-w-[100vw]" : "w-[1000px]"}`}>
           {testimonies.map((item, index) => {
             const total = visibleCards;
             let offset = index - active;
