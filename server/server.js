@@ -218,9 +218,14 @@ function requireSuperAdmin(req, res, next) {
   next();
 }
 
-// Health
+// Health check - should work even if DB is down
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true });
+  res.json({ ok: true, timestamp: new Date().toISOString() });
+});
+
+// Root health check for Render
+app.get('/health', (_req, res) => {
+  res.json({ ok: true, timestamp: new Date().toISOString() });
 });
 
 // HLS reverse proxy to bypass CORS for livestream
@@ -737,29 +742,37 @@ if (WebSocketServer) {
 }
 
 server.listen(PORT, async () => {
-  console.log(`API server listening on http://localhost:${PORT}`);
+  console.log(`✅ API server listening on http://localhost:${PORT}`);
+  console.log(`✅ Health check available at /health and /api/health`);
+  
   if (!process.env.DATABASE_URL) {
     console.warn('⚠️ DATABASE_URL not set. Set it for Postgres (Render)');
+    console.warn('⚠️ Server is running but database features will not work.');
     return;
   }
-  // Initialize DB with timeout and error handling
-  try {
-    const timeout = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Database initialization timeout')), 10000)
-    );
-    await Promise.race([
-      (async () => {
-        await ensureSchema();
-        await initializeDefaultAdmin();
-        console.log('✅ Database initialized successfully');
-      })(),
-      timeout
-    ]);
-  } catch (e) {
-    console.error('❌ Database initialization failed:', e.message);
-    console.error('Server will continue but database features may not work.');
-    console.error('Please check DATABASE_URL and ensure PostgreSQL is accessible.');
-  }
+  
+  // Initialize DB with timeout and error handling (non-blocking)
+  // Server is already listening, so this won't prevent startup
+  (async () => {
+    try {
+      const timeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database initialization timeout')), 15000)
+      );
+      await Promise.race([
+        (async () => {
+          await ensureSchema();
+          await initializeDefaultAdmin();
+          console.log('✅ Database initialized successfully');
+        })(),
+        timeout
+      ]);
+    } catch (e) {
+      console.error('❌ Database initialization failed:', e.message);
+      console.error('⚠️ Server will continue but database features may not work.');
+      console.error('⚠️ Please check DATABASE_URL and ensure PostgreSQL is accessible.');
+      // Don't throw - let server continue running
+    }
+  })();
 });
 
 // Email notifications helper
