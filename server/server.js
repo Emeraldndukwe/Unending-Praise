@@ -604,7 +604,7 @@ app.post('/api/testimonies', async (req, res) => {
 });
 
 // Crusades POST with auto-generate summary (Postgres)
-app.post('/api/crusades', async (req, res) => {
+app.post('/api/crusades', requireAuth, requireRole('crusade'), async (req, res) => {
   const body = req.body || {};
   if (body.description && !body.summary) body.summary = generateSummary(body.description);
   const images = Array.isArray(body.images) ? body.images : [];

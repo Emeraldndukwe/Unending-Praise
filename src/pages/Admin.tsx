@@ -209,20 +209,44 @@ export default function AdminPage() {
 
   const createCrusade = async (payload: Partial<Crusade>) => {
     try {
+      // Clean payload - remove undefined values and ensure arrays are arrays
+      const cleanPayload: any = {};
+      Object.keys(payload).forEach(key => {
+        const value = payload[key as keyof Crusade];
+        if (value !== undefined) {
+          if (key === 'images' || key === 'videos') {
+            cleanPayload[key] = Array.isArray(value) ? value : [];
+          } else {
+            cleanPayload[key] = value;
+          }
+        }
+      });
+      
       const res = await fetch(`/api/crusades`, {
         method: "POST",
         headers: Object.assign({}, headers as Record<string, string>, { "content-type": "application/json" }),
-        body: JSON.stringify(payload),
+        body: JSON.stringify(cleanPayload),
       });
-      const data = await res.json();
+      
+      const contentType = res.headers.get("content-type");
+      let data: any;
+      
+      if (contentType && contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(`Server returned non-JSON response (${res.status}): ${text || 'Unknown error'}`);
+      }
+      
       if (!res.ok) {
         throw new Error(data?.error || data?.details || `HTTP ${res.status}: Failed to create crusade`);
       }
       refresh();
     } catch (err: any) {
       const errorMsg = err?.message || err?.error || err?.details || "Failed to create crusade";
-      alert(errorMsg);
+      alert(`Error creating crusade: ${errorMsg}`);
       console.error('Create crusade error:', err);
+      console.error('Payload sent:', payload);
       throw err;
     }
   };
@@ -1290,7 +1314,12 @@ function CrusadeForm({ onSubmit, crusadeTypes = [] }: { onSubmit: (payload: Part
         }
         try {
           const finalType = newType.trim() ? newType.trim() : type;
-          await onSubmit({ title, date, attendance: attendance ? parseInt(attendance) : undefined, zone, description, summary, type: finalType, images, videos, previewImage, previewVideo });
+          const attendanceNum = attendance && attendance.trim() ? parseInt(attendance) : undefined;
+          if (attendanceNum !== undefined && isNaN(attendanceNum)) {
+            alert("Attendance must be a valid number");
+            return;
+          }
+          await onSubmit({ title, date, attendance: attendanceNum, zone: zone || undefined, description: description || undefined, summary: summary || undefined, type: finalType, images: images.length > 0 ? images : undefined, videos: videos.length > 0 ? videos : undefined, previewImage: previewImage || undefined, previewVideo: previewVideo || undefined });
           setTitle("");
           setDate("");
           setAttendance("");
