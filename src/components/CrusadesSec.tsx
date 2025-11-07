@@ -44,7 +44,7 @@ function CrusadesSection() {
             CRUSADES
           </h2>
           <p className="text-sm sm:text-base md:text-lg text-black leading-relaxed">
-            At the beginning of 2025 — the Year of Completeness, our Man of God, Rev. Dr. Chris Oyakhilome DSc., DSc., D.D., gave us a divine mandate to complete the full preaching of the Gospel to every nation, tribe, and tongue. Riding on this heavenly instruction, the Pastor Chris Live Unending Praise Crusades was birthed — a movement dedicated to soul winning and soul development through ceaseless worship. From prisons to orphanages, hospitals to communities, every gathering becomes an opportunity to share the love of Jesus Christ. This is the heartbeat of the Pastor Chris Live Unending Praise — taking the Gospel through worship to the ends of the earth.
+            At the beginning of the Year 2025 — the Year of Completeness — our Man of God, Rev. Dr. Chris Oyakhilome DSc. DSc. D.D., gave us a divine mandate: to complete the full preaching of the Gospel to every nation, tribe, and tongue. Riding on this divine mandate, the Pastor Chris Live Unending Praise Crusade was born. These crusades are all about soul winning and soul development — this is what we live for. It is our primary responsibility on earth, and everything we do is channeled towards fulfilling this divine mandate.
           </p>
           <Link to="/crusades">
             <button className="mt-3 sm:mt-5 flex items-center justify-center md:justify-start gap-2 bg-purple-400 hover:bg-purple-500 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-medium text-sm sm:text-base transition">
@@ -145,7 +145,7 @@ function CrusadesSection() {
                 CRUSADES
               </h3>
               <p className="text-xs sm:text-sm md:text-base text-gray-700 leading-relaxed mt-2">
-                At the beginning of 2025 — the Year of Completeness, our Man of God, Rev. Dr. Chris Oyakhilome DSc., DSc., D.D., gave us a divine mandate to complete the full preaching of the Gospel to every nation, tribe, and tongue. Riding on this heavenly instruction, the Pastor Chris Live Unending Praise Crusades was birthed — a movement dedicated to soul winning and soul development through ceaseless worship.
+                At the beginning of the Year 2025 — the Year of Completeness — our Man of God, Rev. Dr. Chris Oyakhilome DSc. DSc. D.D., gave us a divine mandate: to complete the full preaching of the Gospel to every nation, tribe, and tongue. Riding on this divine mandate, the Pastor Chris Live Unending Praise Crusade was born. These crusades are all about soul winning and soul development — this is what we live for.
               </p>
               <Link to="/crusades">
                 <button className="mt-3 sm:mt-4 bg-purple-400 hover:bg-purple-500 text-white px-5 sm:px-6 py-2 sm:py-3 rounded-full font-semibold text-xs sm:text-sm md:text-base transition">

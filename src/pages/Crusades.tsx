@@ -81,14 +81,19 @@ export default function Crusades() {
       {/* About + Form */}
       <div className="max-w-6xl mx-auto px-4 py-10 grid grid-cols-1 lg:grid-cols-3 gap-10">
         <div className="lg:col-span-2 text-gray-700 leading-relaxed">
-          <h2 className="font-bold text-2xl mb-4">What Our Crusades Are About</h2>
-          <p className="mb-3">
-            At the beginning of 2025 — the Year of Completeness, our Man of God, Rev. Dr. Chris Oyakhilome DSc., DSc., D.D., gave us a divine mandate to complete the full preaching of the Gospel to every nation, tribe, and tongue.
+          <h2 className="font-bold text-2xl mb-4">What Is the Pastor Chris Live Unending Praise Crusade All About?</h2>
+          <p className="mb-4">
+            At the beginning of the Year 2025 — the Year of Completeness — our Man of God, Rev. Dr. Chris Oyakhilome DSc. DSc. D.D., gave us a divine mandate: to complete the full preaching of the Gospel to every nation, tribe, and tongue. He charged each one of us to go out and win souls, and make disciples of men — as though we were the only ones entrusted with this sacred responsibility.
           </p>
-          <p className="mb-3">
-            Riding on this heavenly instruction, the Pastor Chris Live Unending Praise Crusades was birthed — a movement dedicated to soul winning and soul development through ceaseless worship. From prisons to orphanages, hospitals to communities, every gathering becomes an opportunity to share the love of Jesus Christ.
+          <p className="mb-4">
+            Riding on this divine mandate, the Pastor Chris Live Unending Praise Crusade was born. These crusades are all about soul winning and soul development — this is what we live for. It is our primary responsibility on earth, and everything we do is channeled towards fulfilling this divine mandate. Matthew 28:19–20 - "Go ye therefore, and teach all nations, baptizing them in the name of the Father, and of the Son, and of the Holy Ghost. Teaching them to observe all things whatsoever I have commanded you: and, lo, I am with you always, even unto the end of the world. Amen."
           </p>
-          <p>This is the heartbeat of the Pastor Chris Live Unending Praise — taking the Gospel through worship to the ends of the earth.</p>
+          <p className="mb-4">
+            While The Pastor Chris Live Unending Praise is a platform of continuous worship — where endless praise is offered to our Lord and Savior, Jesus Christ — it is also a powerful discipleship platform. Through it, we carry the message of Christ and the beauty of worship to every place: orphanages, prisons, hospitals, schools, communities etc.
+          </p>
+          <p>
+            Every opportunity becomes a moment for evangelism — even birthday celebrations are turned into soul-winning crusades. This is the heartbeat of the Pastor Chris Live Unending Praise Crusades — taking the Gospel of our Lord and Saviour Jesus Christ through worship across the globe.
+          </p>
         </div>
 
         <CrusadeForm />
