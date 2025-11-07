@@ -33,6 +33,8 @@ interface ImageCarouselProps {
 
 const ImageCarousel = forwardRef<ImageCarouselRef, ImageCarouselProps>(
   ({ media, autoPlay = true, interval = 8000 }, ref) => {
+    // Filter to only show images in preview, but keep all media for gallery
+    const previewMedia = media.filter(item => item.type === "image");
     const [active, setActive] = useState(0);
     const [showGallery, setShowGallery] = useState(false);
     const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
@@ -94,7 +96,7 @@ const ImageCarousel = forwardRef<ImageCarouselRef, ImageCarouselProps>(
               spaceBetween={30}
               slidesPerView={3}
               centeredSlides={true}
-              loop={media.length > 3}
+              loop={previewMedia.length > 3}
               autoplay={autoPlay ? {
                 delay: interval,
                 disableOnInteraction: false,
@@ -118,43 +120,47 @@ const ImageCarousel = forwardRef<ImageCarouselRef, ImageCarouselProps>(
               }}
               className="w-full h-full"
             >
-              {media.map((item, index) => {
-                const offset = index - active;
-                const total = media.length;
-                let normalizedOffset = offset;
-                if (normalizedOffset > total / 2) normalizedOffset -= total;
-                if (normalizedOffset < -total / 2) normalizedOffset += total;
+              {previewMedia.length > 0 ? (
+                previewMedia.map((item, index) => {
+                  const offset = index - active;
+                  const total = previewMedia.length;
+                  let normalizedOffset = offset;
+                  if (normalizedOffset > total / 2) normalizedOffset -= total;
+                  if (normalizedOffset < -total / 2) normalizedOffset += total;
 
-                let scale = 1;
-                if (Math.abs(normalizedOffset) === 1) scale = 0.92;
-                else if (Math.abs(normalizedOffset) === 2) scale = 0.78;
-                else if (Math.abs(normalizedOffset) >= 3) scale = 0.62;
+                  let scale = 1;
+                  if (Math.abs(normalizedOffset) === 1) scale = 0.92;
+                  else if (Math.abs(normalizedOffset) === 2) scale = 0.78;
+                  else if (Math.abs(normalizedOffset) >= 3) scale = 0.62;
 
-                return (
-                  <SwiperSlide key={item.url + index}>
-                    <motion.div
-                      initial={false}
-                      animate={{
-                        scale,
-                        opacity: 1,
-                      }}
-                      transition={{ type: "spring", stiffness: 200, damping: 20 }}
-                      className="rounded-xl overflow-hidden shadow-2xl bg-black cursor-pointer mx-auto"
-                      style={{ width: 300, height: 300 }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setFullscreenIndex(index);
-                      }}
-                    >
-                      {item.type === "image" ? (
+                  return (
+                    <SwiperSlide key={item.url + index}>
+                      <motion.div
+                        initial={false}
+                        animate={{
+                          scale,
+                          opacity: 1,
+                        }}
+                        transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                        className="rounded-xl overflow-hidden shadow-2xl bg-black cursor-pointer mx-auto"
+                        style={{ width: 300, height: 300 }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Find the index in the full media array
+                          const fullIndex = media.findIndex(m => m.url === item.url);
+                          setFullscreenIndex(fullIndex >= 0 ? fullIndex : 0);
+                        }}
+                      >
                         <img src={item.url} alt={item.caption ?? `media-${index}`} className="w-full h-full object-cover" />
-                      ) : (
-                        <video src={item.url} className="w-full h-full object-cover" controls playsInline />
-                      )}
-                    </motion.div>
-                  </SwiperSlide>
-                );
-              })}
+                      </motion.div>
+                    </SwiperSlide>
+                  );
+                })
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-400">
+                  No images available
+                </div>
+              )}
             </Swiper>
           </div>
 
@@ -165,7 +171,7 @@ const ImageCarousel = forwardRef<ImageCarouselRef, ImageCarouselProps>(
             </button>
 
             <div className="flex items-center gap-2">
-              {media.map((_, i) => {
+              {previewMedia.map((_, i) => {
                 const isActive = i === active;
                 return (
                   <motion.div
