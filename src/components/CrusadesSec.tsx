@@ -39,7 +39,7 @@ function CrusadesSection() {
     <>
       <section className="py-12 sm:py-16 md:py-24 px-4 sm:px-8 md:px-16 flex flex-col md:flex-row justify-between items-center gap-8 sm:gap-12 relative overflow-hidden">
         {/* LEFT: TEXT - Hidden on mobile, shown on desktop */}
-        <div className="hidden md:block w-full md:w-auto md:max-w-lg text-center md:text-left space-y-4 sm:space-y-6 relative z-60 bg-white/90 backdrop-blur-sm p-4 sm:p-6 rounded-2xl sm:rounded-full">
+        <div className="hidden md:block w-full md:w-auto md:max-w-lg text-center md:text-left space-y-4 sm:space-y-6 relative z-60 bg-white p-4 sm:p-6 rounded-2xl sm:rounded-full backdrop-blur-sm">
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">
             CRUSADES
           </h2>

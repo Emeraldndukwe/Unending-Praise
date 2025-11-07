@@ -2,8 +2,8 @@ import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function About() {
-  // Placeholder livestream start date (replace with actual)
-  const startDate = new Date("2023-01-01T00:00:00Z");
+  // Livestream began March 27th, 2023
+  const startDate = new Date("2023-03-27T00:00:00Z");
 
   const [elapsed, setElapsed] = useState({
     days: 0,
@@ -74,7 +74,7 @@ export default function About() {
   }, [elapsed]);
 
   return (
-    <div className="bg-[#FAF9F6] text-gray-900 min-h-screen flex flex-col pt-24 overflow-x-hidden">
+    <div className="bg-[#FAF9F6] text-gray-900 min-h-screen flex flex-col pt-24 overflow-x-hidden w-full">
       {/* HERO IMAGE SECTION */}
       <section className="w-full py-10 flex justify-center">
         <div className="w-[90%] md:w-[80%] lg:w-[70%] overflow-hidden rounded-3xl shadow-lg">
@@ -115,37 +115,37 @@ export default function About() {
       </section>
 
       {/* COUNTDOWN SECTION */}
-      <section className="relative py-16 px-6 md:px-12">
-        <div className="absolute right-0 top-0 pr-4 sm:pr-6 md:pr-12 text-right">
-          <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold">Livestream Duration</h2>
+      <section className="relative py-12 sm:py-16 px-4 sm:px-6 md:px-12 overflow-x-hidden">
+        <div className="relative sm:absolute sm:right-0 sm:top-0 pr-0 sm:pr-4 md:pr-6 lg:pr-12 text-left sm:text-right mb-8 sm:mb-0">
+          <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-semibold whitespace-nowrap">Livestream Duration</h2>
           <motion.div
-            className="h-[2px] bg-black/30 rounded-full w-[90vw] md:w-[92vw] mt-3 ml-auto"
+            className="h-[2px] bg-black/30 rounded-full w-full sm:w-[90vw] md:w-[92vw] mt-3 sm:ml-auto"
             initial={{ scaleX: 0 }}
             animate={{ scaleX: 1 }}
             transition={{ duration: 1.2, ease: "easeInOut" }}
-            style={{ transformOrigin: "right" }}
+            style={{ transformOrigin: "left" }}
           />
         </div>
 
-        <div className="max-w-5xl mx-auto mt-16 flex justify-center gap-4 md:gap-6 font-mono">
+        <div className="max-w-5xl mx-auto mt-8 sm:mt-12 md:mt-16 flex justify-center items-start gap-2 sm:gap-3 md:gap-4 lg:gap-6 font-mono flex-wrap sm:flex-nowrap px-2">
           <div className="flex flex-col items-center">
             <AnimatedDigit value={elapsed.days} oldValue={prev.current.days} />
-            <span className="text-sm mt-14 tracking-widest">DAYS</span>
+            <span className="text-xs sm:text-sm mt-6 sm:mt-10 md:mt-14 tracking-widest">DAYS</span>
           </div>
-          <span className="text-4xl font-bold mt-10">:</span>
+          <span className="text-2xl sm:text-3xl md:text-4xl font-bold mt-6 sm:mt-8 md:mt-10">:</span>
           <div className="flex flex-col items-center">
             <AnimatedDigit value={elapsed.hours} oldValue={prev.current.hours} />
-            <span className="text-sm mt-14 tracking-widest">HRS</span>
+            <span className="text-xs sm:text-sm mt-6 sm:mt-10 md:mt-14 tracking-widest">HRS</span>
           </div>
-          <span className="text-4xl font-bold mt-10">:</span>
+          <span className="text-2xl sm:text-3xl md:text-4xl font-bold mt-6 sm:mt-8 md:mt-10">:</span>
           <div className="flex flex-col items-center">
             <AnimatedDigit value={elapsed.minutes} oldValue={prev.current.minutes} />
-            <span className="text-sm mt-14 tracking-widest">MIN</span>
+            <span className="text-xs sm:text-sm mt-6 sm:mt-10 md:mt-14 tracking-widest">MIN</span>
           </div>
-          <span className="text-4xl font-bold mt-10">:</span>
+          <span className="text-2xl sm:text-3xl md:text-4xl font-bold mt-6 sm:mt-8 md:mt-10">:</span>
           <div className="flex flex-col items-center">
             <AnimatedDigit value={elapsed.seconds} oldValue={prev.current.seconds} />
-            <span className="text-sm mt-14 tracking-widest">SEC</span>
+            <span className="text-xs sm:text-sm mt-6 sm:mt-10 md:mt-14 tracking-widest">SEC</span>
           </div>
         </div>
       </section>
