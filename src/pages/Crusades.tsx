@@ -50,11 +50,19 @@ export default function Crusades() {
 
   // Dynamically generate sections based on crusade types
   const getCrusadesByType = (typeName: string) => {
-    if (!typeName || typeName.toLowerCase() === 'prison') {
-      // For prison or undefined, show crusades without type or with prison type
-      return allCrusades.filter((c) => !c.type || c.type.toLowerCase() === "prison").slice(0, 3);
-    }
-    return allCrusades.filter((c) => c.type && c.type.toLowerCase() === typeName.toLowerCase()).slice(0, 3);
+    const normalize = (value?: string) => value?.toLowerCase() ?? "";
+    const matchingCrusades = allCrusades.filter((c) => {
+      const crusadeType = normalize(c.type);
+      if (!typeName || normalize(typeName) === "prison") {
+        // For prison or undefined, show crusades without type or with prison type
+        return crusadeType === "prison" || crusadeType === "";
+      }
+      return crusadeType === normalize(typeName);
+    });
+
+    return matchingCrusades
+      .sort((a, b) => (b.attendance ?? 0) - (a.attendance ?? 0))
+      .slice(0, 3);
   };
 
   // Get all unique types from crusades - only show types that exist in admin

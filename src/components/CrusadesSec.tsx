@@ -13,27 +13,81 @@ type Crusade = {
 
 function CrusadesSection() {
   const [crusades, setCrusades] = useState<Crusade[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/crusades')
-      .then(res => res.json())
-      .then((data: any[]) => {
-        // Convert snake_case to camelCase and show first 5
-        const converted = data.map((c: any) => ({
-          ...c,
-          previewImage: c.previewImage || c.preview_image,
-        }));
-        setCrusades(converted.slice(0, 5));
-      })
-      .catch(() => {});
+    const controller = new AbortController();
+    let isMounted = true;
+
+    const loadCrusades = async () => {
+      try {
+        if (isMounted) {
+          setLoading(true);
+        }
+        const response = await fetch('/api/crusades', { signal: controller.signal });
+        if (!response.ok) {
+          throw new Error(`Failed to load crusades: ${response.status}`);
+        }
+        const data: any[] = await response.json();
+        const converted = data
+          .map((c: any) => ({
+            ...c,
+            previewImage: c.previewImage || c.preview_image,
+          }))
+          .sort((a, b) => (b.attendance ?? 0) - (a.attendance ?? 0));
+        if (isMounted) {
+          setCrusades(converted.slice(0, 5));
+        }
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') {
+          console.error('[CrusadesSection] Failed to fetch crusades', err);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadCrusades();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
   }, []);
 
+  const fallbackImages = [
+    'https://images.unsplash.com/photo-1497435332909-251e61e4e502?w=300&h=200&fit=crop',
+    'https://images.unsplash.com/photo-1548554448-087ebf1e11e3?w=300&h=200&fit=crop',
+    'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=300&h=200&fit=crop',
+    'https://images.unsplash.com/photo-1505373877841-8d25f7d46678?w=300&h=200&fit=crop',
+    'https://images.unsplash.com/photo-1568808163202-efd7e7d63d77?w=300&h=200&fit=crop',
+  ];
+
   const getImageUrl = (idx: number) => {
-    // Use placeholder images for now
     if (crusades[idx]?.previewImage) return crusades[idx].previewImage;
-    // Placeholder images - user will replace these with actual images later
-    return `https://images.unsplash.com/photo-${idx === 0 ? '1497435332909-251e61e4e502' : idx === 1 ? '1548554448-087ebf1e11e3' : idx === 2 ? '1511795409834-ef04bbd61622' : idx === 3 ? '1505373877841-8d25f7d46678' : '1568808163202-efd7e7d63d77'}?w=300&h=200&fit=crop`;
+    return fallbackImages[idx % fallbackImages.length];
   };
+
+  const desktopPositions = [
+    'top-0 right-100 w-70 h-52 rotate-[-2deg]',
+    'top-6 right-1 w-72 h-48 rotate-[4deg]',
+    'top-28 right-50 w-64 h-44 rotate-[2deg]',
+    'bottom-0 right-100 w-70 h-52 rotate-[-3deg]',
+    'bottom-6 right-10 w-72 h-48 rotate-[5deg]',
+  ];
+
+  const mobilePositions = [
+    'top-0 left-0 w-24 h-24 sm:w-28 sm:h-28 rotate-[-8deg]',
+    'top-0 right-0 w-24 h-24 sm:w-28 sm:h-28 rotate-[10deg]',
+    'bottom-10 left-0 w-24 h-24 sm:w-28 sm:h-28 rotate-[5deg]',
+    'bottom-10 right-0 w-24 h-24 sm:w-28 sm:h-28 rotate-[-6deg]',
+    'bottom-20 left-1/2 transform -translate-x-1/2 w-24 h-24 sm:w-28 sm:h-28 rotate-[4deg] shadow-lg',
+  ];
+
+  const topCrusades = crusades.slice(0, 5);
+  const hasCrusades = topCrusades.length > 0;
 
   return (
     <>
@@ -55,90 +109,72 @@ function CrusadesSection() {
 
         {/* DESKTOP IMAGE COLLAGE */}
         <div className="hidden md:flex relative w-full md:w-[700px] h-[480px] justify-center items-center">
-          {crusades.length > 0 ? (
+          {loading ? (
             <>
-              {crusades.slice(0, 5).map((crusade, idx) => (
+              {desktopPositions.map((position, idx) => (
+                <div
+                  key={`desktop-skeleton-${idx}`}
+                  className={`absolute rounded-3xl bg-gray-200/70 animate-pulse ${position}`}
+                />
+              ))}
+            </>
+          ) : hasCrusades ? (
+            <>
+              {topCrusades.map((crusade, idx) => (
                 <Link
                   key={crusade.id}
                   to={`/crusades/details/${crusade.id}`}
-                  className={`absolute object-cover rounded-3xl shadow-lg z-${40 - idx * 10} cursor-pointer hover:scale-105 transition-transform duration-300 ${
-                    idx === 0 ? 'top-0 right-100 w-70 h-52 rotate-[-2deg]' :
-                    idx === 1 ? 'top-6 right-1 w-72 h-48 rotate-[4deg]' :
-                    idx === 2 ? 'top-28 right-50 w-64 h-44 rotate-[2deg]' :
-                    idx === 3 ? 'bottom-0 right-100 w-70 h-52 rotate-[-3deg]' :
-                    'bottom-6 right-10 w-72 h-48 rotate-[5deg]'
-                  }`}
+                  className={`absolute object-cover rounded-3xl shadow-lg z-${40 - idx * 10} cursor-pointer hover:scale-105 transition-transform duration-300 ${desktopPositions[idx]}`}
                 >
-          <img
+                  <img
                     src={getImageUrl(idx)}
                     alt={crusade.title || `Crusade ${idx + 1}`}
                     className="w-full h-full object-cover rounded-3xl"
-          />
+                    loading="lazy"
+                    decoding="async"
+                  />
                 </Link>
               ))}
             </>
           ) : (
-            <>
-              {[0, 1, 2, 3, 4].map((idx) => (
-                <img
-                  key={idx}
-                  src={getImageUrl(idx)}
-                  alt={`Crusade ${idx + 1}`}
-                  className={`absolute object-cover rounded-3xl shadow-lg z-${40 - idx * 10} ${
-                    idx === 0 ? 'top-0 right-100 w-70 h-52 rotate-[-2deg]' :
-                    idx === 1 ? 'top-6 right-1 w-72 h-48 rotate-[4deg]' :
-                    idx === 2 ? 'top-28 right-50 w-64 h-44 rotate-[2deg]' :
-                    idx === 3 ? 'bottom-0 right-100 w-70 h-52 rotate-[-3deg]' :
-                    'bottom-6 right-10 w-72 h-48 rotate-[5deg]'
-                  }`}
-                />
-              ))}
-            </>
+            <div className="text-center text-gray-500">No crusades available yet. Check back soon!</div>
           )}
         </div>
 
         {/* MOBILE/TABLET LAYOUT */}
         <div className="md:hidden relative w-full mt-4 sm:mt-8 flex justify-center items-center">
           <div className="relative w-full max-w-md h-[480px] sm:h-[540px] mx-auto">
-            {crusades.length > 0 ? (
+            {loading ? (
               <>
-                {crusades.slice(0, 5).map((crusade, idx) => (
+                {mobilePositions.map((position, idx) => (
+                  <div
+                    key={`mobile-skeleton-${idx}`}
+                    className={`absolute rounded-2xl bg-gray-200/70 animate-pulse ${position}`}
+                  />
+                ))}
+              </>
+            ) : hasCrusades ? (
+              <>
+                {topCrusades.map((crusade, idx) => (
                   <Link
                     key={crusade.id}
                     to={`/crusades/details/${crusade.id}`}
-                    className={`absolute shadow-md cursor-pointer hover:scale-110 transition-transform duration-300 ${
-                      idx === 0 ? 'top-0 left-0 w-24 h-24 sm:w-28 sm:h-28 rotate-[-8deg]' :
-                      idx === 1 ? 'top-0 right-0 w-24 h-24 sm:w-28 sm:h-28 rotate-[10deg]' :
-                      idx === 2 ? 'bottom-10 left-0 w-24 h-24 sm:w-28 sm:h-28 rotate-[5deg]' :
-                      idx === 3 ? 'bottom-10 right-0 w-24 h-24 sm:w-28 sm:h-28 rotate-[-6deg]' :
-                      'bottom-20 left-1/2 transform -translate-x-1/2 w-24 h-24 sm:w-28 sm:h-28 rotate-[4deg] shadow-lg'
-                    }`}
+                    className={`absolute shadow-md cursor-pointer hover:scale-110 transition-transform duration-300 ${mobilePositions[idx]}`}
                   >
-            <img
+                    <img
                       src={getImageUrl(idx)}
                       alt={crusade.title || `Crusade ${idx + 1}`}
                       className="w-full h-full object-cover rounded-2xl"
+                      loading="lazy"
+                      decoding="async"
                     />
                   </Link>
                 ))}
               </>
             ) : (
-              <>
-                {[0, 1, 2, 3, 4].map((idx) => (
-                  <img
-                    key={idx}
-                    src={getImageUrl(idx)}
-                    alt={`Crusade ${idx + 1}`}
-                    className={`absolute object-cover shadow-md rounded-2xl ${
-                      idx === 0 ? 'top-0 left-0 w-24 h-24 sm:w-28 sm:h-28 rotate-[-8deg]' :
-                      idx === 1 ? 'top-0 right-0 w-24 h-24 sm:w-28 sm:h-28 rotate-[10deg]' :
-                      idx === 2 ? 'bottom-10 left-0 w-24 h-24 sm:w-28 sm:h-28 rotate-[5deg]' :
-                      idx === 3 ? 'bottom-10 right-0 w-24 h-24 sm:w-28 sm:h-28 rotate-[-6deg]' :
-                      'bottom-20 left-1/2 transform -translate-x-1/2 w-24 h-24 sm:w-28 sm:h-28 rotate-[4deg] shadow-lg'
-                    }`}
-                  />
-                ))}
-              </>
+              <div className="absolute inset-0 flex items-center justify-center text-center text-gray-500">
+                No crusades available yet. Check back soon!
+              </div>
             )}
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center bg-white backdrop-blur-sm px-4 sm:px-5 py-4 sm:py-6 rounded-4xl">
               <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">

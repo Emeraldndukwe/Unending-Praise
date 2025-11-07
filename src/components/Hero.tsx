@@ -1,6 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import videojs from "video.js";
-import "video.js/dist/video-js.css";
 import { motion, AnimatePresence } from "framer-motion";
 import SongList from "./SongList";
 import LiveChat from "./LiveChat";
@@ -13,6 +11,16 @@ export default function HeroSection() {
   const [activeTab, setActiveTab] = useState("songs");
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const playerRef = useRef<any>(null);
+  const videoJsModuleRef = useRef<any>(null);
+
+  const loadVideoJs = useCallback(async () => {
+    if (!videoJsModuleRef.current) {
+      const module = await import("video.js");
+      await import("video.js/dist/video-js.css");
+      videoJsModuleRef.current = module.default ?? module;
+    }
+    return videoJsModuleRef.current;
+  }, []);
 
   // ✅ Resize listener
   useEffect(() => {
@@ -22,20 +30,22 @@ export default function HeroSection() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // ✅ Initialize Video.js player
-  const initializePlayer = useCallback((element: HTMLVideoElement) => {
+  // ✅ Initialize Video.js player lazily
+  const initializePlayer = useCallback(async (element: HTMLVideoElement) => {
     if (playerRef.current) {
       console.log("[HeroSection] Player already exists, skipping initialization");
       return;
     }
 
     console.log("[HeroSection] Initializing Video.js player");
-    
+
     try {
       const streamSrc = "https://vcpout-ams01.internetmultimediaonline.org/lmampraise/stream1/playlist.m3u8";
-      
+
       console.log("[HeroSection] Creating Video.js player with source:", streamSrc);
-      
+
+      const videojs = await loadVideoJs();
+
       playerRef.current = videojs(element, {
         autoplay: true,
         controls: true,
@@ -58,7 +68,7 @@ export default function HeroSection() {
         ],
       }, () => {
         console.log("[HeroSection] Video.js player ready");
-        
+
         // Ensure player fills container
         const playerEl = playerRef.current?.el();
         if (playerEl) {
@@ -105,7 +115,7 @@ export default function HeroSection() {
     } catch (err) {
       console.error("[HeroSection] Failed to initialize Video.js:", err);
     }
-  }, []);
+  }, [loadVideoJs]);
 
   // ✅ Callback ref for video element - ensures it's ready when mounted
   const setVideoRef = useCallback((element: HTMLVideoElement | null) => {
@@ -133,7 +143,9 @@ export default function HeroSection() {
       // Small delay to ensure element is fully ready
       setTimeout(() => {
         if (videoRef.current && !playerRef.current && showLiveVideo) {
-          initializePlayer(element);
+          initializePlayer(element).catch((err) =>
+            console.error("[HeroSection] Error initializing player in ref callback:", err)
+          );
         }
       }, 150);
     }
@@ -150,7 +162,9 @@ export default function HeroSection() {
     const tryInitialize = () => {
       if (videoRef.current && !playerRef.current) {
         console.log("[HeroSection] Video element found, initializing player via useEffect");
-        initializePlayer(videoRef.current);
+        initializePlayer(videoRef.current).catch((err) =>
+          console.error("[HeroSection] Error initializing player in effect:", err)
+        );
       } else if (retries < maxRetries) {
         retries++;
         setTimeout(tryInitialize, 100);

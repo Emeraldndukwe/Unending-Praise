@@ -18,6 +18,8 @@ export default function CrusadeCard({ id, title, attendance, date, image }: Crus
         src={image}
         alt={title}
         className="w-full h-[90px] md:h-[160px] object-cover rounded-t-[22px]"
+        loading="lazy"
+        decoding="async"
       />
       
       {/* Content */}
