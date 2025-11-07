@@ -76,10 +76,13 @@ export default function CrusadeCarousel({ data }: CrusadeCarouselProps) {
     <div className="w-full flex flex-col items-center">
       {/* CARDS */}
       <div 
-        className="relative w-full md:h-[480px] h-[360px] flex justify-center overflow-visible mt-8 mb-8 px-2"
+        className="relative w-full flex justify-center overflow-visible mt-8 px-2 min-h-[360px] md:min-h-[480px]"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
-        style={{ paddingTop: '40px', paddingBottom: '40px', marginTop: '20px' }}
+        style={{ 
+          paddingTop: '40px', 
+          paddingBottom: '80px', // Extra padding to ensure cards don't cover pagination
+        }}
       >
         {list.map((item, index) => {
           // For single card, center it
@@ -141,7 +144,7 @@ export default function CrusadeCarousel({ data }: CrusadeCarouselProps) {
       </div>
 
       {/* DOTS */}
-      <div className="flex gap-2 mt-6">
+      <div className="flex gap-2 mt-4 mb-4 relative z-10">
         {list.map((_, i) => (
           <button
             key={i}
