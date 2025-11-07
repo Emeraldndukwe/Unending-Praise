@@ -132,7 +132,7 @@ export default function TestimoniesCarousel() {
 
   const visibleCards = isMobile ? 3 : testimonies.length;
   const cardWidth = isMobile ? 220 : 320;
-  const cardHeight = isMobile ? 300 : 400;
+  const cardHeight = isMobile ? 320 : 400; // Increased mobile height to prevent text cutoff
   const offsetDistance = isMobile ? 180 : 220;
 
   if (testimonies.length === 0) {
