@@ -16,28 +16,73 @@ type Crusade = {
   videos?: string[];
 };
 
+type CrusadeType = {
+  id: string;
+  name: string;
+  description?: string;
+};
+
 export default function CrusadeListPage() {
-  const { type } = useParams(); // "prison" or "online"
+  const { type: typeSlug } = useParams(); // e.g., "prison", "online", "prison-crusades", etc.
   const [crusades, setCrusades] = useState<Crusade[]>([]);
+  const [crusadeTypes, setCrusadeTypes] = useState<CrusadeType[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  const pageTitle =
-    type === "prison" ? "PRISON CRUSADES" : "ONLINE CRUSADES";
+  const [typeName, setTypeName] = useState<string>("");
 
   useEffect(() => {
-    fetch('/api/crusades')
-      .then(res => res.json())
-      .then((data: Crusade[]) => {
-        const filtered = data.filter((c) => 
-          type === "prison" ? (!c.type || c.type === "prison") : c.type === "online"
-        );
-        setCrusades(filtered);
+    Promise.all([
+      fetch('/api/crusades').then(res => res.json()),
+      fetch('/api/crusade-types').then(res => res.json()).catch(() => [])
+    ])
+      .then(([crusadesData, typesData]: [any[], CrusadeType[]]) => {
+        // Convert snake_case to camelCase
+        const convertedCrusades = crusadesData.map((c: any) => ({
+          ...c,
+          previewImage: c.previewImage || c.preview_image,
+        }));
+        
+        setCrusadeTypes(typesData);
+        
+        if (!typeSlug) {
+          setCrusades([]);
+          setLoading(false);
+          return;
+        }
+        
+        // Find the crusade type that matches the slug
+        // Convert slug back to type name by comparing with actual type names
+        const matchedType = typesData.find((t) => {
+          const typeSlugFromName = t.name.toLowerCase().replace(/\s+/g, '-');
+          return typeSlugFromName === typeSlug.toLowerCase();
+        });
+        
+        if (matchedType) {
+          setTypeName(matchedType.name);
+          // Filter crusades by matching type name (case-insensitive)
+          const filtered = convertedCrusades.filter((c) => {
+            if (!c.type) return false;
+            return c.type.toLowerCase() === matchedType.name.toLowerCase();
+          });
+          setCrusades(filtered);
+        } else {
+          // Fallback: try to match directly with slug (for backward compatibility)
+          const filtered = convertedCrusades.filter((c) => {
+            if (!c.type) return false;
+            const typeSlugFromCrusade = c.type.toLowerCase().replace(/\s+/g, '-');
+            return typeSlugFromCrusade === typeSlug.toLowerCase();
+          });
+          setCrusades(filtered);
+          setTypeName(typeSlug.charAt(0).toUpperCase() + typeSlug.slice(1).replace(/-/g, ' '));
+        }
+        
         setLoading(false);
       })
       .catch(() => {
         setLoading(false);
       });
-  }, [type]);
+  }, [typeSlug]);
+  
+  const pageTitle = typeName ? `${typeName.toUpperCase()} CRUSADES` : "CRUSADES";
 
   return (
     <div className="w-full">
