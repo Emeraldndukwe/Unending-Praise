@@ -82,9 +82,10 @@ export default function Testimonies() {
             )}
           </div>
 
-        {/* Form */}
-        <div className="w-full order-1 lg:order-2">
-          <TestimonyForm />
+          {/* Form */}
+          <div className="w-full order-1 lg:order-2">
+            <TestimonyForm />
+          </div>
         </div>
       </div>
     </div>
