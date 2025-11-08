@@ -77,15 +77,15 @@ export default function TestimonyForm() {
 
       if (res.ok) {
         alert("Your testimony has been submitted! It will be reviewed before being posted.");
-      setFormData({
-        title: "",
-        name: "",
-        phone: "",
-        email: "",
-        testimony: "",
-        attachments: [],
+    setFormData({
+      title: "",
+      name: "",
+      phone: "",
+      email: "",
+      testimony: "",
+      attachments: [],
         salutation: "",
-      });
+    });
       } else {
         throw new Error('Submission failed');
       }

@@ -81,7 +81,7 @@ export default function About() {
           <img
             src="https://loveworldmusic.org/wp-content/uploads/2024/06/1000097946-1536x836.jpg"
             alt="About Unending Praise"
-            className="absolute inset-0 w-full h-full object-contain bg-black"
+            className="absolute inset-0 w-full h-full object-cover object-[center_top]"
           />
         </div>
       </section>
