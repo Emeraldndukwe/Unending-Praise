@@ -28,24 +28,99 @@ export default function Crusades() {
   const [crusadeTypes, setCrusadeTypes] = useState<CrusadeType[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const CRUSADES_CACHE_KEY = "crusades-cache-v1";
+  const CRUSADE_TYPES_CACHE_KEY = "crusade-types-cache-v1";
+  const CACHE_TTL = 5 * 60 * 1000;
+
+  const loadFromCache = <T,>(key: string): T | null => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = sessionStorage.getItem(key);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed?.timestamp || Date.now() - parsed.timestamp > CACHE_TTL) {
+        sessionStorage.removeItem(key);
+        return null;
+      }
+      return parsed.data as T;
+    } catch (error) {
+      console.warn(`[Crusades] Failed to read cache for ${key}`, error);
+      return null;
+    }
+  };
+
+  const saveToCache = (key: string, data: unknown) => {
+    if (typeof window === "undefined") return;
+    try {
+      sessionStorage.setItem(
+        key,
+        JSON.stringify({ timestamp: Date.now(), data })
+      );
+    } catch (error) {
+      console.warn(`[Crusades] Failed to write cache for ${key}`, error);
+    }
+  };
+
   useEffect(() => {
-    Promise.all([
-      fetch('/api/crusades').then(res => res.json()),
-      fetch('/api/crusade-types').then(res => res.json()).catch(() => [])
-    ])
-      .then(([crusades, types]: [any[], CrusadeType[]]) => {
-        // Convert snake_case to camelCase for previewImage
-        const convertedCrusades = crusades.map((c: any) => ({
+    const cachedCrusades = loadFromCache<Crusade[]>(CRUSADES_CACHE_KEY);
+    const cachedTypes = loadFromCache<CrusadeType[]>(CRUSADE_TYPES_CACHE_KEY);
+
+    if (cachedCrusades) {
+      setAllCrusades(cachedCrusades);
+    }
+    if (cachedTypes) {
+      setCrusadeTypes(cachedTypes);
+    }
+    if (cachedCrusades || cachedTypes) {
+      setLoading(false);
+    }
+
+    const controller = new AbortController();
+    const { signal } = controller;
+    let ignore = false;
+
+    const hydrate = async () => {
+      try {
+        const [crusadesResponse, rawTypesResponse] = await Promise.all([
+          fetch("/api/crusades", { signal }),
+          fetch("/api/crusade-types", { signal }).catch(() => ({
+            ok: false,
+            json: async () => [],
+          })),
+        ]);
+
+        const crusadesJson: any[] = crusadesResponse.ok ? await crusadesResponse.json() : [];
+        const typesResponse =
+          rawTypesResponse instanceof Response ? rawTypesResponse : null;
+        const typesJson: CrusadeType[] =
+          typesResponse && typesResponse.ok ? await typesResponse.json() : [];
+
+        const convertedCrusades = crusadesJson.map((c: any) => ({
           ...c,
           previewImage: c.previewImage || c.preview_image,
         }));
-        setAllCrusades(convertedCrusades);
-        setCrusadeTypes(types);
-        setLoading(false);
-      })
-      .catch(() => {
-        setLoading(false);
-      });
+
+        if (!ignore) {
+          setAllCrusades(convertedCrusades);
+          setCrusadeTypes(typesJson);
+          setLoading(false);
+          saveToCache(CRUSADES_CACHE_KEY, convertedCrusades);
+          saveToCache(CRUSADE_TYPES_CACHE_KEY, typesJson);
+        }
+      } catch (error: any) {
+        if (error?.name === "AbortError") return;
+        if (!cachedCrusades && !ignore) {
+          setLoading(false);
+        }
+      }
+    };
+
+    hydrate();
+
+    return () => {
+      ignore = true;
+      controller.abort();
+    };
   }, []);
 
   const formatTypeHeading = (name: string) => {

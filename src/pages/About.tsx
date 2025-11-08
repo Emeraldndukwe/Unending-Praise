@@ -79,8 +79,8 @@ export default function About() {
       <section className="w-full py-10 flex justify-center">
         <div className="w-[90%] md:w-[80%] lg:w-[70%] overflow-hidden rounded-3xl shadow-lg">
           <img
-            src="/Unending_Praise-1.jpg"
-            alt="Unending Praise"
+            src="https://loveworldmusic.org/wp-content/uploads/2024/06/1000097946-1536x836.jpg"
+            alt="About Unending Praise"
             className="w-full h-[300px] md:h-[400px] object-cover"
           />
         </div>
@@ -89,7 +89,7 @@ export default function About() {
       {/* VISION SECTION */}
       <section className="relative py-16 px-6 md:px-12">
         <div className="absolute left-0 top-0 pl-4 sm:pl-6 md:pl-12">
-          <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold">Our Vision</h2>
+          <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold">About Us</h2>
           <motion.div
             className="h-[2px] bg-black/30 rounded-full w-[90vw] md:w-[92vw] mt-3"
             initial={{ scaleX: 0 }}

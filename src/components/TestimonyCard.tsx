@@ -19,9 +19,18 @@ export default function TestimonyCard({ id, title, name, summary, content, previ
       <div className="w-full md:w-1/3 bg-gray-200 h-48 flex items-center justify-center overflow-hidden rounded-lg relative">
         {previewMedia ? (
           previewVideo ? (
-            <video src={previewVideo} className="object-cover w-full h-full" muted playsInline />
+            <video
+              src={previewVideo}
+              className="object-cover w-full h-full"
+              muted
+              playsInline
+            />
           ) : (
-            <img src={previewImage} alt={title || "Testimony"} className="object-cover w-full h-full" />
+            <img
+              src={previewImage}
+              alt={title || "Testimony"}
+              className="object-cover object-top w-full h-full"
+            />
           )
         ) : (
           <div className="text-gray-400 text-sm">No preview</div>

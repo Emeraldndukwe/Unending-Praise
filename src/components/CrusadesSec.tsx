@@ -15,14 +15,50 @@ function CrusadesSection() {
   const [crusades, setCrusades] = useState<Crusade[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const CRUSADES_CACHE_KEY = "crusades-cache-v1";
+  const CACHE_TTL = 5 * 60 * 1000;
+
+  const loadFromCache = (): Crusade[] | null => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = sessionStorage.getItem(CRUSADES_CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed?.timestamp || Date.now() - parsed.timestamp > CACHE_TTL) {
+        sessionStorage.removeItem(CRUSADES_CACHE_KEY);
+        return null;
+      }
+      return parsed.data as Crusade[];
+    } catch (error) {
+      console.warn("[CrusadesSection] Failed to read cached crusades", error);
+      return null;
+    }
+  };
+
+  const saveToCache = (data: Crusade[]) => {
+    if (typeof window === "undefined") return;
+    try {
+      sessionStorage.setItem(
+        CRUSADES_CACHE_KEY,
+        JSON.stringify({ timestamp: Date.now(), data })
+      );
+    } catch (error) {
+      console.warn("[CrusadesSection] Failed to cache crusades", error);
+    }
+  };
+
   useEffect(() => {
     const controller = new AbortController();
     let isMounted = true;
 
     const loadCrusades = async () => {
       try {
+        const cached = loadFromCache();
+        if (isMounted && cached && cached.length > 0) {
+          setCrusades(cached);
+        }
         if (isMounted) {
-          setLoading(true);
+          setLoading(!(cached && cached.length > 0));
         }
         const response = await fetch('/api/crusades', { signal: controller.signal });
         if (!response.ok) {
@@ -35,8 +71,11 @@ function CrusadesSection() {
             previewImage: c.previewImage || c.preview_image,
           }))
           .sort((a, b) => (b.attendance ?? 0) - (a.attendance ?? 0));
+        const topFive = converted.slice(0, 5);
         if (isMounted) {
-          setCrusades(converted.slice(0, 5));
+          setCrusades(topFive);
+          setLoading(false);
+          saveToCache(converted);
         }
       } catch (err: any) {
         if (err?.name !== 'AbortError') {

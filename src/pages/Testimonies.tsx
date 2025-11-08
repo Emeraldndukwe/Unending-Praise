@@ -11,6 +11,9 @@ type Testimony = {
   previewImage?: string;
   previewVideo?: string;
   approved?: boolean;
+  preview_image?: string;
+  preview_video?: string;
+  media?: { type?: string; url?: string }[];
 };
 
 export default function Testimonies() {
@@ -21,8 +24,23 @@ export default function Testimonies() {
     fetch('/api/testimonies')
       .then(res => res.json())
       .then((data: Testimony[]) => {
-        // Only show approved testimonies
-        setTestimonies(data.filter(t => t.approved));
+        const normalized = data
+          .filter((t) => t.approved)
+          .map((t) => {
+            const mediaFallbackImage = t.media?.find(
+              (item) => item.type === "image" && item.url
+            )?.url;
+            const mediaFallbackVideo = t.media?.find(
+              (item) => item.type === "video" && item.url
+            )?.url;
+
+            return {
+              ...t,
+              previewImage: t.previewImage || t.preview_image || mediaFallbackImage,
+              previewVideo: t.previewVideo || t.preview_video || mediaFallbackVideo,
+            };
+          });
+        setTestimonies(normalized);
         setLoading(false);
       })
       .catch(() => {

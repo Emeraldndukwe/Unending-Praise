@@ -229,7 +229,7 @@ export default function HeroSection() {
                   className="absolute inset-0"
                 >
                   <img
-                    src="/Unending_Praise-1.jpg"
+                    src="https://loveworldmusic.org/wp-content/uploads/2024/06/1000097946-1536x836.jpg"
                     alt="Unending Praise"
                     className="absolute inset-0 w-full h-full object-cover rounded-3xl"
                   />
