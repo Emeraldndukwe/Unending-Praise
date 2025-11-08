@@ -162,7 +162,7 @@ export default function Crusades() {
       </div>
 
       {/* About + Form */}
-      <div className="max-w-6xl mx-auto px-4 py-10 grid grid-cols-1 lg:grid-cols-3 gap-10">
+      <div className="max-w-6xl mx-auto px-4 py-10 grid grid-cols-1 lg:grid-cols-3 gap-10 items-start">
         <div className="lg:col-span-2 text-gray-700 leading-relaxed space-y-4">
           <h2 className="font-bold text-2xl">What Is the Pastor Chris Live Unending Praise Crusade All About?</h2>
           <p>

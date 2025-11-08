@@ -105,8 +105,8 @@ export default function CrusadeForm() {
         </div>
 
         <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
           type="submit"
           className=" bg-[#54037C]/70 text-white font-semibold py-2 rounded hover:bg-[#8e5858] transition"
         >
