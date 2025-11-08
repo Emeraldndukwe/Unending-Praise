@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { motion, animate } from "framer-motion";
+import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, ArrowUpRight } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -64,32 +64,11 @@ export default function TestimoniesCarousel() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Animate color transition on active change
+  // Update base color when active testimony changes
   useEffect(() => {
     if (!testimonies.length || !testimonies[active]) return;
-    const currentColor = testimonies[active]?.color || "rgb(155, 89, 214)";
-    // Only animate if the color actually changed
-    if (baseColor === currentColor) return;
-    
-    const from = baseColor;
-    const to = currentColor;
-    const controls = animate(0, 1, {
-      duration: 0.8,
-      ease: "easeInOut",
-      onUpdate: (latest) => {
-        const fromMatch = from.match(/\d+/g);
-        const toMatch = to.match(/\d+/g);
-        if (!fromMatch || !toMatch) return;
-        const [r1, g1, b1] = fromMatch.map(Number);
-        const [r2, g2, b2] = toMatch.map(Number);
-        const r = Math.round(r1 + (r2 - r1) * latest);
-        const g = Math.round(g1 + (g2 - g1) * latest);
-        const b = Math.round(b1 + (b2 - b1) * latest);
-        setBaseColor(`rgb(${r}, ${g}, ${b})`);
-      },
-    });
-    return () => controls.stop();
-  }, [active, testimonies.length]);
+    setBaseColor(testimonies[active]?.color || "rgb(155, 89, 214)");
+  }, [active, testimonies]);
 
   // Entrance animation
   useEffect(() => {
@@ -177,7 +156,6 @@ export default function TestimoniesCarousel() {
             return (
               <motion.div
                 key={item.id}
-                layout
                 onClick={() => {
                   // Navigate to testimony details
                   navigate(`/testimonies/${item.id}`);
@@ -192,11 +170,8 @@ export default function TestimoniesCarousel() {
                   opacity: animateIn ? 1 : 0,
                 }}
                 transition={{
-                  type: "spring",
-                  stiffness: 140,
-                  damping: 18,
-                  mass: 0.8,
-                  backgroundColor: { duration: 0.5, ease: "easeInOut" },
+                  duration: 0.55,
+                  ease: "easeInOut",
                 }}
                 className="absolute rounded-3xl cursor-pointer text-white shadow-2xl overflow-hidden transition-transform duration-300 hover:scale-105"
                 style={{ width: cardWidth, height: cardHeight }}

@@ -76,12 +76,12 @@ export default function About() {
   return (
     <div className="bg-[#FAF9F6] text-gray-900 min-h-screen flex flex-col pt-24 overflow-x-hidden w-full">
       {/* HERO IMAGE SECTION */}
-      <section className="w-full py-10 flex justify-center">
-        <div className="w-[90%] md:w-[80%] lg:w-[70%] overflow-hidden rounded-3xl shadow-lg">
+      <section className="w-full py-10 flex justify-center px-4">
+        <div className="relative w-full max-w-6xl rounded-3xl shadow-lg overflow-hidden aspect-[21/9]">
           <img
             src="https://loveworldmusic.org/wp-content/uploads/2024/06/1000097946-1536x836.jpg"
             alt="About Unending Praise"
-            className="w-full h-[300px] md:h-[400px] object-cover"
+            className="absolute inset-0 w-full h-full object-contain bg-black"
           />
         </div>
       </section>
