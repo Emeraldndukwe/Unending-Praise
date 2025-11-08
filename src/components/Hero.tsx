@@ -223,7 +223,13 @@ export default function HeroSection() {
         >
           <div
             className={`w-full rounded-3xl shadow-lg overflow-hidden relative ${
-              showLiveVideo ? "aspect-video" : isMobile ? "h-[18rem]" : "h-[34rem]"
+              showLiveVideo
+                ? isMobile
+                  ? "h-[240px]"
+                  : "aspect-video"
+                : isMobile
+                ? "h-[18rem]"
+                : "h-[34rem]"
             }`}
           >
             <AnimatePresence mode="wait">
@@ -281,14 +287,12 @@ export default function HeroSection() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -12 }}
                   transition={{ duration: 0.35 }}
-                  className={`absolute inset-0 rounded-3xl overflow-hidden bg-black ${
-                    isMobile ? "min-h-[220px]" : ""
-                  }`}
+                  className="absolute inset-0 rounded-3xl overflow-hidden bg-black"
                 >
                   <video
                     ref={setVideoRef}
                     className={`video-js vjs-default-skin w-full h-full rounded-3xl ${
-                      isMobile ? "min-h-[220px]" : ""
+                      isMobile ? "object-cover" : ""
                     }`}
                     playsInline
                   ></video>
