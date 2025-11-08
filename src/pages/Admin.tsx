@@ -1487,6 +1487,24 @@ function CrusadeForm({ onSubmit, crusadeTypes = [] }: { onSubmit: (payload: Part
     }
   };
 
+  const removeImage = (index: number) => {
+    const newImages = [...images];
+    const removed = newImages.splice(index, 1)[0];
+    setImages(newImages);
+    if (previewImage === removed) {
+      setPreviewImage(newImages[0] || "");
+    }
+  };
+
+  const removeVideo = (index: number) => {
+    const newVideos = [...videos];
+    const removed = newVideos.splice(index, 1)[0];
+    setVideos(newVideos);
+    if (previewVideo === removed) {
+      setPreviewVideo(newVideos[0] || "");
+    }
+  };
+
   return (
     <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 mb-6 border border-[#54037C]/10">
       <h2 className="text-xl font-bold text-[#54037C] mb-4">Create New Crusade</h2>
@@ -1675,6 +1693,13 @@ function CrusadeForm({ onSubmit, crusadeTypes = [] }: { onSubmit: (payload: Part
                         >
                           {previewImage === img ? '✓ Preview' : 'Set'}
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => removeImage(idx)}
+                          className="absolute top-1 left-1 text-xs px-2 py-1 rounded bg-red-500 text-white"
+                        >
+                          ×
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -1698,6 +1723,13 @@ function CrusadeForm({ onSubmit, crusadeTypes = [] }: { onSubmit: (payload: Part
                           }`}
                         >
                           {previewVideo === vid ? '✓ Preview' : 'Set'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeVideo(idx)}
+                          className="absolute top-1 left-1 text-xs px-2 py-1 rounded bg-red-500 text-white"
+                        >
+                          ×
                         </button>
                       </div>
                     ))}
