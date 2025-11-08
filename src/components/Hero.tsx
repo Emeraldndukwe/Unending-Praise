@@ -281,11 +281,15 @@ export default function HeroSection() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -12 }}
                   transition={{ duration: 0.35 }}
-                  className="absolute inset-0 rounded-3xl overflow-hidden bg-black"
+                  className={`absolute inset-0 rounded-3xl overflow-hidden bg-black ${
+                    isMobile ? "min-h-[220px]" : ""
+                  }`}
                 >
                   <video
                     ref={setVideoRef}
-                    className="video-js vjs-default-skin w-full h-full rounded-3xl"
+                    className={`video-js vjs-default-skin w-full h-full rounded-3xl ${
+                      isMobile ? "min-h-[220px]" : ""
+                    }`}
                     playsInline
                   ></video>
                   {playerRef.current && (
