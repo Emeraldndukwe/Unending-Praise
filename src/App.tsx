@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect } from "react";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
+import ScrollToTopButton from "./components/ScrollToTopButton";
 import Home from "./pages/Home";
 import About from "./pages/About";
 import Contacts from "./pages/Contacts";
@@ -164,6 +165,7 @@ export default function App() {
           </Routes>
         </AnimatePresence>
       </main>
+      {!isAdmin && <ScrollToTopButton />}
       {!isAdmin && <Footer />}
     </div>
   );

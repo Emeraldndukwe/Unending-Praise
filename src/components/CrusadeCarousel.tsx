@@ -80,20 +80,20 @@ export default function CrusadeCarousel({ data }: CrusadeCarouselProps) {
     const node = cardRefs.current[String(currentItem.id)];
     if (!node) return;
 
-    const topPadding = isMobile ? 32 : 48;
-    const bottomPadding = isMobile ? 52 : 64;
+    const topPadding = isMobile ? 20 : 32;
+    const bottomPadding = isMobile ? 36 : 48;
     setDynamicHeight(node.offsetHeight + topPadding + bottomPadding);
   }, [active, list, isMobile]);
 
-  const topPadding = isMobile ? 32 : 48;
-  const bottomPadding = isMobile ? 52 : 64;
+  const topPadding = isMobile ? 20 : 32;
+  const bottomPadding = isMobile ? 36 : 48;
   const computedMinHeight = dynamicHeight || (isMobile ? 420 : 540);
 
   return (
     <div className="w-full flex flex-col items-center">
       {/* CARDS */}
       <div 
-        className="relative w-full flex justify-center overflow-visible mt-8 px-2"
+        className="relative w-full flex justify-center overflow-visible mt-6 px-2"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
         style={{ 
