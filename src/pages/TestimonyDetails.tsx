@@ -4,6 +4,11 @@ import ImageCarousel, { type ImageCarouselRef, type MediaItem } from "../compone
 import CommentSection from "../components/shared/CommentSection";
 import { motion } from "framer-motion";
 
+type RawMediaItem = {
+  type?: string;
+  url?: string;
+};
+
 type Testimony = {
   id: string;
   name?: string;
@@ -12,6 +17,7 @@ type Testimony = {
   summary?: string;
   images?: string[];
   videos?: string[];
+  media?: RawMediaItem[];
   previewImage?: string;
   previewVideo?: string;
   approved?: boolean;
@@ -29,18 +35,52 @@ export default function TestimonyDetails() {
       .then(res => res.json())
       .then((data: any[]) => {
         // Convert snake_case to camelCase
-        const converted = data.map((t: any) => ({
-          id: t.id,
-          name: t.name,
-          title: t.title,
-          content: t.content,
-          summary: t.summary,
-          images: t.images,
-          videos: t.videos,
-          previewImage: t.previewImage || t.preview_image,
-          previewVideo: t.previewVideo || t.preview_video,
-          approved: t.approved,
-        }));
+        const converted = data.map((t: any) => {
+          const mediaArray: RawMediaItem[] = Array.isArray(t.media) ? t.media : [];
+          const imageItems = mediaArray.filter(
+            (item): item is RawMediaItem & { url: string } =>
+              item?.type === "image" && typeof item.url === "string"
+          );
+          const videoItems = mediaArray.filter(
+            (item): item is RawMediaItem & { url: string } =>
+              item?.type === "video" && typeof item.url === "string"
+          );
+          const imagesArray: string[] = Array.isArray(t.images)
+            ? t.images
+            : imageItems.map((item) => item.url);
+          const videosArray: string[] = Array.isArray(t.videos)
+            ? t.videos
+            : videoItems.map((item) => item.url);
+
+          const fallbackImage =
+            t.previewImage ||
+            t.preview_image ||
+            t.image ||
+            imagesArray[0] ||
+            imageItems[0]?.url ||
+            null;
+
+          const fallbackVideo =
+            t.previewVideo ||
+            t.preview_video ||
+            videosArray[0] ||
+            videoItems[0]?.url ||
+            null;
+
+          return {
+            id: t.id,
+            name: t.name,
+            title: t.title,
+            content: t.content,
+            summary: t.summary,
+            images: imagesArray,
+            videos: videosArray,
+            media: mediaArray,
+            previewImage: fallbackImage ?? undefined,
+            previewVideo: fallbackVideo ?? undefined,
+            approved: t.approved,
+          };
+        });
         const found = converted.find(t => t.id === id && t.approved);
         if (found) {
           setTestimony(found);
@@ -67,7 +107,7 @@ export default function TestimonyDetails() {
     testimony.videos.forEach(vid => media.push({ type: "video", url: vid }));
   }
 
-  const heroMedia = testimony.previewVideo 
+  const heroMedia = testimony.previewVideo
     ? { type: "video" as const, url: testimony.previewVideo }
     : testimony.previewImage
     ? { type: "image" as const, url: testimony.previewImage }
@@ -105,7 +145,7 @@ export default function TestimonyDetails() {
             <img
               src={heroMedia.url}
               alt={testimony.title || "Testimony"}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover object-top"
             />
           )
         ) : (
