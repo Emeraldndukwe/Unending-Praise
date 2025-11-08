@@ -113,30 +113,6 @@ export default function HeroSection() {
         setAutoplayBlocked(false);
       });
 
-      const resizePlayer = () => {
-        const container = element.parentElement as HTMLElement | null;
-        if (!container) return;
-        const width = container.offsetWidth;
-        if (!width) return;
-        const height = width * (9 / 16);
-        container.style.height = `${height}px`;
-        element.style.height = `${height}px`;
-        const playerEl = playerRef.current?.el();
-        if (playerEl) {
-          playerEl.style.height = `${height}px`;
-        }
-      };
-
-      resizePlayer();
-      window.addEventListener("resize", resizePlayer);
-      playerRef.current.on("loadedmetadata", resizePlayer);
-      playerRef.current.on("playerresize", resizePlayer);
-      playerRef.current.on("fullscreenchange", () => {
-        const isFullscreen = document.fullscreenElement === playerRef.current?.el();
-        if (!isFullscreen) resizePlayer();
-      });
-      playerRef.current._resizeHandler = resizePlayer;
-
       playerRef.current.on("waiting", () => {
         console.log("[HeroSection] Waiting for data");
       });
@@ -154,9 +130,6 @@ export default function HeroSection() {
       if (playerRef.current) {
         try {
           console.log("[HeroSection] Disposing player on unmount");
-          if (playerRef.current._resizeHandler) {
-            window.removeEventListener("resize", playerRef.current._resizeHandler);
-          }
           playerRef.current.dispose();
           playerRef.current = null;
         } catch (err) {
@@ -226,9 +199,6 @@ export default function HeroSection() {
     return () => {
       if (playerRef.current) {
         try {
-          if (playerRef.current._resizeHandler) {
-            window.removeEventListener("resize", playerRef.current._resizeHandler);
-          }
           playerRef.current.dispose();
           playerRef.current = null;
         } catch (err) {
@@ -252,10 +222,9 @@ export default function HeroSection() {
           }`}
         >
           <div
-            className="w-full rounded-3xl shadow-lg overflow-hidden relative"
-            style={{
-              height: showLiveVideo ? undefined : isMobile ? "18rem" : "34rem",
-            }}
+            className={`w-full rounded-3xl shadow-lg overflow-hidden relative ${
+              showLiveVideo ? "aspect-video" : isMobile ? "h-[18rem]" : "h-[34rem]"
+            }`}
           >
             <AnimatePresence mode="wait">
               {!showLiveVideo ? (
