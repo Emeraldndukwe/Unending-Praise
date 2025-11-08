@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { compressImage, compressVideo } from "../utils/mediaOptimizer";
 
 type Testimony = { 
@@ -63,10 +63,57 @@ export default function AdminPage() {
   const [crusades, setCrusades] = useState<Crusade[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [songs, setSongs] = useState<Song[]>([]);
+  const [editingSongId, setEditingSongId] = useState<string | null>(null);
+  const [editingLyrics, setEditingLyrics] = useState("");
+  const [songEditLoading, setSongEditLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [users, setUsers] = useState<Array<{id:string; name:string; email:string; role:string; status:string; created_at?: string;}>>([]);
   const [crusadeTypes, setCrusadeTypes] = useState<Array<{id:string; name:string; description?:string; created_at?:string;}>>([]);
+
+  const uploadMedia = useCallback(
+    async (dataUrl: string, scope: 'testimonies' | 'crusades') => {
+      if (!dataUrl || !dataUrl.startsWith('data:')) return dataUrl;
+      const authHeaders: Record<string, string> = {};
+      const headerSource = headers as HeadersInit;
+      if (headerSource instanceof Headers) {
+        headerSource.forEach((value, key) => {
+          authHeaders[key] = value;
+        });
+      } else if (Array.isArray(headerSource)) {
+        headerSource.forEach(([key, value]) => {
+          authHeaders[key] = value;
+        });
+      } else if (headerSource && typeof headerSource === 'object') {
+        Object.assign(authHeaders, headerSource as Record<string, string>);
+      }
+
+      const res = await fetch('/api/admin/upload', {
+        method: 'POST',
+        headers: { ...authHeaders, 'content-type': 'application/json' },
+        body: JSON.stringify({ dataUrl, folder: `unendingpraise/${scope}` }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || 'Upload failed');
+      }
+
+      const payload = await res.json();
+      return (payload?.url as string) || dataUrl;
+    },
+    [headers]
+  );
+
+  const uploadTestimonyMedia = useCallback(
+    (dataUrl: string) => uploadMedia(dataUrl, 'testimonies'),
+    [uploadMedia]
+  );
+
+  const uploadCrusadeMedia = useCallback(
+    (dataUrl: string) => uploadMedia(dataUrl, 'crusades'),
+    [uploadMedia]
+  );
 
   // Admin comments management
   const [commentEntityType, setCommentEntityType] = useState<"testimony" | "crusade">("testimony");
@@ -278,6 +325,15 @@ export default function AdminPage() {
     refresh();
   };
 
+  const updateSong = async (id: string, payload: Partial<Song>) => {
+    await api<Song>(`/api/songs/${id}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    await refresh();
+  };
+
   // Auth UI
   const [mode, setMode] = useState<"login" | "register">("login");
   const [name, setName] = useState("");
@@ -420,7 +476,7 @@ export default function AdminPage() {
 
       {tab === "testimonies" && (
         <section className="space-y-6">
-          <TestimonyForm onSubmit={createTestimony} />
+          <TestimonyForm onSubmit={createTestimony} onUploadMedia={uploadTestimonyMedia} />
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
             <h2 className="text-xl font-bold text-[#54037C] mb-4">Pending Approvals ({testimonies.filter(t => !t.approved).length})</h2>
             <div className="space-y-4">
@@ -431,6 +487,7 @@ export default function AdminPage() {
                   testimony={t} 
                   onApprove={() => approveTestimony(t.id)}
                   onDelete={() => deleteItem("testimonies", t.id)}
+                  onUploadMedia={uploadTestimonyMedia}
                   onUpdate={async (payload) => {
                     await api<Testimony>(`/api/testimonies/${t.id}`, {
                       method: "PUT",
@@ -454,6 +511,7 @@ export default function AdminPage() {
                   testimony={t} 
                   onApprove={() => approveTestimony(t.id)}
                   onDelete={() => deleteItem("testimonies", t.id)}
+                  onUploadMedia={uploadTestimonyMedia}
                   onUpdate={async (payload) => {
                     await api<Testimony>(`/api/testimonies/${t.id}`, {
                       method: "PUT",
@@ -471,7 +529,7 @@ export default function AdminPage() {
 
       {tab === "crusades" && (
         <section className="space-y-6">
-          <CrusadeForm onSubmit={createCrusade} crusadeTypes={crusadeTypes} />
+          <CrusadeForm onSubmit={createCrusade} crusadeTypes={crusadeTypes} onUploadMedia={uploadCrusadeMedia} />
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
             <h2 className="text-xl font-bold text-[#54037C] mb-4">Crusades ({crusades.length})</h2>
             <div className="space-y-4">
@@ -482,6 +540,7 @@ export default function AdminPage() {
                   crusade={c}
                   crusadeTypes={crusadeTypes}
                   onDelete={() => deleteItem("crusades", c.id)}
+                  onUploadMedia={uploadCrusadeMedia}
                   onUpdate={async (payload) => {
                     await api<Crusade>(`/api/crusades/${c.id}`, {
                       method: "PUT",
@@ -534,26 +593,95 @@ export default function AdminPage() {
             <h2 className="text-xl font-bold text-[#54037C] mb-4">Songs ({songs.length})</h2>
             <div className="space-y-4">
               {songs.length === 0 && <div className="text-sm text-gray-500 text-center py-8">No songs yet</div>}
-              {[...songs].sort((a, b) => (a.date || '').localeCompare(b.date || '')).map((s) => (
+              {[...songs].sort((a, b) => (a.date || '').localeCompare(b.date || '')).map((s) => {
+                const isEditing = editingSongId === s.id;
+                return (
                 <div key={s.id} className="p-4 border border-gray-200 rounded-xl bg-white hover:shadow-md transition">
                   <div className="flex flex-col md:flex-row justify-between gap-4">
                     <div className="flex-1">
                       <h3 className="font-bold text-lg mb-1">{s.title} {s.artist ? `- ${s.artist}` : ''}</h3>
                       <div className="text-sm text-gray-600 mb-2">📅 Date: {s.date || 'unspecified'}</div>
-                      {s.lyrics && (
+                      {isEditing ? (
+                        <form
+                          className="space-y-3"
+                          onSubmit={async (e) => {
+                            e.preventDefault();
+                            setSongEditLoading(true);
+                            try {
+                              await updateSong(s.id, { lyrics: editingLyrics });
+                              setEditingSongId(null);
+                              setEditingLyrics("");
+                            } catch (err: any) {
+                              const message = err?.message || "Failed to update lyrics";
+                              alert(message);
+                            } finally {
+                              setSongEditLoading(false);
+                            }
+                          }}
+                        >
+                          <label className="text-sm block">
+                            <div className="mb-1 text-gray-700 font-medium">Lyrics</div>
+                            <textarea
+                              className="w-full border rounded-xl px-3 py-2 min-h-[120px] focus:outline-none focus:ring-2 focus:ring-[#54037C]"
+                              value={editingLyrics}
+                              onChange={(e) => setEditingLyrics(e.target.value)}
+                            />
+                          </label>
+                          <div className="flex gap-2">
+                            <button
+                              type="submit"
+                              className="px-4 py-2 bg-[#54037C] text-white rounded-xl text-sm font-semibold disabled:opacity-60"
+                              disabled={songEditLoading}
+                            >
+                              {songEditLoading ? "Saving…" : "Save"}
+                            </button>
+                            <button
+                              type="button"
+                              className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl text-sm font-semibold"
+                              onClick={() => {
+                                setEditingSongId(null);
+                                setEditingLyrics("");
+                              }}
+                              disabled={songEditLoading}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </form>
+                      ) : s.lyrics ? (
                         <details className="text-sm text-gray-700">
                           <summary className="cursor-pointer text-[#54037C] font-medium">View Lyrics</summary>
                           <pre className="mt-2 whitespace-pre-wrap font-sans">{s.lyrics}</pre>
                         </details>
+                      ) : (
+                        <div className="text-sm text-gray-500 italic">No lyrics provided.</div>
                       )}
                       <div className="text-xs text-gray-500 mt-2">Created: {new Date(s.createdAt).toLocaleString()}</div>
                     </div>
-                    <button className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm h-fit" onClick={() => deleteItem("songs", s.id)}>
-                      Delete
-                    </button>
+                    <div className="flex gap-2">
+                      {isEditing ? null : (
+                        <button
+                          className="px-3 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-xl text-sm h-fit"
+                          onClick={() => {
+                            setEditingSongId(s.id);
+                            setEditingLyrics(s.lyrics || "");
+                          }}
+                        >
+                          Edit Lyrics
+                        </button>
+                      )}
+                      <button
+                        className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm h-fit disabled:opacity-60"
+                        onClick={() => deleteItem("songs", s.id)}
+                        disabled={isEditing}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           </div>
         </section>
@@ -788,11 +916,12 @@ export default function AdminPage() {
   );
 }
 
-function TestimonyItem({ testimony, onApprove, onDelete, onUpdate }: { 
+function TestimonyItem({ testimony, onApprove, onDelete, onUpdate, onUploadMedia }: { 
   testimony: Testimony; 
   onApprove: () => void;
   onDelete: () => void;
   onUpdate: (payload: Partial<Testimony>) => Promise<void>;
+  onUploadMedia: (dataUrl: string) => Promise<string>;
 }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(testimony.name || "");
@@ -811,15 +940,18 @@ function TestimonyItem({ testimony, onApprove, onDelete, onUpdate }: {
       try {
         if (file.type.startsWith("image/")) {
           const compressed = await compressImage(file);
-          setImages(prev => [...prev, compressed]);
-          if (!previewImage && !previewVideo) setPreviewImage(compressed);
+          const uploaded = await onUploadMedia(compressed);
+          setImages(prev => [...prev, uploaded]);
+          if (!previewImage && !previewVideo) setPreviewImage(uploaded);
         } else if (file.type.startsWith("video/")) {
           const compressed = await compressVideo(file);
-          setVideos(prev => [...prev, compressed]);
-          if (!previewImage && !previewVideo) setPreviewVideo(compressed);
+          const uploaded = await onUploadMedia(compressed);
+          setVideos(prev => [...prev, uploaded]);
+          if (!previewImage && !previewVideo) setPreviewVideo(uploaded);
         }
       } catch (err: any) {
-        alert(`Error processing ${file.name}: ${err.message}`);
+        console.error('Media upload failed', err);
+        alert(`Error processing ${file.name}: ${err?.message || 'Upload failed'}`);
       }
     }
   };
@@ -1095,11 +1227,12 @@ function TestimonyItem({ testimony, onApprove, onDelete, onUpdate }: {
   );
 }
 
-function CrusadeItem({ crusade, onDelete, onUpdate, crusadeTypes = [] }: { 
+function CrusadeItem({ crusade, onDelete, onUpdate, crusadeTypes = [], onUploadMedia }: { 
   crusade: Crusade; 
   onDelete: () => void;
   onUpdate: (payload: Partial<Crusade>) => Promise<void>;
   crusadeTypes?: Array<{id:string; name:string; description?:string;}>;
+  onUploadMedia: (dataUrl: string) => Promise<string>;
 }) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(crusade.title || "");
@@ -1122,15 +1255,18 @@ function CrusadeItem({ crusade, onDelete, onUpdate, crusadeTypes = [] }: {
       try {
         if (file.type.startsWith("image/")) {
           const compressed = await compressImage(file);
-          setImages(prev => [...prev, compressed]);
-          if (!previewImage && !previewVideo) setPreviewImage(compressed);
+          const uploaded = await onUploadMedia(compressed);
+          setImages(prev => [...prev, uploaded]);
+          if (!previewImage && !previewVideo) setPreviewImage(uploaded);
         } else if (file.type.startsWith("video/")) {
           const compressed = await compressVideo(file);
-          setVideos(prev => [...prev, compressed]);
-          if (!previewImage && !previewVideo) setPreviewVideo(compressed);
+          const uploaded = await onUploadMedia(compressed);
+          setVideos(prev => [...prev, uploaded]);
+          if (!previewImage && !previewVideo) setPreviewVideo(uploaded);
         }
       } catch (err: any) {
-        alert(`Error processing ${file.name}: ${err.message}`);
+        console.error('Media upload failed', err);
+        alert(`Error processing ${file.name}: ${err?.message || 'Upload failed'}`);
       }
     }
   };
@@ -1434,7 +1570,7 @@ function CrusadeItem({ crusade, onDelete, onUpdate, crusadeTypes = [] }: {
   );
 }
 
-function CrusadeForm({ onSubmit, crusadeTypes = [] }: { onSubmit: (payload: Partial<Crusade>) => Promise<void>; crusadeTypes?: Array<{id:string; name:string; description?:string;}> }) {
+function CrusadeForm({ onSubmit, crusadeTypes = [], onUploadMedia }: { onSubmit: (payload: Partial<Crusade>) => Promise<void>; crusadeTypes?: Array<{id:string; name:string; description?:string;}>; onUploadMedia: (dataUrl: string) => Promise<string> }) {
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
   const [attendance, setAttendance] = useState("");
@@ -1455,15 +1591,18 @@ function CrusadeForm({ onSubmit, crusadeTypes = [] }: { onSubmit: (payload: Part
       try {
         if (file.type.startsWith("image/")) {
           const compressed = await compressImage(file);
-          setImages(prev => [...prev, compressed]);
-          if (!previewImage && !previewVideo) setPreviewImage(compressed);
+          const uploaded = await onUploadMedia(compressed);
+          setImages(prev => [...prev, uploaded]);
+          if (!previewImage && !previewVideo) setPreviewImage(uploaded);
         } else if (file.type.startsWith("video/")) {
           const compressed = await compressVideo(file);
-          setVideos(prev => [...prev, compressed]);
-          if (!previewImage && !previewVideo) setPreviewVideo(compressed);
+          const uploaded = await onUploadMedia(compressed);
+          setVideos(prev => [...prev, uploaded]);
+          if (!previewImage && !previewVideo) setPreviewVideo(uploaded);
         }
       } catch (err: any) {
-        alert(`Error processing ${file.name}: ${err.message}`);
+        console.error('Media upload failed', err);
+        alert(`Error processing ${file.name}: ${err?.message || 'Upload failed'}`);
       }
     }
   };
@@ -1747,7 +1886,7 @@ function CrusadeForm({ onSubmit, crusadeTypes = [] }: { onSubmit: (payload: Part
   );
 }
 
-function TestimonyForm({ onSubmit }: { onSubmit: (payload: Partial<Testimony>) => Promise<void> }) {
+function TestimonyForm({ onSubmit, onUploadMedia }: { onSubmit: (payload: Partial<Testimony>) => Promise<void>; onUploadMedia: (dataUrl: string) => Promise<string> }) {
   const [name, setName] = useState("");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -1764,15 +1903,18 @@ function TestimonyForm({ onSubmit }: { onSubmit: (payload: Partial<Testimony>) =
       try {
         if (file.type.startsWith("image/")) {
           const compressed = await compressImage(file);
-          setImages(prev => [...prev, compressed]);
-          if (!previewImage && !previewVideo) setPreviewImage(compressed);
+          const uploaded = await onUploadMedia(compressed);
+          setImages(prev => [...prev, uploaded]);
+          if (!previewImage && !previewVideo) setPreviewImage(uploaded);
         } else if (file.type.startsWith("video/")) {
           const compressed = await compressVideo(file);
-          setVideos(prev => [...prev, compressed]);
-          if (!previewImage && !previewVideo) setPreviewVideo(compressed);
+          const uploaded = await onUploadMedia(compressed);
+          setVideos(prev => [...prev, uploaded]);
+          if (!previewImage && !previewVideo) setPreviewVideo(uploaded);
         }
       } catch (err: any) {
-        alert(`Error processing ${file.name}: ${err.message}`);
+        console.error('Media upload failed', err);
+        alert(`Error processing ${file.name}: ${err?.message || 'Upload failed'}`);
       }
     }
   };

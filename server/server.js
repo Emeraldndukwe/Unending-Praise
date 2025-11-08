@@ -10,6 +10,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { Readable } from 'stream';
 import { Pool } from 'pg';
+import { v2 as cloudinary } from 'cloudinary';
 // Optional email notifications (nodemailer is optional)
 let nodemailer = null;
 try {
@@ -19,6 +20,15 @@ try {
 }
 
 loadEnv();
+
+const cloudinaryEnabled = Boolean(process.env.CLOUDINARY_URL);
+if (cloudinaryEnabled) {
+  cloudinary.config({
+    secure: true,
+  });
+} else {
+  console.warn('⚠️ CLOUDINARY_URL not set. Media uploads will use base64 fallback.');
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -173,7 +183,7 @@ function writeDb(db) {
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '10mb' }));
 
 // JWT auth
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
@@ -216,6 +226,27 @@ function requireSuperAdmin(req, res, next) {
   if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
   if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'Forbidden' });
   next();
+}
+
+async function uploadMediaFromDataUrl(dataUrl, { folder = 'unendingpraise/uploads' } = {}) {
+  if (!cloudinaryEnabled) {
+    throw new Error('Cloudinary not configured');
+  }
+  if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) {
+    throw new Error('Invalid data URL');
+  }
+  const resourceType = dataUrl.startsWith('data:video/') ? 'video' : 'image';
+  const upload = await cloudinary.uploader.upload(dataUrl, {
+    folder,
+    resource_type: 'auto',
+    overwrite: false,
+  });
+  return {
+    url: upload.secure_url,
+    publicId: upload.public_id,
+    bytes: upload.bytes,
+    resourceType: upload.resource_type || resourceType,
+  };
 }
 
 // Health check - should work even if DB is down
@@ -371,6 +402,21 @@ function makeListRoute(key, roleForWrite) {
   });
 }
 
+app.post('/api/admin/upload', requireAuth, requireRole('crusade', 'testimony', 'songs'), async (req, res) => {
+  if (!cloudinaryEnabled) {
+    return res.status(503).json({ error: 'Cloudinary not configured' });
+  }
+  const { dataUrl, folder } = req.body || {};
+  if (!dataUrl) return res.status(400).json({ error: 'Missing dataUrl' });
+  try {
+    const result = await uploadMediaFromDataUrl(dataUrl, { folder });
+    res.status(201).json(result);
+  } catch (e) {
+    console.error('Cloudinary upload failed', e);
+    res.status(500).json({ error: 'Upload failed', details: e?.message || 'Unknown error' });
+  }
+});
+
 // Entities: messages, songs now backed by Postgres
 app.get('/api/messages', async (_req, res) => {
   try {
@@ -399,8 +445,27 @@ app.delete('/api/messages/:id', async (req, res) => {
   } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
 });
 
+async function purgeExpiredSongs() {
+  try {
+    const result = await pool.query(`
+      DELETE FROM songs
+      WHERE date IS NOT NULL
+        AND TRIM(date) <> ''
+        AND date ~ '^\\d{4}-\\d{2}-\\d{2}$'
+        AND date::date < CURRENT_DATE
+      RETURNING id
+    `);
+    if (result.rowCount > 0) {
+      console.log(`[Songs] Purged ${result.rowCount} expired song${result.rowCount === 1 ? '' : 's'}`);
+    }
+  } catch (err) {
+    console.error('[Songs] Failed to purge expired songs', err);
+  }
+}
+
 app.get('/api/songs', async (_req, res) => {
   try {
+    await purgeExpiredSongs();
     const result = await pool.query('SELECT id, title, artist, lyrics, date, created_at FROM songs ORDER BY created_at DESC');
     res.json(result.rows.map(r => ({ id: r.id, title: r.title, artist: r.artist, lyrics: r.lyrics, date: r.date, createdAt: r.created_at })));
   } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
@@ -413,8 +478,33 @@ app.post('/api/songs', async (req, res) => {
       [title || null, artist || null, lyrics || null, date || null]
     );
     const r = result.rows[0];
+    await purgeExpiredSongs();
     res.status(201).json({ id: r.id, title: r.title, artist: r.artist, lyrics: r.lyrics, date: r.date, createdAt: r.created_at });
   } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
+});
+
+app.put('/api/songs/:id', async (req, res) => {
+  const { id } = req.params;
+  const { title, artist, lyrics, date } = req.body || {};
+  try {
+    const result = await pool.query(
+      `UPDATE songs SET
+        title = COALESCE($2, title),
+        artist = COALESCE($3, artist),
+        lyrics = COALESCE($4, lyrics),
+        date = COALESCE($5, date)
+       WHERE id = $1
+       RETURNING id, title, artist, lyrics, date, created_at`,
+      [id, title ?? null, artist ?? null, lyrics ?? null, date ?? null]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    await purgeExpiredSongs();
+    const r = result.rows[0];
+    res.json({ id: r.id, title: r.title, artist: r.artist, lyrics: r.lyrics, date: r.date, createdAt: r.created_at });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 app.delete('/api/songs/:id', async (req, res) => {

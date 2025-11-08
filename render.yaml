@@ -16,6 +16,8 @@ services:
         generateValue: true
       - key: DATABASE_SSL
         value: enabled
+      - key: CLOUDINARY_URL
+        sync: false
       - key: SMTP_URL
         sync: false
       - key: MAIL_FROM
