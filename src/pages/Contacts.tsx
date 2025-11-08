@@ -1,5 +1,4 @@
 import React, { useState, type ChangeEvent, type FormEvent } from "react";
-import { MapPin } from "lucide-react";
 
 const Contacts: React.FC = () => {
   const [bookingForm, setBookingForm] = useState({
@@ -316,15 +315,6 @@ const Contacts: React.FC = () => {
                     KINGSCHAT USERNAME
                   </h3>
                   <p className="text-gray-900 font-medium">@Title</p>
-                </div>
-
-                <div>
-                  <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
-                    <MapPin size={18} /> LOCATE US
-                  </h3>
-                  <p className="text-gray-900 font-medium">
-                    UnendingPraiseWithpastorchris@gmail.com
-                  </p>
                 </div>
               </div>
             </div>
