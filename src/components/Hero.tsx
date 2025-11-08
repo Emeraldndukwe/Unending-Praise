@@ -9,6 +9,8 @@ export default function HeroSection() {
   const [showLiveVideo, setShowLiveVideo] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [activeTab, setActiveTab] = useState("songs");
+  const [isMuted, setIsMuted] = useState(false);
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const playerRef = useRef<any>(null);
   const videoJsModuleRef = useRef<any>(null);
@@ -52,7 +54,7 @@ export default function HeroSection() {
         responsive: true,
         fluid: true,
         preload: "auto",
-        muted: true,
+        muted: isMuted,
         liveui: true,
         html5: {
           vhs: {
@@ -80,6 +82,7 @@ export default function HeroSection() {
         // Try to play
         playerRef.current.play().catch((err: Error) => {
           console.error("[HeroSection] Autoplay failed (user interaction may be required):", err);
+          setAutoplayBlocked(true);
         });
       });
 
@@ -107,6 +110,7 @@ export default function HeroSection() {
 
       playerRef.current.on("playing", () => {
         console.log("[HeroSection] Playing");
+        setAutoplayBlocked(false);
       });
 
       playerRef.current.on("waiting", () => {
@@ -255,7 +259,11 @@ export default function HeroSection() {
                     <motion.button
                       whileHover={{ scale: 1.04 }}
                       whileTap={{ scale: 0.98 }}
-                      onClick={() => setShowLiveVideo(true)}
+                      onClick={() => {
+                        setIsMuted(false);
+                        setAutoplayBlocked(false);
+                        setShowLiveVideo(true);
+                      }}
                       className=" bg-[#54037C]/70 hover:bg-purple-800 text-white px-6 py-3 rounded-xl font-semibold shadow-md"
                     >
                       Watch Live →
@@ -276,9 +284,49 @@ export default function HeroSection() {
                     className="video-js vjs-default-skin w-full h-full rounded-3xl"
                     playsInline
                   ></video>
+                  {playerRef.current && (
+                    <button
+                      onClick={() => {
+                        const player = playerRef.current;
+                        if (!player) return;
+                        const nextMuted = !player.muted();
+                        player.muted(nextMuted);
+                        setIsMuted(nextMuted);
+                      }}
+                      className="absolute top-4 left-4 bg-black/60 text-white px-3 py-1 rounded-lg hover:bg-black/80 z-10 text-sm"
+                    >
+                      {isMuted ? "Unmute" : "Mute"}
+                    </button>
+                  )}
+                  {autoplayBlocked && (
+                    <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-4 text-white z-20 px-6 text-center">
+                      <p className="text-lg font-semibold">Tap to start the livestream with sound</p>
+                      <button
+                        onClick={() => {
+                          const player = playerRef.current;
+                          if (!player) return;
+                          try {
+                            player.muted(false);
+                            setIsMuted(false);
+                            player.play().then(() => setAutoplayBlocked(false)).catch((err: Error) => {
+                              console.error("[HeroSection] Manual play failed:", err);
+                            });
+                          } catch (err) {
+                            console.error("[HeroSection] Error handling manual play:", err);
+                          }
+                        }}
+                        className="px-4 py-2 bg-[#54037C] hover:bg-[#54037C]/90 rounded-xl font-semibold shadow-lg"
+                      >
+                        Play with Sound
+                      </button>
+                    </div>
+                  )}
 
                   <button
-                    onClick={() => setShowLiveVideo(false)}
+                    onClick={() => {
+                      setShowLiveVideo(false);
+                      setAutoplayBlocked(false);
+                    }}
                     className="absolute top-4 right-4 bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700 z-10"
                   >
                     Close
