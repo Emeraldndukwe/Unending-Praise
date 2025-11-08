@@ -131,9 +131,9 @@ export default function TestimoniesCarousel() {
   const shorten = (text: string) => (text.length > (isMobile ? 40 : 50) ? text.slice(0, isMobile ? 40 : 50) + "..." : text);
 
   const visibleCards = isMobile ? 3 : testimonies.length;
-  const cardWidth = isMobile ? 220 : 320;
-  const cardHeight = isMobile ? 320 : 400; // Increased mobile height to prevent text cutoff
-  const offsetDistance = isMobile ? 180 : 220;
+  const cardWidth = isMobile ? 240 : 340;
+  const cardHeight = isMobile ? 320 : 400;
+  const offsetDistance = isMobile ? 190 : 230;
 
   if (testimonies.length === 0) {
     return (
@@ -177,6 +177,7 @@ export default function TestimoniesCarousel() {
             return (
               <motion.div
                 key={item.id}
+                layout
                 onClick={() => {
                   // Navigate to testimony details
                   navigate(`/testimonies/${item.id}`);
@@ -192,15 +193,20 @@ export default function TestimoniesCarousel() {
                 }}
                 transition={{
                   type: "spring",
-                  stiffness: 180,
-                  damping: 22,
-                  backgroundColor: { duration: 0.6, ease: "easeInOut" },
+                  stiffness: 140,
+                  damping: 18,
+                  mass: 0.8,
+                  backgroundColor: { duration: 0.5, ease: "easeInOut" },
                 }}
-                className="absolute rounded-3xl cursor-pointer text-white shadow-2xl overflow-hidden transition-transform duration-300 hover:scale-110"
+                className="absolute rounded-3xl cursor-pointer text-white shadow-2xl overflow-hidden transition-transform duration-300 hover:scale-105"
                 style={{ width: cardWidth, height: cardHeight }}
               >
                 <div className="w-full flex justify-center mt-5">
-                  <img src={item.image} className={`w-[85%] ${isMobile ? "h-[120px]" : "h-[160px]"} object-cover rounded-xl`} />
+                  <img
+                    src={item.image}
+                    className={`w-[85%] ${isMobile ? "h-[140px]" : "h-[180px]"} object-cover object-top rounded-xl transition-transform duration-500`}
+                    alt={item.name}
+                  />
                 </div>
                 <p className="font-bold text-xs mt-4 px-5">{item.name}</p>
                 <p className={`px-5 mt-2 pb-4 ${isMobile ? 'text-xs' : 'text-sm'} leading-relaxed ${isActive ? '' : 'line-clamp-3'} overflow-hidden`} style={{ maxHeight: isActive ? 'none' : (isMobile ? '60px' : '80px') }}>

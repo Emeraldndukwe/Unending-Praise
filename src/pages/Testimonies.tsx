@@ -51,15 +51,10 @@ export default function Testimonies() {
   return (
     <div className="w-full">
       {/* Header Section */}
-      <div className="relative h-48 sm:h-60 md:h-72 w-full">
-        <img
-          src="https://images.unsplash.com/photo-1497435332909-251e61e4e502?w=1200&h=400&fit=crop&auto=format"
-          alt="Banner"
-          className="object-cover w-full h-full"
-        />
-        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-          <h1 className="text-white text-2xl sm:text-3xl md:text-4xl font-bold">TESTIMONIES</h1>
-        </div>
+      <div className="relative h-48 sm:h-60 md:h-72 w-full bg-gradient-to-r from-[#54037C] via-[#6f3aa6] to-[#8A4EBF] rounded-b-3xl flex items-center justify-center shadow-md">
+        <h1 className="text-white text-2xl sm:text-3xl md:text-4xl font-bold tracking-wide">
+          TESTIMONIES
+        </h1>
       </div>
 
       {/* Content */}

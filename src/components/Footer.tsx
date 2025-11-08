@@ -1,6 +1,3 @@
-import { FaInstagram, FaXTwitter, FaFacebookF } from "react-icons/fa6";
-
-
 export default function Footer() {
   return (
     <footer className="bg-[#8A4EBF] text-white py-10 px-6 md:px-16 rounded-t-3xl">
@@ -23,24 +20,10 @@ export default function Footer() {
 
         {/* RIGHT — CONTACT */}
         <div className="text-center md:text-left">
-          <h2 className="text-lg font-semibold mb-4 tracking-wide text-white">CONTACT US</h2>
-          <div className="flex justify-center md:justify-start items-center gap-4 text-xl mb-3">
-            <a href="#" aria-label="Instagram" className="hover:text-white/80 text-white">
-              <FaInstagram />
-            </a>
-            <a href="#" aria-label="X" className="hover:text-white/80 text-white">
-              <FaXTwitter />
-            </a>
-            <a href="#" aria-label="Facebook" className="hover:text-white/80 text-white">
-              <FaFacebookF />
-            </a>
+          <h2 className="text-lg font-semibold mb-4 tracking-wide text-white">CONNECT</h2>
+          <div className="bg-white/15 inline-flex px-4 py-2 rounded-full font-semibold tracking-wide">
+            KingsChat: @Title
           </div>
-          <a
-            href="mailto:Unendingpraise@gmail.com"
-            className="text-sm font-medium hover:underline text-white"
-          >
-            Unendingpraise@gmail.com
-          </a>
         </div>
       </div>
     </footer>

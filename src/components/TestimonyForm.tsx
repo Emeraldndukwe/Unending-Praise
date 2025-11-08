@@ -10,10 +10,11 @@ export default function TestimonyForm() {
     email: "",
     testimony: "",
     attachments: [] as File[],
+    salutation: "",
   });
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -56,7 +57,9 @@ export default function TestimonyForm() {
       }
 
       const payload = {
-        name: formData.name,
+        name: formData.salutation
+          ? `${formData.salutation} ${formData.name}`.trim()
+          : formData.name,
         title: formData.title,
         email: formData.email,
         phone: formData.phone,
@@ -74,14 +77,15 @@ export default function TestimonyForm() {
 
       if (res.ok) {
         alert("Your testimony has been submitted! It will be reviewed before being posted.");
-    setFormData({
-      title: "",
-      name: "",
-      phone: "",
-      email: "",
-      testimony: "",
-      attachments: [],
-    });
+      setFormData({
+        title: "",
+        name: "",
+        phone: "",
+        email: "",
+        testimony: "",
+        attachments: [],
+        salutation: "",
+      });
       } else {
         throw new Error('Submission failed');
       }
@@ -96,17 +100,32 @@ export default function TestimonyForm() {
       <h3 className="font-bold text-xl mb-4 text-center">SHARE YOUR TESTIMONY</h3>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <select
+            name="salutation"
+            value={formData.salutation}
+            onChange={handleChange}
+            className="border border-gray-300 rounded px-3 py-2 bg-white text-gray-700"
+          >
+            <option value="">Title</option>
+            <option value="Bro.">Bro.</option>
+            <option value="Sis.">Sis.</option>
+            <option value="Deaconess">Deaconess</option>
+            <option value="Deacon">Deacon</option>
+            <option value="Pastor">Pastor</option>
+          </select>
+          <input
+            name="name"
+            placeholder="Full Name"
+            value={formData.name}
+            onChange={handleChange}
+            className="border border-gray-300 rounded px-3 py-2"
+          />
+        </div>
         <input
           name="title"
-          placeholder="Title"
+          placeholder="Testimony Title"
           value={formData.title}
-          onChange={handleChange}
-          className="border border-gray-300 rounded px-3 py-2"
-        />
-        <input
-          name="name"
-          placeholder="Name"
-          value={formData.name}
           onChange={handleChange}
           className="border border-gray-300 rounded px-3 py-2"
         />

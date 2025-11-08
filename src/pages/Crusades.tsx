@@ -155,15 +155,10 @@ export default function Crusades() {
   return (
     <div className="w-full">
       {/* Banner */}
-      <div className="relative h-60 md:h-72 w-full">
-        <img
-          src="https://tse2.mm.bing.net/th/id/OIP.nDOAT7QDp1Hc1A07uK4iJgHaE8?rs=1&pid=ImgDetMain&o=7&rm=3"
-          alt="Crusades Banner"
-          className="object-cover w-full h-full"
-        />
-        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-          <h1 className="text-white text-3xl md:text-4xl font-bold">CRUSADES</h1>
-        </div>
+      <div className="relative h-60 md:h-72 w-full bg-gradient-to-r from-[#54037C] via-[#6f3aa6] to-[#8A4EBF] rounded-b-3xl flex items-center justify-center shadow-md">
+        <h1 className="text-white text-3xl md:text-4xl font-bold tracking-wide">
+          CRUSADES
+        </h1>
       </div>
 
       {/* About + Form */}
