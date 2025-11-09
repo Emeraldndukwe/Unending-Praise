@@ -29,7 +29,7 @@ export default function Footer() {
             aria-label="KingsChat -unendingpraise"
           >
             <img
-              src="https://image.emojipng.com/48/11303048.jpg"
+              src="/Kingschat.png"
               alt="KingsChat -unendingpraise"
               className="w-10 h-10 object-contain"
             />

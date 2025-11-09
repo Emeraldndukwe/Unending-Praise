@@ -19,6 +19,7 @@ const Contacts: React.FC = () => {
     email: "",
     subject: "",
     message: "",
+    kingschat: "",
   });
 
   const handleBookingChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -72,7 +73,10 @@ const Contacts: React.FC = () => {
         name: messageForm.name,
         email: messageForm.email,
         phone: messageForm.phone,
-        message: messageForm.message,
+        message:
+          (messageForm.kingschat
+            ? `KingsChat Username: ${messageForm.kingschat}\n\n`
+            : "") + messageForm.message,
         subject: messageForm.subject || 'Contact Form Message',
       };
       const res = await fetch('/api/messages', {
@@ -88,6 +92,7 @@ const Contacts: React.FC = () => {
           email: "",
           subject: "",
           message: "",
+          kingschat: "",
         });
       } else {
         throw new Error('Submission failed');
@@ -294,6 +299,14 @@ const Contacts: React.FC = () => {
                   className={inputClass}
                   required
                 />
+                <input
+                  type="text"
+                  name="kingschat"
+                  placeholder="KingsChat Username"
+                  value={messageForm.kingschat}
+                  onChange={handleMessageChange}
+                  className={inputClass}
+                />
                 <textarea
                   name="message"
                   placeholder="Message"
@@ -318,18 +331,15 @@ const Contacts: React.FC = () => {
 
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
-                    KINGSCHAT
-                  </h3>
                   <a
                     href="https://kingschat.online/user/-unendingpraise"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center mt-2"
+                    className="inline-flex items-center justify-center"
                     aria-label="KingsChat -unendingpraise"
                   >
                     <img
-                      src="https://image.emojipng.com/48/11303048.jpg"
+                      src="/Kingschat.png"
                       alt="KingsChat -unendingpraise"
                       className="w-12 h-12 object-contain"
                     />
