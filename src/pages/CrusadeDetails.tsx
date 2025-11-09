@@ -142,9 +142,10 @@ export default function CrusadeDetails() {
         className="mt-10"
       >
         <h2 className="text-xl font-semibold mb-3">About this crusade</h2>
-        <p className="text-gray-700 leading-relaxed text-sm md:text-base">
-          {crusade.description}
-        </p>
+        <div
+          className="prose prose-sm md:prose-base text-gray-700 max-w-none leading-relaxed text-justify whitespace-pre-wrap"
+          dangerouslySetInnerHTML={{ __html: crusade.description || "" }}
+        />
       </motion.div>
 
       {/* MEDIA - Only show if there's more than one media item */}
