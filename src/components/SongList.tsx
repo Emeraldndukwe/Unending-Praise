@@ -34,7 +34,7 @@ export default function SongList() {
   return (
     <div className="rounded-2xl p-4 md:p-5 backdrop-blur-sm bg-white/70">
       <h2 className="text-center text-lg md:text-xl font-bold mb-4 text-gray-900">
-        Song of the Day
+        Songs of the Day
       </h2>
 
       <div className="space-y-2">
