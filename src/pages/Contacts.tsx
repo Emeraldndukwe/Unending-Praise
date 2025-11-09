@@ -332,15 +332,15 @@ const Contacts: React.FC = () => {
               <div className="space-y-6">
                 <div>
                   <a
-                    href="https://kingschat.online/user/-unendingpraise"
+                    href="https://kingschat.online/user/uepcommunications"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center justify-center"
-                    aria-label="KingsChat -unendingpraise"
+                    aria-label="KingsChat uepcommunications"
                   >
                     <img
                       src="/Kingschat.png"
-                      alt="KingsChat -unendingpraise"
+                      alt="KingsChat uepcommunications"
                       className="w-12 h-12 object-contain"
                     />
                   </a>
