@@ -21,9 +21,19 @@ export default function Footer() {
         {/* RIGHT — CONTACT */}
         <div className="text-center md:text-left">
           <h2 className="text-lg font-semibold mb-4 tracking-wide text-white">CONNECT</h2>
-          <div className="bg-white/15 inline-flex px-4 py-2 rounded-full font-semibold tracking-wide">
-            KingsChat: @Title
-          </div>
+          <a
+            href="https://kingschat.online/user/-unendingpraise"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white/15 inline-flex items-center justify-center px-4 py-2 rounded-full transition hover:bg-white/25"
+            aria-label="KingsChat -unendingpraise"
+          >
+            <img
+              src="https://image.emojipng.com/48/11303048.jpg"
+              alt="KingsChat -unendingpraise"
+              className="w-10 h-10 object-contain"
+            />
+          </a>
         </div>
       </div>
     </footer>

@@ -319,9 +319,21 @@ const Contacts: React.FC = () => {
               <div className="space-y-6">
                 <div>
                   <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
-                    KINGSCHAT USERNAME
+                    KINGSCHAT
                   </h3>
-                  <p className="text-gray-900 font-medium">@Title</p>
+                  <a
+                    href="https://kingschat.online/user/-unendingpraise"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center mt-2"
+                    aria-label="KingsChat -unendingpraise"
+                  >
+                    <img
+                      src="https://image.emojipng.com/48/11303048.jpg"
+                      alt="KingsChat -unendingpraise"
+                      className="w-12 h-12 object-contain"
+                    />
+                  </a>
                 </div>
               </div>
             </div>
