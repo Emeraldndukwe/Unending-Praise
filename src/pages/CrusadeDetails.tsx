@@ -107,11 +107,8 @@ export default function CrusadeDetails() {
         <div className="absolute inset-0 bg-black/40"></div>
 
         {/* Content overlay */}
-        <div className="absolute inset-0 flex flex-col justify-end p-6 text-white">
-          <h1 className="text-2xl md:text-3xl font-bold">{crusade.title || "Crusade"}</h1>
-          {crusade.subtitle && <p className="text-sm text-gray-200">{crusade.subtitle}</p>}
-
-          <div className="flex flex-wrap gap-6 mt-4 text-sm">
+        <div className="absolute inset-0 flex flex-col justify-end p-6 text-white gap-4">
+          <div className="flex flex-wrap gap-6 text-sm">
             {crusade.date && (
             <div className="flex items-center gap-2">
               <CalendarDays size={16} /> {crusade.date}
@@ -139,9 +136,16 @@ export default function CrusadeDetails() {
         initial={{ opacity: 0, y: 50 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
-        className="mt-10"
+        className="mt-10 space-y-3"
       >
-        <h2 className="text-xl font-semibold mb-3">About this crusade</h2>
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+          {crusade.title || "Crusade"}
+        </h1>
+        {crusade.subtitle && (
+          <p className="text-sm md:text-base text-gray-600">
+            {crusade.subtitle}
+          </p>
+        )}
         <div
           className="prose prose-sm md:prose-base text-gray-700 max-w-none leading-relaxed text-justify whitespace-pre-wrap"
           dangerouslySetInnerHTML={{ __html: crusade.description || "" }}

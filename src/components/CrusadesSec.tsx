@@ -143,7 +143,7 @@ function CrusadesSection() {
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">
             CRUSADES
           </h2>
-          <p className="text-sm sm:text-base md:text-lg text-black leading-relaxed">
+          <p className="text-sm sm:text-base md:text-lg text-black leading-relaxed text-justify">
             At the beginning of the Year 2025 — the Year of Completeness — our Man of God, Rev. Dr. Chris Oyakhilome DSc. DSc. D.D., gave us a divine mandate: to complete the full preaching of the Gospel to every nation, tribe, and tongue. Riding on this divine mandate, the Pastor Chris Live Unending Praise Crusade was born. These crusades are all about soul winning and soul development — this is what we live for. It is our primary responsibility on earth, and everything we do is channeled towards fulfilling this divine mandate.
           </p>
           <Link to="/crusades">
@@ -226,7 +226,7 @@ function CrusadesSection() {
               <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">
                 CRUSADES
               </h3>
-              <p className="text-xs sm:text-sm md:text-base text-gray-700 leading-relaxed mt-2">
+              <p className="text-xs sm:text-sm md:text-base text-gray-700 leading-relaxed text-justify mt-2">
                 At the beginning of the Year 2025 — the Year of Completeness — our Man of God, Rev. Dr. Chris Oyakhilome DSc. DSc. D.D., gave us a divine mandate: to complete the full preaching of the Gospel to every nation, tribe, and tongue. Riding on this divine mandate, the Pastor Chris Live Unending Praise Crusade was born. These crusades are all about soul winning and soul development — this is what we live for.
               </p>
               <Link to="/crusades">
