@@ -165,16 +165,16 @@ export default function Crusades() {
       <div className="max-w-6xl mx-auto px-4 py-10 grid grid-cols-1 lg:grid-cols-3 gap-10 items-start">
         <div className="lg:col-span-2 text-gray-700 leading-relaxed space-y-4">
           <h2 className="font-bold text-2xl">What Is the Pastor Chris Live Unending Praise Crusade All About?</h2>
-          <p>
+          <p className="text-justify">
             At the beginning of the Year 2025 &mdash; the Year of Completeness &mdash; our Man of God, Rev. Dr. Chris Oyakhilome DSc. DSc. D.D., gave us a divine mandate: to complete the full preaching of the Gospel to every nation, tribe, and tongue. He charged each one of us to go out and win souls, and make disciples of men &mdash; as though we were the only ones entrusted with this sacred responsibility.
           </p>
-          <p>
+          <p className="text-justify">
             Riding on this divine mandate, the Pastor Chris Live Unending Praise Crusade was born. These crusades are all about soul winning and soul development &mdash; this is what we live for. It is our primary responsibility on earth, and everything we do is channeled towards fulfilling this divine mandate. Matthew 28:19&ndash;20 states: &ldquo;Go ye therefore, and teach all nations, baptizing them in the name of the Father, and of the Son, and of the Holy Ghost. Teaching them to observe all things whatsoever I have commanded you: and, lo, I am with you always, even unto the end of the world. Amen.&rdquo;
           </p>
-          <p>
+          <p className="text-justify">
             While The Pastor Chris Live Unending Praise is a platform of continuous worship &mdash; where endless praise is offered to our Lord and Savior, Jesus Christ &mdash; it is also a powerful discipleship platform. Through it, we carry the message of Christ and the beauty of worship to every place: orphanages, prisons, hospitals, schools, communities, and more.
           </p>
-          <p>
+          <p className="text-justify">
             Every opportunity becomes a moment for evangelism &mdash; even birthday celebrations are turned into soul-winning crusades. This is the heartbeat of the Pastor Chris Live Unending Praise Crusades &mdash; taking the Gospel of our Lord and Saviour Jesus Christ through worship across the globe.
           </p>
 
@@ -202,7 +202,7 @@ export default function Crusades() {
             <li>Demography-targeted crusades such as Children, Teenagers, Youth, Women, Men, etc.</li>
           </ul>
 
-          <p>
+        <p className="text-justify">
             Kindly fill the form to receive more information on how to organize Pastor Chris Live Unending Praise Crusades.
           </p>
         </div>

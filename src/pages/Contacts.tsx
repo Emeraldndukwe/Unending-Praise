@@ -103,7 +103,14 @@ const Contacts: React.FC = () => {
     "September", "October", "November", "December",
   ];
   const days = Array.from({ length: 31 }, (_, i) => i + 1);
-  const praiseTimes = ["6:00 AM", "7:00 AM", "8:00 AM", "9:00 AM", "10:00 AM"];
+  const praiseTimes = Array.from({ length: 48 }, (_, index) => {
+    const hour = Math.floor(index / 2);
+    const minute = index % 2 === 0 ? 0 : 30;
+    const period = hour >= 12 ? "PM" : "AM";
+    const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+    const minuteLabel = minute === 0 ? "00" : "30";
+    return `${hour12}:${minuteLabel} ${period}`;
+  });
 
   const inputClass =
     "w-full p-3 border border-gray-300 rounded-lg bg-[#FFF] text-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-500";

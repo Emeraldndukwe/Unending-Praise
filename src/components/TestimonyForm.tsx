@@ -108,8 +108,8 @@ export default function TestimonyForm() {
             className="border border-gray-300 rounded px-3 py-2 bg-white text-gray-700"
           >
             <option value="">Title</option>
-            <option value="Bro.">Bro.</option>
-            <option value="Sis.">Sis.</option>
+            <option value="Brother">Brother</option>
+            <option value="Sister">Sister</option>
             <option value="Deaconess">Deaconess</option>
             <option value="Deacon">Deacon</option>
             <option value="Pastor">Pastor</option>
