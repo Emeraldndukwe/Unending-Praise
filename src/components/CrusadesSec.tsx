@@ -70,6 +70,13 @@ function CrusadesSection() {
             ...c,
             previewImage: c.previewImage || c.preview_image,
           }))
+          .filter(
+            (c: any) =>
+              (c.title || "")
+                .toLowerCase()
+                .trim() !==
+              "pastor chris live unending praise online crusade (praise night edition) — christ embassy port harcourt zone 3"
+          )
           .sort((a, b) => (b.attendance ?? 0) - (a.attendance ?? 0));
         const topFive = converted.slice(0, 5);
         if (isMounted) {
