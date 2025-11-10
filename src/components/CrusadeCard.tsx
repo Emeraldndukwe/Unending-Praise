@@ -64,7 +64,7 @@ export default function CrusadeCard({ id, title, attendance, date, image }: Crus
           className="mt-5 mb-2 text-[11px] md:text-[13px] font-semibold inline-flex items-center gap-1 hover:opacity-80 transition"
           aria-label={`Read more about ${title}`}
         >
-          Read more about {title} <ArrowUpRight size={13} className="md:w-[15px] md:h-[15px]" />
+          Read more <ArrowUpRight size={13} className="md:w-[15px] md:h-[15px]" />
         </Link>
 
       </div>
