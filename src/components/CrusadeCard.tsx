@@ -20,6 +20,9 @@ export default function CrusadeCard({ id, title, attendance, date, image }: Crus
         className="w-full h-[90px] md:h-[160px] object-cover rounded-t-[22px]"
         loading="lazy"
         decoding="async"
+        width={400}
+        height={300}
+        sizes="(max-width: 768px) 250px, 320px"
       />
       
       {/* Content */}

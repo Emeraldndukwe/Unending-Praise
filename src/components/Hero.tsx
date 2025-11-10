@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import SongList from "./SongList";
-import LiveChat from "./LiveChat";
+
+const SongList = lazy(() => import("./SongList"));
+const LiveChat = lazy(() => import("./LiveChat"));
 
 const NAV_HEIGHT = 72;
 
@@ -242,22 +243,40 @@ export default function HeroSection() {
                   transition={{ duration: 0.35 }}
                   className="absolute inset-0"
                 >
-                  <img
-                    src="https://loveworldmusic.org/wp-content/uploads/2024/06/1000097946-1536x836.jpg"
-                    srcSet="
-                      https://loveworldmusic.org/wp-content/uploads/2024/06/1000097946-768x418.jpg 768w,
-                      https://loveworldmusic.org/wp-content/uploads/2024/06/1000097946-1024x558.jpg 1024w,
-                      https://loveworldmusic.org/wp-content/uploads/2024/06/1000097946-1536x836.jpg 1536w
-                    "
-                    sizes="(max-width: 768px) 100vw, (max-width: 1024px) 75vw, 50vw"
-                    width={1536}
-                    height={836}
-                    loading="eager"
-                    fetchPriority="high"
-                    decoding="async"
-                    alt="Unending Praise livestream poster featuring worshippers"
-                    className="absolute inset-0 w-full h-full object-cover rounded-3xl"
-                  />
+                  <picture>
+                    <source
+                      type="image/avif"
+                      srcSet="
+                        https://images.weserv.nl/?url=loveworldmusic.org/wp-content/uploads/2024/06/1000097946-768x418.jpg&output=avif 768w,
+                        https://images.weserv.nl/?url=loveworldmusic.org/wp-content/uploads/2024/06/1000097946-1024x558.jpg&output=avif 1024w,
+                        https://images.weserv.nl/?url=loveworldmusic.org/wp-content/uploads/2024/06/1000097946-1536x836.jpg&output=avif 1536w
+                      "
+                    />
+                    <source
+                      type="image/webp"
+                      srcSet="
+                        https://images.weserv.nl/?url=loveworldmusic.org/wp-content/uploads/2024/06/1000097946-768x418.jpg&output=webp 768w,
+                        https://images.weserv.nl/?url=loveworldmusic.org/wp-content/uploads/2024/06/1000097946-1024x558.jpg&output=webp 1024w,
+                        https://images.weserv.nl/?url=loveworldmusic.org/wp-content/uploads/2024/06/1000097946-1536x836.jpg&output=webp 1536w
+                      "
+                    />
+                    <img
+                      src="https://loveworldmusic.org/wp-content/uploads/2024/06/1000097946-1536x836.jpg"
+                      srcSet="
+                        https://loveworldmusic.org/wp-content/uploads/2024/06/1000097946-768x418.jpg 768w,
+                        https://loveworldmusic.org/wp-content/uploads/2024/06/1000097946-1024x558.jpg 1024w,
+                        https://loveworldmusic.org/wp-content/uploads/2024/06/1000097946-1536x836.jpg 1536w
+                      "
+                      sizes="(max-width: 768px) 100vw, (max-width: 1024px) 75vw, 50vw"
+                      width={1536}
+                      height={836}
+                      loading="eager"
+                      fetchPriority="high"
+                      decoding="async"
+                      alt="Unending Praise livestream poster featuring worshippers"
+                      className="absolute inset-0 w-full h-full object-cover rounded-3xl"
+                    />
+                  </picture>
                   <div className="absolute inset-0 bg-black/45 rounded-3xl" />
 
                   <div className="absolute bottom-6 left-6 text-white z-10 max-w-md">
@@ -399,7 +418,15 @@ export default function HeroSection() {
 
             {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto px-4 pb-4">
-              {activeTab === "songs" ? <SongList /> : <LiveChat />}
+              <Suspense
+                fallback={
+                  <div className="h-full flex items-center justify-center text-sm text-black/60">
+                    Loading {activeTab === "songs" ? "songs" : "live chat"}…
+                  </div>
+                }
+              >
+                {activeTab === "songs" ? <SongList /> : <LiveChat />}
+              </Suspense>
             </div>
           </div>
         </div>
