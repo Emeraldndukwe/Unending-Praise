@@ -100,6 +100,8 @@ export default function CrusadeCarousel({ data }: CrusadeCarouselProps) {
           minHeight: computedMinHeight,
           paddingTop: topPadding,
           paddingBottom: bottomPadding,
+          touchAction: "pan-y",
+          overscrollBehaviorX: "contain",
         }}
       >
         {list.map((item, index) => {

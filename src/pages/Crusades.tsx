@@ -153,7 +153,7 @@ export default function Crusades() {
   }
 
   return (
-    <div className="w-full">
+    <div className="w-full overflow-x-hidden">
       {/* Banner */}
       <div className="relative h-60 md:h-72 w-full bg-gradient-to-r from-[#54037C] via-[#6f3aa6] to-[#8A4EBF] rounded-b-3xl flex items-center justify-center shadow-md">
         <h1 className="text-white text-3xl md:text-4xl font-bold tracking-wide">
