@@ -29,7 +29,7 @@ export default function TestimonyCard({ id, title, name, summary, content, previ
             <img
               src={previewImage}
               alt={title || "Testimony"}
-              className="object-cover object-top w-full h-full"
+              className="object-cover object-center w-full h-full"
             />
           )
         ) : (
