@@ -151,7 +151,13 @@ const ImageCarousel = forwardRef<ImageCarouselRef, ImageCarouselProps>(
                           setFullscreenIndex(fullIndex >= 0 ? fullIndex : 0);
                         }}
                       >
-                        <img src={item.url} alt={item.caption ?? `media-${index}`} className="w-full h-full object-cover" />
+                        <img
+                          src={item.url}
+                          alt={item.caption ?? `media-${index}`}
+                          className="w-full h-full object-cover"
+                          loading={index === 0 ? "eager" : "lazy"}
+                          decoding="async"
+                        />
                       </motion.div>
                     </SwiperSlide>
                   );
@@ -226,7 +232,13 @@ const ImageCarousel = forwardRef<ImageCarouselRef, ImageCarouselProps>(
                       }}
                     >
                       {m.type === "image" ? (
-                        <img src={m.url} alt={m.caption} className="w-full h-36 object-cover rounded" />
+                        <img
+                          src={m.url}
+                          alt={m.caption}
+                          className="w-full h-36 object-cover rounded"
+                          loading="lazy"
+                          decoding="async"
+                        />
                       ) : (
                         <>
                           <video src={m.url} className="w-full h-36 object-cover rounded" muted />
@@ -293,7 +305,13 @@ const ImageCarousel = forwardRef<ImageCarouselRef, ImageCarouselProps>(
                 onClick={(e) => e.stopPropagation()}
               >
                 {media[fullscreenIndex].type === "image" ? (
-                  <img src={media[fullscreenIndex].url} alt={media[fullscreenIndex].caption} className="w-full h-full object-contain" />
+                  <img
+                    src={media[fullscreenIndex].url}
+                    alt={media[fullscreenIndex].caption}
+                    className="w-full h-full object-contain"
+                    loading="eager"
+                    decoding="async"
+                  />
                 ) : (
                   <video src={media[fullscreenIndex].url} controls autoPlay playsInline className="w-full h-full object-contain" />
                 )}

@@ -181,6 +181,8 @@ export default function TestimoniesCarousel() {
                     src={item.image}
                     className={`w-[85%] ${isMobile ? "h-[140px]" : "h-[180px]"} object-cover object-center rounded-xl transition-transform duration-500`}
                     alt={item.name}
+                    loading={isActive ? "eager" : "lazy"}
+                    decoding="async"
                   />
                 </div>
                 <p className="font-bold text-xs mt-4 px-5">{item.name}</p>
@@ -212,9 +214,9 @@ export default function TestimoniesCarousel() {
         <button onClick={next} className="p-2 rounded-full hover:bg-gray-200"><ChevronRight size={18} /></button>
       </div>
 
-      <Link to="/testimonies">
+      <Link to="/testimonies" aria-label="Browse all testimonies">
         <button className="mt-6 px-6 sm:px-10 py-3 sm:py-4 bg-gray-700 rounded-2xl text-xs sm:text-sm font-semibold hover:bg-gray-600 flex items-center gap-2 mx-auto text-white transition">
-          READ MORE <ArrowUpRight size={16} />
+          Explore more testimonies <ArrowUpRight size={16} />
         </button>
       </Link>
     </section>

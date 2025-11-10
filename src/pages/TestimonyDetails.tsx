@@ -146,6 +146,9 @@ export default function TestimonyDetails() {
               src={heroMedia.url}
               alt={testimony.title || "Testimony"}
               className="w-full h-full object-cover object-center"
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
             />
           )
         ) : (

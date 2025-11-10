@@ -25,7 +25,13 @@ export default function CrusadeListCard({
   return (
     <div className="flex flex-col md:flex-row gap-4 border-b border-gray-300 pb-6 mb-8">
       <div className="w-full md:w-1/3 bg-gray-200 h-48 flex items-center justify-center overflow-hidden rounded-lg">
-        <img src={image} alt={title} className="object-cover w-full h-full" />
+        <img
+          src={image}
+          alt={title}
+          className="object-cover w-full h-full"
+          loading="lazy"
+          decoding="async"
+        />
       </div>
 
       <div className="flex-1">
@@ -58,8 +64,9 @@ export default function CrusadeListCard({
         <Link
           to={`/crusades/details/${id}`}
           className="text-purple-700 font-semibold hover:underline text-xs md:text-sm inline-block"
+          aria-label={`Learn more about ${title}`}
         >
-          READ MORE &raquo;
+          Read more about {title} &raquo;
         </Link>
       </div>
     </div>

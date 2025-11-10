@@ -1,18 +1,19 @@
 import { Routes, Route, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import ScrollToTopButton from "./components/ScrollToTopButton";
-import Home from "./pages/Home";
-import About from "./pages/About";
-import Contacts from "./pages/Contacts";
-import Testimonies from "./pages/Testimonies";
-import TestimonyDetails from "./pages/TestimonyDetails";
-import Crusades from "./pages/Crusades";
-import CrusadeListPage from "./pages/CrusadeListPage";
-import CrusadeDetails from "./pages/CrusadeDetails";
-import AdminPage from "./pages/Admin";
+
+const Home = lazy(() => import("./pages/Home"));
+const About = lazy(() => import("./pages/About"));
+const Contacts = lazy(() => import("./pages/Contacts"));
+const Testimonies = lazy(() => import("./pages/Testimonies"));
+const TestimonyDetails = lazy(() => import("./pages/TestimonyDetails"));
+const Crusades = lazy(() => import("./pages/Crusades"));
+const CrusadeListPage = lazy(() => import("./pages/CrusadeListPage"));
+const CrusadeDetails = lazy(() => import("./pages/CrusadeDetails"));
+const AdminPage = lazy(() => import("./pages/Admin"));
 
 export default function App() {
   const location = useLocation();
@@ -28,7 +29,14 @@ export default function App() {
       {!isAdmin && <Navbar />}
       <main className="flex-grow">
         <AnimatePresence mode="wait">
-          <Routes location={location} key={location.pathname}>
+          <Suspense
+            fallback={
+              <div className="flex min-h-[60vh] items-center justify-center text-gray-500">
+                Loading...
+              </div>
+            }
+          >
+            <Routes location={location} key={location.pathname}>
             {/* Home */}
             <Route
               path="/"
@@ -162,7 +170,8 @@ export default function App() {
                 </motion.div>
               }
             />
-          </Routes>
+            </Routes>
+          </Suspense>
         </AnimatePresence>
       </main>
       {!isAdmin && <ScrollToTopButton />}

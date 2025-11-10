@@ -30,6 +30,8 @@ export default function TestimonyCard({ id, title, name, summary, content, previ
               src={previewImage}
               alt={title || "Testimony"}
               className="object-cover object-center w-full h-full"
+              loading="lazy"
+              decoding="async"
             />
           )
         ) : (
@@ -40,8 +42,12 @@ export default function TestimonyCard({ id, title, name, summary, content, previ
         <h2 className="font-bold text-lg md:text-xl mb-2">{title || "Testimony"}</h2>
         <p className="text-gray-600 mb-3 text-sm md:text-base line-clamp-3">{displaySummary}</p>
         <p className="text-xs md:text-sm font-semibold mb-2 uppercase">{name || "Anonymous"}</p>
-        <Link to={`/testimonies/${id}`} className="text-purple-600 font-semibold hover:underline text-xs md:text-sm inline-block">
-          READ MORE &raquo;
+        <Link
+          to={`/testimonies/${id}`}
+          className="text-purple-600 font-semibold hover:underline text-xs md:text-sm inline-block"
+          aria-label={`Read the full testimony from ${name || "this participant"}`}
+        >
+          Read the full testimony &raquo;
         </Link>
       </div>
     </div>
