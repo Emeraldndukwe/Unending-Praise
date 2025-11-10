@@ -897,15 +897,6 @@ async function notifyUsersForRole(role, subject, text) {
   }
 }
 
-// Serve built frontend (dist) from the same server for Render
-const distDir = path.resolve(__dirname, '../dist');
-if (fs.existsSync(distDir)) {
-  app.use(express.static(distDir));
-  app.get('*', (_req, res) => {
-    res.sendFile(path.join(distDir, 'index.html'));
-  });
-}
-
 // Superadmin user management APIs
 app.get('/api/admin/users', requireAuth, requireSuperAdmin, async (_req, res) => {
   try {
@@ -1000,5 +991,14 @@ app.post('/api/admin/fix-superadmin', async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+
+// Serve built frontend (dist) from the same server for Render
+const distDir = path.resolve(__dirname, '../dist');
+if (fs.existsSync(distDir)) {
+  app.use(express.static(distDir));
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(distDir, 'index.html'));
+  });
+}
 
 
