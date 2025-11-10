@@ -179,7 +179,7 @@ export default function TestimoniesCarousel() {
                 <div className="w-full flex justify-center mt-5">
                   <img
                     src={item.image}
-                    className={`w-[85%] ${isMobile ? "h-[140px]" : "h-[180px]"} object-cover object-top rounded-xl transition-transform duration-500`}
+                    className={`w-[85%] ${isMobile ? "h-[140px]" : "h-[180px]"} object-cover object-center rounded-xl transition-transform duration-500`}
                     alt={item.name}
                   />
                 </div>

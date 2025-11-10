@@ -145,7 +145,7 @@ export default function TestimonyDetails() {
             <img
               src={heroMedia.url}
               alt={testimony.title || "Testimony"}
-              className="w-full h-full object-cover object-top"
+              className="w-full h-full object-cover object-center"
             />
           )
         ) : (
