@@ -115,10 +115,6 @@ export default function TestimonyDetails() {
     ? media[0]
     : null;
 
-  const paragraphs = testimony.content
-    ?.split("\n")
-    .map((para) => para.trimStart());
-
   return (
     // ✅ Added pt-24 so content sits below navbar
     <div className="max-w-5xl mx-auto px-4 pt-24 pb-10">
@@ -179,16 +175,11 @@ export default function TestimonyDetails() {
       <div className="border-t my-10 w-full" />
 
       {/* ✅ LONG JUSTIFIED DESCRIPTION */}
-      <div className="text-gray-800 leading-relaxed text-sm md:text-base text-justify space-y-5">
-        {paragraphs?.map((para, i) => (
-          <p key={i}>
-            {para}
-          </p>
-        )) ??
-          (testimony.content && (
-            <p>{testimony.content.trimStart()}</p>
-          ))}
-      </div>
+      {testimony.content && (
+        <div className="text-gray-800 leading-relaxed text-sm md:text-base text-justify whitespace-pre-wrap">
+          {testimony.content.trim()}
+        </div>
+      )}
 
         
         {/* Media - Only show if there's more than one media item */}
