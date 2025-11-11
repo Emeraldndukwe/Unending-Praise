@@ -115,6 +115,10 @@ export default function TestimonyDetails() {
     ? media[0]
     : null;
 
+  const paragraphs = testimony.content
+    ?.split("\n")
+    .map((para) => para.trimStart());
+
   return (
     // ✅ Added pt-24 so content sits below navbar
     <div className="max-w-5xl mx-auto px-4 pt-24 pb-10">
@@ -176,13 +180,14 @@ export default function TestimonyDetails() {
 
       {/* ✅ LONG JUSTIFIED DESCRIPTION */}
       <div className="text-gray-800 leading-relaxed text-sm md:text-base text-justify space-y-5">
-        {testimony.content?.split("\n").map((para, i) => (
+        {paragraphs?.map((para, i) => (
           <p key={i} className="indent-6">
             {para}
           </p>
-        )) || (
-          <p className="indent-6">{testimony.content}</p>
-        )}
+        )) ??
+          (testimony.content && (
+            <p className="indent-6">{testimony.content.trimStart()}</p>
+          ))}
       </div>
 
         
