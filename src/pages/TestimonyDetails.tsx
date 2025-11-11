@@ -181,12 +181,12 @@ export default function TestimonyDetails() {
       {/* ✅ LONG JUSTIFIED DESCRIPTION */}
       <div className="text-gray-800 leading-relaxed text-sm md:text-base text-justify space-y-5">
         {paragraphs?.map((para, i) => (
-          <p key={i} className="indent-6">
+          <p key={i}>
             {para}
           </p>
         )) ??
           (testimony.content && (
-            <p className="indent-6">{testimony.content.trimStart()}</p>
+            <p>{testimony.content.trimStart()}</p>
           ))}
       </div>
 
