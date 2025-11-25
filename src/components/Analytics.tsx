@@ -65,7 +65,12 @@ export default function Analytics({ headers }: AnalyticsProps) {
   if (!data) return null;
 
   // Prepare chart data for last 7 days
-  const chartData = [];
+  type ChartDataItem = {
+    date: string;
+    label: string;
+    views: number;
+  };
+  const chartData: ChartDataItem[] = [];
   const today = new Date();
   for (let i = 6; i >= 0; i--) {
     const date = new Date(today);
