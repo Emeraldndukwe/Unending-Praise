@@ -1061,9 +1061,9 @@ app.post('/api/analytics/track', async (req, res) => {
         'INSERT INTO page_views (page_path, visitor_ip, user_agent) VALUES ($1, $2, $3)',
         [pagePath, visitorIp, userAgent]
       );
-    } catch (insertError: any) {
+    } catch (insertError) {
       // If columns don't exist, insert without them
-      if (insertError.code === '42703') {
+      if (insertError?.code === '42703') {
         await pool.query(
           'INSERT INTO page_views (page_path) VALUES ($1)',
           [pagePath]
