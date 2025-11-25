@@ -2,7 +2,12 @@ import { useEffect, useState, useRef } from "react";
 import { Printer, Download } from "lucide-react";
 
 type AnalyticsData = {
-  visitors: {
+  pageViews: {
+    last7Days: number;
+    last30Days: number;
+    allTime: number;
+  };
+  uniqueVisitors: {
     last7Days: number;
     last30Days: number;
     allTime: number;
@@ -107,10 +112,10 @@ export default function Analytics({ headers }: AnalyticsProps) {
     
     // Visitor Stats
     csvRows.push("VISITOR STATISTICS");
-    csvRows.push("Period,Page Views");
-    csvRows.push(`Last 7 Days,${data.visitors.last7Days}`);
-    csvRows.push(`Last 30 Days,${data.visitors.last30Days}`);
-    csvRows.push(`All Time,${data.visitors.allTime}`);
+    csvRows.push("Period,Unique Visitors,Page Views");
+    csvRows.push(`Last 7 Days,${data.uniqueVisitors.last7Days},${data.pageViews.last7Days}`);
+    csvRows.push(`Last 30 Days,${data.uniqueVisitors.last30Days},${data.pageViews.last30Days}`);
+    csvRows.push(`All Time,${data.uniqueVisitors.allTime},${data.pageViews.allTime}`);
     csvRows.push("");
     
     // Daily Views
@@ -210,18 +215,21 @@ export default function Analytics({ headers }: AnalyticsProps) {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 print-section">
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
               <h3 className="text-sm font-semibold text-gray-600 mb-2">Last 7 Days</h3>
-              <p className="text-3xl font-bold text-[#54037C]">{data.visitors.last7Days.toLocaleString()}</p>
-              <p className="text-xs text-gray-500 mt-1">Page Views</p>
+              <p className="text-3xl font-bold text-[#54037C]">{data.uniqueVisitors.last7Days.toLocaleString()}</p>
+              <p className="text-xs text-gray-500 mt-1">Unique Visitors</p>
+              <p className="text-lg font-semibold text-gray-700 mt-2">{data.pageViews.last7Days.toLocaleString()} <span className="text-xs font-normal text-gray-500">page views</span></p>
             </div>
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
               <h3 className="text-sm font-semibold text-gray-600 mb-2">Last 30 Days</h3>
-              <p className="text-3xl font-bold text-[#54037C]">{data.visitors.last30Days.toLocaleString()}</p>
-              <p className="text-xs text-gray-500 mt-1">Page Views</p>
+              <p className="text-3xl font-bold text-[#54037C]">{data.uniqueVisitors.last30Days.toLocaleString()}</p>
+              <p className="text-xs text-gray-500 mt-1">Unique Visitors</p>
+              <p className="text-lg font-semibold text-gray-700 mt-2">{data.pageViews.last30Days.toLocaleString()} <span className="text-xs font-normal text-gray-500">page views</span></p>
             </div>
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
               <h3 className="text-sm font-semibold text-gray-600 mb-2">All Time</h3>
-              <p className="text-3xl font-bold text-[#54037C]">{data.visitors.allTime.toLocaleString()}</p>
-              <p className="text-xs text-gray-500 mt-1">Page Views</p>
+              <p className="text-3xl font-bold text-[#54037C]">{data.uniqueVisitors.allTime.toLocaleString()}</p>
+              <p className="text-xs text-gray-500 mt-1">Unique Visitors</p>
+              <p className="text-lg font-semibold text-gray-700 mt-2">{data.pageViews.allTime.toLocaleString()} <span className="text-xs font-normal text-gray-500">page views</span></p>
             </div>
           </div>
 

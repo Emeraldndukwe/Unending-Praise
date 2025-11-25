@@ -146,11 +146,24 @@ async function ensureSchema() {
       CREATE TABLE IF NOT EXISTS page_views (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         page_path TEXT NOT NULL,
+        visitor_ip TEXT,
+        user_agent TEXT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
       -- Create index for faster queries
       CREATE INDEX IF NOT EXISTS idx_page_views_path ON page_views(page_path);
       CREATE INDEX IF NOT EXISTS idx_page_views_created_at ON page_views(created_at);
+      CREATE INDEX IF NOT EXISTS idx_page_views_visitor ON page_views(visitor_ip, created_at);
+      -- Add columns if they don't exist (migration)
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='page_views' AND column_name='visitor_ip') THEN
+          ALTER TABLE page_views ADD COLUMN visitor_ip TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='page_views' AND column_name='user_agent') THEN
+          ALTER TABLE page_views ADD COLUMN user_agent TEXT;
+        END IF;
+      END $$;
     `);
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
       ALTER TABLE crusades ADD COLUMN IF NOT EXISTS zone TEXT;
@@ -194,6 +207,8 @@ function writeDb(db) {
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+// Trust proxy to get correct IP addresses (needed for Render and other proxies)
+app.set('trust proxy', true);
 
 // JWT auth
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
@@ -1009,7 +1024,14 @@ app.post('/api/analytics/track', async (req, res) => {
     return res.status(400).json({ error: 'Missing pagePath' });
   }
   try {
-    await pool.query('INSERT INTO page_views (page_path) VALUES ($1)', [pagePath]);
+    // Get visitor IP and user agent for unique visitor tracking
+    const visitorIp = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.connection?.remoteAddress || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+    
+    await pool.query(
+      'INSERT INTO page_views (page_path, visitor_ip, user_agent) VALUES ($1, $2, $3)',
+      [pagePath, visitorIp, userAgent]
+    );
     res.status(201).json({ success: true });
   } catch (e) {
     console.error('Analytics track error:', e);
@@ -1026,26 +1048,49 @@ app.get('/api/analytics/stats', requireAuth, requireAdmin, async (req, res) => {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
-    // Count page views for 7 days
-    const visitors7Days = await pool.query(
+    // Count total page views for 7 days
+    const pageViews7Days = await pool.query(
       `SELECT COUNT(*) as total_views
        FROM page_views 
        WHERE created_at >= $1`,
       [sevenDaysAgo.toISOString()]
     );
     
-    // Count page views for 30 days
-    const visitors30Days = await pool.query(
+    // Count unique visitors for 7 days (distinct IP addresses)
+    const uniqueVisitors7Days = await pool.query(
+      `SELECT COUNT(DISTINCT visitor_ip) as unique_visitors
+       FROM page_views 
+       WHERE created_at >= $1 AND visitor_ip IS NOT NULL AND visitor_ip != 'unknown'`,
+      [sevenDaysAgo.toISOString()]
+    );
+    
+    // Count total page views for 30 days
+    const pageViews30Days = await pool.query(
       `SELECT COUNT(*) as total_views
        FROM page_views 
        WHERE created_at >= $1`,
       [thirtyDaysAgo.toISOString()]
     );
     
-    // Count all time
-    const allTime = await pool.query(
+    // Count unique visitors for 30 days
+    const uniqueVisitors30Days = await pool.query(
+      `SELECT COUNT(DISTINCT visitor_ip) as unique_visitors
+       FROM page_views 
+       WHERE created_at >= $1 AND visitor_ip IS NOT NULL AND visitor_ip != 'unknown'`,
+      [thirtyDaysAgo.toISOString()]
+    );
+    
+    // Count all time page views
+    const allTimePageViews = await pool.query(
       `SELECT COUNT(*) as total_views
        FROM page_views`
+    );
+    
+    // Count all time unique visitors
+    const allTimeUniqueVisitors = await pool.query(
+      `SELECT COUNT(DISTINCT visitor_ip) as unique_visitors
+       FROM page_views 
+       WHERE visitor_ip IS NOT NULL AND visitor_ip != 'unknown'`
     );
     
     // Get page rankings (most visited pages)
@@ -1068,10 +1113,15 @@ app.get('/api/analytics/stats', requireAuth, requireAdmin, async (req, res) => {
     );
     
     res.json({
-      visitors: {
-        last7Days: parseInt(visitors7Days.rows[0]?.total_views || '0'),
-        last30Days: parseInt(visitors30Days.rows[0]?.total_views || '0'),
-        allTime: parseInt(allTime.rows[0]?.total_views || '0')
+      pageViews: {
+        last7Days: parseInt(pageViews7Days.rows[0]?.total_views || '0'),
+        last30Days: parseInt(pageViews30Days.rows[0]?.total_views || '0'),
+        allTime: parseInt(allTimePageViews.rows[0]?.total_views || '0')
+      },
+      uniqueVisitors: {
+        last7Days: parseInt(uniqueVisitors7Days.rows[0]?.unique_visitors || '0'),
+        last30Days: parseInt(uniqueVisitors30Days.rows[0]?.unique_visitors || '0'),
+        allTime: parseInt(allTimeUniqueVisitors.rows[0]?.unique_visitors || '0')
       },
       pageRankings: pageRankings.rows.map(row => ({
         page: row.page_path,
