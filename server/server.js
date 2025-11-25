@@ -1017,21 +1017,61 @@ app.post('/api/admin/fix-superadmin', async (req, res) => {
   }
 });
 
-// Analytics endpoints
+// Analytics endpoints - ensure columns exist before using them
+async function ensureAnalyticsColumns() {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='page_views' AND column_name='visitor_ip') THEN
+          ALTER TABLE page_views ADD COLUMN visitor_ip TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='page_views' AND column_name='user_agent') THEN
+          ALTER TABLE page_views ADD COLUMN user_agent TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='idx_page_views_visitor') THEN
+          CREATE INDEX idx_page_views_visitor ON page_views(visitor_ip, created_at);
+        END IF;
+      END $$;
+    `);
+  } catch (e) {
+    console.error('Error ensuring analytics columns:', e);
+  } finally {
+    client.release();
+  }
+}
+
 app.post('/api/analytics/track', async (req, res) => {
   const { pagePath } = req.body || {};
   if (!pagePath || typeof pagePath !== 'string') {
     return res.status(400).json({ error: 'Missing pagePath' });
   }
   try {
+    // Ensure columns exist
+    await ensureAnalyticsColumns();
+    
     // Get visitor IP and user agent for unique visitor tracking
     const visitorIp = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.connection?.remoteAddress || 'unknown';
     const userAgent = req.headers['user-agent'] || 'unknown';
     
-    await pool.query(
-      'INSERT INTO page_views (page_path, visitor_ip, user_agent) VALUES ($1, $2, $3)',
-      [pagePath, visitorIp, userAgent]
-    );
+    // Try to insert with new columns, fallback to old format if they don't exist
+    try {
+      await pool.query(
+        'INSERT INTO page_views (page_path, visitor_ip, user_agent) VALUES ($1, $2, $3)',
+        [pagePath, visitorIp, userAgent]
+      );
+    } catch (insertError: any) {
+      // If columns don't exist, insert without them
+      if (insertError.code === '42703') {
+        await pool.query(
+          'INSERT INTO page_views (page_path) VALUES ($1)',
+          [pagePath]
+        );
+      } else {
+        throw insertError;
+      }
+    }
     res.status(201).json({ success: true });
   } catch (e) {
     console.error('Analytics track error:', e);
@@ -1041,6 +1081,17 @@ app.post('/api/analytics/track', async (req, res) => {
 
 app.get('/api/analytics/stats', requireAuth, requireAdmin, async (req, res) => {
   try {
+    // Ensure columns exist before querying
+    await ensureAnalyticsColumns();
+    
+    // Check if visitor_ip column exists
+    const columnCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name='page_views' AND column_name='visitor_ip'
+    `);
+    const hasVisitorIp = columnCheck.rows.length > 0;
+    
     // Get visitor counts for different time periods
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -1056,13 +1107,20 @@ app.get('/api/analytics/stats', requireAuth, requireAdmin, async (req, res) => {
       [sevenDaysAgo.toISOString()]
     );
     
-    // Count unique visitors for 7 days (distinct IP addresses)
-    const uniqueVisitors7Days = await pool.query(
-      `SELECT COUNT(DISTINCT visitor_ip) as unique_visitors
-       FROM page_views 
-       WHERE created_at >= $1 AND visitor_ip IS NOT NULL AND visitor_ip != 'unknown'`,
-      [sevenDaysAgo.toISOString()]
-    );
+    // Count unique visitors for 7 days (distinct IP addresses) - only if column exists
+    let uniqueVisitors7Days = { rows: [{ unique_visitors: '0' }] };
+    if (hasVisitorIp) {
+      try {
+        uniqueVisitors7Days = await pool.query(
+          `SELECT COUNT(DISTINCT visitor_ip) as unique_visitors
+           FROM page_views 
+           WHERE created_at >= $1 AND visitor_ip IS NOT NULL AND visitor_ip != 'unknown'`,
+          [sevenDaysAgo.toISOString()]
+        );
+      } catch (e) {
+        console.error('Error counting unique visitors 7 days:', e);
+      }
+    }
     
     // Count total page views for 30 days
     const pageViews30Days = await pool.query(
@@ -1073,12 +1131,19 @@ app.get('/api/analytics/stats', requireAuth, requireAdmin, async (req, res) => {
     );
     
     // Count unique visitors for 30 days
-    const uniqueVisitors30Days = await pool.query(
-      `SELECT COUNT(DISTINCT visitor_ip) as unique_visitors
-       FROM page_views 
-       WHERE created_at >= $1 AND visitor_ip IS NOT NULL AND visitor_ip != 'unknown'`,
-      [thirtyDaysAgo.toISOString()]
-    );
+    let uniqueVisitors30Days = { rows: [{ unique_visitors: '0' }] };
+    if (hasVisitorIp) {
+      try {
+        uniqueVisitors30Days = await pool.query(
+          `SELECT COUNT(DISTINCT visitor_ip) as unique_visitors
+           FROM page_views 
+           WHERE created_at >= $1 AND visitor_ip IS NOT NULL AND visitor_ip != 'unknown'`,
+          [thirtyDaysAgo.toISOString()]
+        );
+      } catch (e) {
+        console.error('Error counting unique visitors 30 days:', e);
+      }
+    }
     
     // Count all time page views
     const allTimePageViews = await pool.query(
@@ -1087,11 +1152,18 @@ app.get('/api/analytics/stats', requireAuth, requireAdmin, async (req, res) => {
     );
     
     // Count all time unique visitors
-    const allTimeUniqueVisitors = await pool.query(
-      `SELECT COUNT(DISTINCT visitor_ip) as unique_visitors
-       FROM page_views 
-       WHERE visitor_ip IS NOT NULL AND visitor_ip != 'unknown'`
-    );
+    let allTimeUniqueVisitors = { rows: [{ unique_visitors: '0' }] };
+    if (hasVisitorIp) {
+      try {
+        allTimeUniqueVisitors = await pool.query(
+          `SELECT COUNT(DISTINCT visitor_ip) as unique_visitors
+           FROM page_views 
+           WHERE visitor_ip IS NOT NULL AND visitor_ip != 'unknown'`
+        );
+      } catch (e) {
+        console.error('Error counting all time unique visitors:', e);
+      }
+    }
     
     // Get page rankings (most visited pages)
     const pageRankings = await pool.query(
