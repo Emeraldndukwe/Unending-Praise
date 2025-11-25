@@ -24,6 +24,20 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [location.pathname]);
 
+  // Track page views for analytics (don't track admin pages)
+  useEffect(() => {
+    if (!isAdmin && location.pathname) {
+      // Track page view asynchronously (don't block navigation)
+      fetch('/api/analytics/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pagePath: location.pathname })
+      }).catch(() => {
+        // Silently fail - analytics should not block user experience
+      });
+    }
+  }, [location.pathname, isAdmin]);
+
   return (
     <div className="min-h-screen flex flex-col">
       {!isAdmin && <Navbar />}

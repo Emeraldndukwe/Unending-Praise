@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { compressImage, compressVideo } from "../utils/mediaOptimizer";
+import Analytics from "../components/Analytics";
 
 type Testimony = { 
   id: string; 
@@ -57,7 +58,7 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 
 export default function AdminPage() {
   const { token, setToken, headers } = useAuthToken();
-  const [tab, setTab] = useState<"testimonies" | "crusades" | "messages" | "songs" | "comments" | "users" | "crusade-types">("testimonies");
+  const [tab, setTab] = useState<"testimonies" | "crusades" | "messages" | "songs" | "comments" | "users" | "crusade-types" | "analytics">("testimonies");
   const [role, setRole] = useState<string>("");
   const [testimonies, setTestimonies] = useState<Testimony[]>([]);
   const [crusades, setCrusades] = useState<Crusade[]>([]);
@@ -441,8 +442,8 @@ export default function AdminPage() {
         <div className="flex flex-wrap gap-2 mb-6 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-2 border border-[#54037C]/10">
           {((() => {
             const base = ["testimonies", "crusades", "messages", "songs", "comments"] as const;
-            if (role === 'superadmin') return ([...base, 'crusade-types', 'users'] as const);
-            if (!role || role === 'admin') return ([...base, 'crusade-types'] as const);
+            if (role === 'superadmin') return ([...base, 'crusade-types', 'users', 'analytics'] as const);
+            if (!role || role === 'admin') return ([...base, 'crusade-types', 'analytics'] as const);
             if (role === 'testimony') return ["testimonies", "comments"] as const;
             if (role === 'crusade') return (["crusades", "crusade-types", "comments"] as const);
             if (role === 'messages') return ["messages"] as const;
@@ -822,6 +823,12 @@ export default function AdminPage() {
               ))}
             </div>
           </div>
+        </section>
+      )}
+
+      {tab === "analytics" && (
+        <section className="space-y-6">
+          <Analytics headers={headers} />
         </section>
       )}
 

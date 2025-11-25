@@ -141,6 +141,16 @@ async function ensureSchema() {
         comment TEXT NOT NULL,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+
+      -- Analytics (page views)
+      CREATE TABLE IF NOT EXISTS page_views (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        page_path TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      -- Create index for faster queries
+      CREATE INDEX IF NOT EXISTS idx_page_views_path ON page_views(page_path);
+      CREATE INDEX IF NOT EXISTS idx_page_views_created_at ON page_views(created_at);
     `);
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
       ALTER TABLE crusades ADD COLUMN IF NOT EXISTS zone TEXT;
@@ -988,6 +998,92 @@ app.post('/api/admin/fix-superadmin', async (req, res) => {
     res.json({ message: 'Account upgraded to superadmin', user: result.rows[0] });
   } catch (e) {
     console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Analytics endpoints
+app.post('/api/analytics/track', async (req, res) => {
+  const { pagePath } = req.body || {};
+  if (!pagePath || typeof pagePath !== 'string') {
+    return res.status(400).json({ error: 'Missing pagePath' });
+  }
+  try {
+    await pool.query('INSERT INTO page_views (page_path) VALUES ($1)', [pagePath]);
+    res.status(201).json({ success: true });
+  } catch (e) {
+    console.error('Analytics track error:', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.get('/api/analytics/stats', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    // Get visitor counts for different time periods
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    // Count page views for 7 days
+    const visitors7Days = await pool.query(
+      `SELECT COUNT(*) as total_views
+       FROM page_views 
+       WHERE created_at >= $1`,
+      [sevenDaysAgo.toISOString()]
+    );
+    
+    // Count page views for 30 days
+    const visitors30Days = await pool.query(
+      `SELECT COUNT(*) as total_views
+       FROM page_views 
+       WHERE created_at >= $1`,
+      [thirtyDaysAgo.toISOString()]
+    );
+    
+    // Count all time
+    const allTime = await pool.query(
+      `SELECT COUNT(*) as total_views
+       FROM page_views`
+    );
+    
+    // Get page rankings (most visited pages)
+    const pageRankings = await pool.query(
+      `SELECT page_path, COUNT(*) as views
+       FROM page_views
+       GROUP BY page_path
+       ORDER BY views DESC
+       LIMIT 10`
+    );
+    
+    // Get daily views for the last 7 days for chart
+    const dailyViews = await pool.query(
+      `SELECT DATE(created_at) as date, COUNT(*) as views
+       FROM page_views
+       WHERE created_at >= $1
+       GROUP BY DATE(created_at)
+       ORDER BY date ASC`,
+      [sevenDaysAgo.toISOString()]
+    );
+    
+    res.json({
+      visitors: {
+        last7Days: parseInt(visitors7Days.rows[0]?.total_views || '0'),
+        last30Days: parseInt(visitors30Days.rows[0]?.total_views || '0'),
+        allTime: parseInt(allTime.rows[0]?.total_views || '0')
+      },
+      pageRankings: pageRankings.rows.map(row => ({
+        page: row.page_path,
+        views: parseInt(row.views)
+      })),
+      dailyViews: dailyViews.rows.map(row => ({
+        date: row.date,
+        views: parseInt(row.views)
+      }))
+    });
+  } catch (e) {
+    console.error('Analytics stats error:', e);
     res.status(500).json({ error: 'Server error' });
   }
 });
