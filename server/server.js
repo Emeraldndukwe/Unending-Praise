@@ -1183,6 +1183,69 @@ app.get('/api/analytics/stats', requireAuth, requireAdmin, async (req, res) => {
        ORDER BY date ASC`,
       [sevenDaysAgo.toISOString()]
     );
+
+    // --- Current-year analytics (auto-updates each new year) ---
+    const now = new Date();
+    const currentYear = now.getUTCFullYear();
+    const yearStart = new Date(Date.UTC(currentYear, 0, 1, 0, 0, 0));
+    const yearEnd = new Date(Date.UTC(currentYear + 1, 0, 1, 0, 0, 0));
+
+    // Total page views in current year
+    const pageViewsYear = await pool.query(
+      `SELECT COUNT(*) as total_views
+       FROM page_views
+       WHERE created_at >= $1 AND created_at < $2`,
+      [yearStart.toISOString(), yearEnd.toISOString()]
+    );
+
+    // Total unique visitors in current year (if we have visitor_ip)
+    let uniqueVisitorsYear = { rows: [{ unique_visitors: '0' }] };
+    if (hasVisitorIp) {
+      try {
+        uniqueVisitorsYear = await pool.query(
+          `SELECT COUNT(DISTINCT visitor_ip) as unique_visitors
+           FROM page_views
+           WHERE created_at >= $1
+             AND created_at < $2
+             AND visitor_ip IS NOT NULL
+             AND visitor_ip != 'unknown'`,
+          [yearStart.toISOString(), yearEnd.toISOString()]
+        );
+      } catch (e) {
+        console.error('Error counting unique visitors 2025:', e);
+      }
+    }
+
+    // Monthly stats for current year
+    let monthlyYear;
+    if (hasVisitorIp) {
+      // With unique visitors per month
+      monthlyYear = await pool.query(
+        `SELECT
+           DATE_TRUNC('month', created_at) AS month,
+           COUNT(*) AS views,
+           COUNT(DISTINCT visitor_ip) FILTER (
+             WHERE visitor_ip IS NOT NULL AND visitor_ip != 'unknown'
+           ) AS unique_visitors
+         FROM page_views
+         WHERE created_at >= $1 AND created_at < $2
+         GROUP BY DATE_TRUNC('month', created_at)
+         ORDER BY month ASC`,
+        [yearStart.toISOString(), yearEnd.toISOString()]
+      );
+    } else {
+      // Fallback if visitor_ip column is missing
+      monthlyYear = await pool.query(
+        `SELECT
+           DATE_TRUNC('month', created_at) AS month,
+           COUNT(*) AS views
+         FROM page_views
+         WHERE created_at >= $1 AND created_at < $2
+         GROUP BY DATE_TRUNC('month', created_at)
+         ORDER BY month ASC`,
+        [yearStart.toISOString(), yearEnd.toISOString()]
+      );
+    }
     
     res.json({
       pageViews: {
@@ -1202,6 +1265,19 @@ app.get('/api/analytics/stats', requireAuth, requireAdmin, async (req, res) => {
       dailyViews: dailyViews.rows.map(row => ({
         date: row.date,
         views: parseInt(row.views)
+      })),
+      // Current-year aggregates (auto-rollover)
+      yearly: {
+        year: currentYear,
+        pageViews: parseInt(pageViewsYear.rows[0]?.total_views || '0'),
+        uniqueVisitors: parseInt(uniqueVisitorsYear.rows[0]?.unique_visitors || '0')
+      },
+      monthly: monthlyYear.rows.map(row => ({
+        month: row.month,
+        pageViews: parseInt(row.views),
+        uniqueVisitors: hasVisitorIp
+          ? parseInt(row.unique_visitors || '0')
+          : 0
       }))
     });
   } catch (e) {

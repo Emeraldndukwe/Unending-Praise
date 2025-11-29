@@ -12,6 +12,16 @@ type AnalyticsData = {
     last30Days: number;
     allTime: number;
   };
+  yearly: {
+    year: number;
+    pageViews: number;
+    uniqueVisitors: number;
+  };
+  monthly: Array<{
+    month: string;
+    pageViews: number;
+    uniqueVisitors: number;
+  }>;
   pageRankings: Array<{
     page: string;
     views: number;
@@ -95,6 +105,40 @@ export default function Analytics({ headers }: AnalyticsProps) {
   }
 
   const maxViews = Math.max(...chartData.map((d) => d.views), 1);
+
+  const currentYear = data.yearly?.year ?? new Date().getFullYear();
+
+  // Prepare current-year monthly stats (ensure all 12 months are represented)
+  type MonthlyItem = {
+    label: string;
+    pageViews: number;
+    uniqueVisitors: number;
+  };
+
+  const monthlyData: MonthlyItem[] = [];
+  for (let monthIndex = 0; monthIndex < 12; monthIndex++) {
+    const date = new Date(currentYear, monthIndex, 1);
+    const yearMonthKey = `${date.getFullYear()}-${String(
+      date.getMonth() + 1
+    ).padStart(2, "0")}`;
+
+    const matching = data.monthly.find((m) => {
+      const baseDate =
+        typeof m.month === "string"
+          ? new Date(m.month)
+          : new Date(String(m.month));
+      const key = `${baseDate.getFullYear()}-${String(
+        baseDate.getMonth() + 1
+      ).padStart(2, "0")}`;
+      return key === yearMonthKey;
+    });
+
+    monthlyData.push({
+      label: date.toLocaleString("en-US", { month: "short" }),
+      pageViews: matching?.pageViews ?? 0,
+      uniqueVisitors: matching?.uniqueVisitors ?? 0,
+    });
+  }
 
   const handlePrint = () => {
     window.print();
@@ -230,6 +274,58 @@ export default function Analytics({ headers }: AnalyticsProps) {
               <p className="text-3xl font-bold text-[#54037C]">{data.uniqueVisitors.allTime.toLocaleString()}</p>
               <p className="text-xs text-gray-500 mt-1">Unique Visitors</p>
               <p className="text-lg font-semibold text-gray-700 mt-2">{data.pageViews.allTime.toLocaleString()} <span className="text-xs font-normal text-gray-500">page views</span></p>
+            </div>
+          </div>
+
+          {/* Current Year Summary */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 print-section">
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
+              <h3 className="text-sm font-semibold text-gray-600 mb-2">
+                {currentYear} Total (Jan 1 - Dec 31)
+              </h3>
+              <p className="text-3xl font-bold text-[#54037C]">
+                {data.yearly.uniqueVisitors.toLocaleString()}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Unique Visitors</p>
+              <p className="text-lg font-semibold text-gray-700 mt-2">
+                {data.yearly.pageViews.toLocaleString()}{" "}
+                <span className="text-xs font-normal text-gray-500">
+                  page views
+                </span>
+              </p>
+            </div>
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
+              <h3 className="text-sm font-semibold text-gray-600 mb-3">
+                {currentYear} Monthly Breakdown
+              </h3>
+              <div className="max-h-48 overflow-y-auto pr-1">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-gray-500 border-b">
+                      <th className="text-left py-1 font-semibold">Month</th>
+                      <th className="text-right py-1 font-semibold">
+                        Unique Visitors
+                      </th>
+                      <th className="text-right py-1 font-semibold">
+                        Page Views
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {monthlyData.map((m) => (
+                      <tr key={m.label} className="border-b last:border-0">
+                        <td className="py-1">{m.label}</td>
+                        <td className="py-1 text-right">
+                          {m.uniqueVisitors.toLocaleString()}
+                        </td>
+                        <td className="py-1 text-right">
+                          {m.pageViews.toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
