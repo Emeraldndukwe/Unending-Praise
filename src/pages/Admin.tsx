@@ -592,7 +592,7 @@ export default function AdminPage() {
             
             // Parse header to find column indices
             const headerLine = lines[headerRow];
-            let separator = ',';
+            let separator: string | RegExp = ',';
             if (headerLine.includes('\t')) separator = '\t';
             else if (headerLine.includes(',')) separator = ',';
             else if (headerLine.includes('|')) separator = '|';
