@@ -411,6 +411,7 @@ export default function AdminPage() {
     };
     
     // Helper function to extract title and lyrics
+    // Title appears BEFORE "Verse 1" or other section labels
     const extractSongFromCell = (cellValue: string): { title: string; lyrics: string } => {
       if (!cellValue) return { title: '', lyrics: '' };
       const cellText = cellValue.trim();
@@ -419,39 +420,37 @@ export default function AdminPage() {
       const lines = cellText.split(/\r?\n/).map(l => l.trim()).filter(l => l);
       if (lines.length === 0) return { title: '', lyrics: '' };
       
-      let title = '';
-      let lyricsStartIdx = -1;
-      const sectionPattern = /^(verse|chorus|bridge|intro|outro|solo|pre-chorus|interlude|tag)\s*\d*/i;
+      // Section labels include: Verse, Chorus, Bridge, Intro, Outro, Solo, Pre-chorus, All:, etc.
+      const sectionPattern = /^(verse|chorus|bridge|intro|outro|solo|pre-chorus|interlude|tag|all:)\s*\d*/i;
       
+      // Find the first section label
+      let firstSectionIdx = -1;
       for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        const lowerLine = line.toLowerCase();
-        
-        if (sectionPattern.test(lowerLine)) {
-          if (!title && i > 0) {
-            title = lines[i - 1];
-          }
-          lyricsStartIdx = i + 1;
+        if (sectionPattern.test(lines[i].toLowerCase())) {
+          firstSectionIdx = i;
           break;
-        }
-        
-        if (!title && !sectionPattern.test(lowerLine)) {
-          title = line;
         }
       }
       
-      if (lyricsStartIdx === -1) {
+      let title = '';
+      let lyricsStartIdx = -1;
+      
+      if (firstSectionIdx >= 0) {
+        // Title is the line BEFORE the first section label
+        if (firstSectionIdx > 0) {
+          title = lines[firstSectionIdx - 1];
+        }
+        // Lyrics start after the section label
+        lyricsStartIdx = firstSectionIdx + 1;
+      } else {
+        // No section label found - first line is title, rest are lyrics
         if (lines.length > 0) {
           title = lines[0];
           lyricsStartIdx = 1;
         }
       }
       
-      if (!title && lines.length > 0) {
-        title = lines[0];
-        lyricsStartIdx = 1;
-      }
-      
+      // Extract lyrics
       const lyrics = lyricsStartIdx >= 0 && lyricsStartIdx < lines.length 
         ? lines.slice(lyricsStartIdx).join('\n').trim()
         : '';
@@ -486,9 +485,10 @@ export default function AdminPage() {
         
         const songData = extractSongFromCell(parts[songCol]);
         
-        if (songData.title) {
+        // Accept songs with either title or lyrics (or both)
+        if (songData.title || songData.lyrics) {
           const song: Partial<Song> = {
-            title: songData.title,
+            title: songData.title || 'Untitled',
             lyrics: songData.lyrics,
             date: rowDate || undefined,
             artist: undefined,
@@ -621,7 +621,8 @@ export default function AdminPage() {
               return null;
             };
             
-            // Helper function to extract title and lyrics (same as Excel version)
+            // Helper function to extract title and lyrics
+            // Title appears BEFORE "Verse 1" or other section labels
             const extractSongFromCell = (cellValue: string): { title: string; lyrics: string } => {
               if (!cellValue) return { title: '', lyrics: '' };
               const cellText = cellValue.trim();
@@ -630,39 +631,37 @@ export default function AdminPage() {
               const lines = cellText.split(/\r?\n/).map(l => l.trim()).filter(l => l);
               if (lines.length === 0) return { title: '', lyrics: '' };
               
-              let title = '';
-              let lyricsStartIdx = -1;
-              const sectionPattern = /^(verse|chorus|bridge|intro|outro|solo|pre-chorus|interlude|tag)\s*\d*/i;
+              // Section labels include: Verse, Chorus, Bridge, Intro, Outro, Solo, Pre-chorus, All:, etc.
+              const sectionPattern = /^(verse|chorus|bridge|intro|outro|solo|pre-chorus|interlude|tag|all:)\s*\d*/i;
               
+              // Find the first section label
+              let firstSectionIdx = -1;
               for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                const lowerLine = line.toLowerCase();
-                
-                if (sectionPattern.test(lowerLine)) {
-                  if (!title && i > 0) {
-                    title = lines[i - 1];
-                  }
-                  lyricsStartIdx = i + 1;
+                if (sectionPattern.test(lines[i].toLowerCase())) {
+                  firstSectionIdx = i;
                   break;
-                }
-                
-                if (!title && !sectionPattern.test(lowerLine)) {
-                  title = line;
                 }
               }
               
-              if (lyricsStartIdx === -1) {
+              let title = '';
+              let lyricsStartIdx = -1;
+              
+              if (firstSectionIdx >= 0) {
+                // Title is the line BEFORE the first section label
+                if (firstSectionIdx > 0) {
+                  title = lines[firstSectionIdx - 1];
+                }
+                // Lyrics start after the section label
+                lyricsStartIdx = firstSectionIdx + 1;
+              } else {
+                // No section label found - first line is title, rest are lyrics
                 if (lines.length > 0) {
                   title = lines[0];
                   lyricsStartIdx = 1;
                 }
               }
               
-              if (!title && lines.length > 0) {
-                title = lines[0];
-                lyricsStartIdx = 1;
-              }
-              
+              // Extract lyrics
               const lyrics = lyricsStartIdx >= 0 && lyricsStartIdx < lines.length 
                 ? lines.slice(lyricsStartIdx).join('\n').trim()
                 : '';
@@ -698,9 +697,10 @@ export default function AdminPage() {
                 
                 const songData = extractSongFromCell(parts[songCol]);
                 
-                if (songData.title) {
+                // Accept songs with either title or lyrics (or both)
+                if (songData.title || songData.lyrics) {
                   const song: Partial<Song> = {
-                    title: songData.title,
+                    title: songData.title || 'Untitled',
                     lyrics: songData.lyrics,
                     date: rowDate || undefined,
                     artist: undefined,
@@ -794,6 +794,7 @@ export default function AdminPage() {
             };
             
             // Helper function to extract title and lyrics from a cell
+            // Title appears BEFORE "Verse 1" or other section labels
             const extractSongFromCell = (cellValue: any): { title: string; lyrics: string } => {
               if (!cellValue) return { title: '', lyrics: '' };
               
@@ -805,48 +806,37 @@ export default function AdminPage() {
               
               if (lines.length === 0) return { title: '', lyrics: '' };
               
-              // Find title (first line that doesn't start with Verse/Chorus/Bridge/etc.)
-              let title = '';
-              let lyricsStartIdx = -1;
+              // Section labels include: Verse, Chorus, Bridge, Intro, Outro, Solo, Pre-chorus, All:, etc.
+              const sectionPattern = /^(verse|chorus|bridge|intro|outro|solo|pre-chorus|interlude|tag|all:)\s*\d*/i;
               
-              // Look for section labels like "Verse 1", "Chorus", etc.
-              const sectionPattern = /^(verse|chorus|bridge|intro|outro|solo|pre-chorus|interlude|tag)\s*\d*/i;
-              
+              // Find the first section label
+              let firstSectionIdx = -1;
               for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                const lowerLine = line.toLowerCase();
-                
-                // Check if this line is a section label
-                if (sectionPattern.test(lowerLine)) {
-                  // Found section label - title should be before this
-                  if (!title && i > 0) {
-                    title = lines[i - 1];
-                  }
-                  lyricsStartIdx = i + 1;
+                if (sectionPattern.test(lines[i].toLowerCase())) {
+                  firstSectionIdx = i;
                   break;
-                }
-                
-                // If we haven't found a title yet and this doesn't look like a section label
-                if (!title && !sectionPattern.test(lowerLine)) {
-                  title = line;
                 }
               }
               
-              // If no section label found, first line is title, rest are lyrics
-              if (lyricsStartIdx === -1) {
+              let title = '';
+              let lyricsStartIdx = -1;
+              
+              if (firstSectionIdx >= 0) {
+                // Title is the line BEFORE the first section label
+                if (firstSectionIdx > 0) {
+                  title = lines[firstSectionIdx - 1];
+                }
+                // Lyrics start after the section label
+                lyricsStartIdx = firstSectionIdx + 1;
+              } else {
+                // No section label found - first line is title, rest are lyrics
                 if (lines.length > 0) {
                   title = lines[0];
                   lyricsStartIdx = 1;
                 }
               }
               
-              // If still no title, use first line
-              if (!title && lines.length > 0) {
-                title = lines[0];
-                lyricsStartIdx = 1;
-              }
-              
-              // Lyrics are everything after the section label (or after title if no label)
+              // Extract lyrics
               const lyrics = lyricsStartIdx >= 0 && lyricsStartIdx < lines.length 
                 ? lines.slice(lyricsStartIdx).join('\n').trim()
                 : '';
@@ -873,9 +863,10 @@ export default function AdminPage() {
                 
                 const songData = extractSongFromCell(row[songCol]);
                 
-                if (songData.title) {
+                // Accept songs with either title or lyrics (or both)
+                if (songData.title || songData.lyrics) {
                   const song: Partial<Song> = {
-                    title: songData.title,
+                    title: songData.title || 'Untitled',
                     lyrics: songData.lyrics,
                     date: rowDate || undefined,
                     artist: undefined, // No artist in this format
@@ -913,7 +904,7 @@ export default function AdminPage() {
       const songsToImport = await parseSongsFromFile(file);
       
       if (songsToImport.length === 0) {
-        setBulkImportError("No songs found in the file. Please check the file format.");
+        setBulkImportError("No songs found in the file. Please check:\n1. The file has a header row with 'DATE' and 'SONG' columns\n2. Song titles appear BEFORE 'Verse 1' labels\n3. The file format matches the expected structure (S/N, DATE, SONG 1, SONG 2, etc.)");
         setBulkImportLoading(false);
         return;
       }
