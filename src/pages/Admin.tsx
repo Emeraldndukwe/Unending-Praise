@@ -889,10 +889,6 @@ export default function AdminPage() {
             reject(new Error("Unsupported file format. Please use CSV, Excel (.xlsx, .xls), Word (.docx), or text files."));
             return;
           }
-          } else {
-            reject(new Error("Unsupported file format. Please use CSV, Excel (.xlsx, .xls), Word (.docx), or text files."));
-            return;
-          }
 
           resolve(songs);
         } catch (error: any) {
@@ -901,7 +897,7 @@ export default function AdminPage() {
       };
       reader.onerror = () => reject(new Error("Failed to read file"));
       
-      if (file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls')) {
+      if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
         reader.readAsArrayBuffer(file);
       } else {
         reader.readAsText(file);
