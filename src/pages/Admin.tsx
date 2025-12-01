@@ -66,6 +66,7 @@ export default function AdminPage() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [editingSongId, setEditingSongId] = useState<string | null>(null);
   const [editingLyrics, setEditingLyrics] = useState("");
+  const [editingDate, setEditingDate] = useState("");
   const [songEditLoading, setSongEditLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -609,17 +610,27 @@ export default function AdminPage() {
                             e.preventDefault();
                             setSongEditLoading(true);
                             try {
-                              await updateSong(s.id, { lyrics: editingLyrics });
+                              await updateSong(s.id, { lyrics: editingLyrics, date: editingDate });
                               setEditingSongId(null);
                               setEditingLyrics("");
+                              setEditingDate("");
                             } catch (err: any) {
-                              const message = err?.message || "Failed to update lyrics";
+                              const message = err?.message || "Failed to update song";
                               alert(message);
                             } finally {
                               setSongEditLoading(false);
                             }
                           }}
                         >
+                          <label className="text-sm block">
+                            <div className="mb-1 text-gray-700 font-medium">Date</div>
+                            <input
+                              type="date"
+                              className="w-full border rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#54037C]"
+                              value={editingDate}
+                              onChange={(e) => setEditingDate(e.target.value)}
+                            />
+                          </label>
                           <label className="text-sm block">
                             <div className="mb-1 text-gray-700 font-medium">Lyrics</div>
                             <textarea
@@ -642,6 +653,7 @@ export default function AdminPage() {
                               onClick={() => {
                                 setEditingSongId(null);
                                 setEditingLyrics("");
+                                setEditingDate("");
                               }}
                               disabled={songEditLoading}
                             >
@@ -666,6 +678,7 @@ export default function AdminPage() {
                           onClick={() => {
                             setEditingSongId(s.id);
                             setEditingLyrics(s.lyrics || "");
+                            setEditingDate(s.date || "");
                           }}
                         >
                           Edit Lyrics
