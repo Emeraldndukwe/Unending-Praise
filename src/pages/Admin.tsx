@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { compressImage, compressVideo } from "../utils/mediaOptimizer";
 import Analytics from "../components/Analytics";
+import * as XLSX from "xlsx";
+import mammoth from "mammoth";
 
 type Testimony = { 
   id: string; 
@@ -68,6 +70,8 @@ export default function AdminPage() {
   const [editingLyrics, setEditingLyrics] = useState("");
   const [editingDate, setEditingDate] = useState("");
   const [songEditLoading, setSongEditLoading] = useState(false);
+  const [bulkImportLoading, setBulkImportLoading] = useState(false);
+  const [bulkImportError, setBulkImportError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [users, setUsers] = useState<Array<{id:string; name:string; email:string; role:string; status:string; created_at?: string;}>>([]);
@@ -336,6 +340,579 @@ export default function AdminPage() {
     await refresh();
   };
 
+  const parseSongsFromFile = async (file: File): Promise<Partial<Song>[]> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = e.target?.result;
+          if (!data) {
+            reject(new Error("Failed to read file"));
+            return;
+          }
+
+          const fileName = file.name.toLowerCase();
+          let songs: Partial<Song>[] = [];
+
+          if (fileName.endsWith('.csv') || fileName.endsWith('.txt')) {
+            // Parse CSV or text file - handle format with S/N, DATE, SONG 1-6 columns
+            const text = typeof data === 'string' ? data : new TextDecoder().decode(data as ArrayBuffer);
+            const lines = text.split('\n').filter(line => line.trim());
+            
+            if (lines.length === 0) {
+              resolve([]);
+              return;
+            }
+            
+            // Find header row
+            let headerRow = 0;
+            for (let i = 0; i < Math.min(5, lines.length); i++) {
+              const line = lines[i].toLowerCase();
+              if (line.includes('date') && (line.includes('song') || line.includes('s/n'))) {
+                headerRow = i;
+                break;
+              }
+            }
+            
+            // Parse header to find column indices
+            const headerLine = lines[headerRow];
+            let separator = ',';
+            if (headerLine.includes('\t')) separator = '\t';
+            else if (headerLine.includes(',')) separator = ',';
+            else if (headerLine.includes('|')) separator = '|';
+            
+            const headerParts = headerLine.split(separator).map(p => p.trim().replace(/^"|"$/g, ''));
+            let dateCol = -1;
+            const songCols: number[] = [];
+            
+            headerParts.forEach((cell, idx) => {
+              const cellStr = cell.toLowerCase();
+              if (cellStr.includes('date') && !cellStr.includes('song')) {
+                dateCol = idx;
+              } else if (cellStr.includes('song')) {
+                songCols.push(idx);
+              }
+            });
+            
+            // If no SONG columns found but we have DATE, look for columns after DATE
+            if (songCols.length === 0 && dateCol >= 0) {
+              for (let i = dateCol + 1; i < headerParts.length; i++) {
+                const cellStr = headerParts[i].toLowerCase();
+                if (!cellStr.includes('date') && !cellStr.includes('s/n') && !cellStr.includes('serial')) {
+                  songCols.push(i);
+                }
+              }
+            }
+            
+            // Helper function to normalize date
+            const normalizeDate = (dateValue: string): string | null => {
+              if (!dateValue) return null;
+              const datePattern = /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/;
+              const match = dateValue.match(datePattern);
+              if (match) {
+                let month = match[1].padStart(2, '0');
+                let day = match[2].padStart(2, '0');
+                let year = match[3];
+                if (year.length === 2) year = '20' + year;
+                return `${year}-${month}-${day}`;
+              }
+              return null;
+            };
+            
+            // Helper function to extract title and lyrics (same as Excel version)
+            const extractSongFromCell = (cellValue: string): { title: string; lyrics: string } => {
+              if (!cellValue) return { title: '', lyrics: '' };
+              const cellText = cellValue.trim();
+              if (!cellText) return { title: '', lyrics: '' };
+              
+              const lines = cellText.split(/\r?\n/).map(l => l.trim()).filter(l => l);
+              if (lines.length === 0) return { title: '', lyrics: '' };
+              
+              let title = '';
+              let lyricsStartIdx = -1;
+              const sectionPattern = /^(verse|chorus|bridge|intro|outro|solo|pre-chorus|interlude|tag)\s*\d*/i;
+              
+              for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const lowerLine = line.toLowerCase();
+                
+                if (sectionPattern.test(lowerLine)) {
+                  if (!title && i > 0) {
+                    title = lines[i - 1];
+                  }
+                  lyricsStartIdx = i + 1;
+                  break;
+                }
+                
+                if (!title && !sectionPattern.test(lowerLine)) {
+                  title = line;
+                }
+              }
+              
+              if (lyricsStartIdx === -1) {
+                if (lines.length > 0) {
+                  title = lines[0];
+                  lyricsStartIdx = 1;
+                }
+              }
+              
+              if (!title && lines.length > 0) {
+                title = lines[0];
+                lyricsStartIdx = 1;
+              }
+              
+              const lyrics = lyricsStartIdx >= 0 && lyricsStartIdx < lines.length 
+                ? lines.slice(lyricsStartIdx).join('\n').trim()
+                : '';
+              
+              return { title: title.trim(), lyrics };
+            };
+            
+            // Parse data rows
+            for (let i = headerRow + 1; i < lines.length; i++) {
+              const line = lines[i].trim();
+              if (!line) continue;
+              
+              // Parse the line with the same separator
+              let parts: string[] = [];
+              if (separator === '\t') {
+                parts = line.split('\t').map(p => p.trim().replace(/^"|"$/g, ''));
+              } else if (separator === ',') {
+                // Handle quoted CSV values
+                parts = line.split(',').map(p => p.trim().replace(/^"|"$/g, ''));
+              } else {
+                parts = line.split(separator).map(p => p.trim());
+              }
+              
+              // Get date for this row
+              let rowDate: string | null = null;
+              if (dateCol >= 0 && parts[dateCol]) {
+                rowDate = normalizeDate(parts[dateCol]);
+              }
+              
+              // Extract songs from SONG columns
+              for (const songCol of songCols) {
+                if (songCol >= parts.length) continue;
+                
+                const songData = extractSongFromCell(parts[songCol]);
+                
+                if (songData.title) {
+                  const song: Partial<Song> = {
+                    title: songData.title,
+                    lyrics: songData.lyrics,
+                    date: rowDate || undefined,
+                    artist: undefined,
+                  };
+                  songs.push(song);
+                }
+              }
+            }
+          } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+            // Parse Excel file - handle format with S/N, DATE, SONG 1, SONG 2, SONG 3 columns
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' }) as any[][];
+            
+            if (jsonData.length === 0) {
+              resolve([]);
+              return;
+            }
+            
+            // Find header row (look for DATE, SONG 1, SONG 2, etc.)
+            let headerRow = 0;
+            for (let i = 0; i < Math.min(5, jsonData.length); i++) {
+              const row = jsonData[i] || [];
+              const rowStr = row.map((cell: any) => String(cell).toLowerCase()).join(' ');
+              if (rowStr.includes('date') && (rowStr.includes('song') || rowStr.includes('s/n'))) {
+                headerRow = i;
+                break;
+              }
+            }
+            
+            const headerRowData = jsonData[headerRow] || [];
+            
+            // Find DATE column
+            let dateCol = -1;
+            const songCols: number[] = [];
+            
+            headerRowData.forEach((cell: any, idx: number) => {
+              const cellStr = String(cell).toLowerCase();
+              if (cellStr.includes('date') && !cellStr.includes('song')) {
+                dateCol = idx;
+              } else if (cellStr.includes('song')) {
+                songCols.push(idx);
+              }
+            });
+            
+            // If no SONG columns found but we have DATE, look for columns after DATE
+            // Also check for numbered song columns (SONG 1, SONG 2, etc. up to SONG 6 or more)
+            if (songCols.length === 0 && dateCol >= 0) {
+              // Look for columns that might be songs (after DATE and S/N columns)
+              for (let i = dateCol + 1; i < headerRowData.length; i++) {
+                const cellStr = String(headerRowData[i] || '').toLowerCase();
+                // If it's not clearly a date or S/N column, assume it's a song column
+                if (!cellStr.includes('date') && !cellStr.includes('s/n') && !cellStr.includes('serial')) {
+                  songCols.push(i);
+                }
+              }
+            }
+            
+            // Sort song columns to ensure proper order
+            songCols.sort((a, b) => a - b);
+            
+            // Helper function to normalize date
+            const normalizeDate = (dateValue: any): string | null => {
+              if (!dateValue) return null;
+              
+              let dateStr = '';
+              if (typeof dateValue === 'number') {
+                // Excel date serial number
+                const excelDate = XLSX.SSF.parse_date_code(dateValue);
+                if (excelDate) {
+                  return `${excelDate.y}-${String(excelDate.m).padStart(2, '0')}-${String(excelDate.d).padStart(2, '0')}`;
+                }
+                return null;
+              } else {
+                dateStr = String(dateValue).trim();
+              }
+              
+              // Parse M/D/YYYY or other formats
+              const datePattern = /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/;
+              const match = dateStr.match(datePattern);
+              if (match) {
+                let month = match[1].padStart(2, '0');
+                let day = match[2].padStart(2, '0');
+                let year = match[3];
+                if (year.length === 2) year = '20' + year;
+                return `${year}-${month}-${day}`;
+              }
+              
+              return null;
+            };
+            
+            // Helper function to extract title and lyrics from a cell
+            const extractSongFromCell = (cellValue: any): { title: string; lyrics: string } => {
+              if (!cellValue) return { title: '', lyrics: '' };
+              
+              const cellText = String(cellValue).trim();
+              if (!cellText) return { title: '', lyrics: '' };
+              
+              // Split by newlines
+              const lines = cellText.split(/\r?\n/).map(l => l.trim()).filter(l => l);
+              
+              if (lines.length === 0) return { title: '', lyrics: '' };
+              
+              // Find title (first line that doesn't start with Verse/Chorus/Bridge/etc.)
+              let title = '';
+              let lyricsStartIdx = -1;
+              
+              // Look for section labels like "Verse 1", "Chorus", etc.
+              const sectionPattern = /^(verse|chorus|bridge|intro|outro|solo|pre-chorus|interlude|tag)\s*\d*/i;
+              
+              for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const lowerLine = line.toLowerCase();
+                
+                // Check if this line is a section label
+                if (sectionPattern.test(lowerLine)) {
+                  // Found section label - title should be before this
+                  if (!title && i > 0) {
+                    title = lines[i - 1];
+                  }
+                  lyricsStartIdx = i + 1;
+                  break;
+                }
+                
+                // If we haven't found a title yet and this doesn't look like a section label
+                if (!title && !sectionPattern.test(lowerLine)) {
+                  title = line;
+                }
+              }
+              
+              // If no section label found, first line is title, rest are lyrics
+              if (lyricsStartIdx === -1) {
+                if (lines.length > 0) {
+                  title = lines[0];
+                  lyricsStartIdx = 1;
+                }
+              }
+              
+              // If still no title, use first line
+              if (!title && lines.length > 0) {
+                title = lines[0];
+                lyricsStartIdx = 1;
+              }
+              
+              // Lyrics are everything after the section label (or after title if no label)
+              const lyrics = lyricsStartIdx >= 0 && lyricsStartIdx < lines.length 
+                ? lines.slice(lyricsStartIdx).join('\n').trim()
+                : '';
+              
+              return { title: title.trim(), lyrics };
+            };
+            
+            // Parse data rows
+            for (let i = headerRow + 1; i < jsonData.length; i++) {
+              const row = jsonData[i] || [];
+              
+              // Skip empty rows
+              if (row.every((cell: any) => !cell || String(cell).trim() === '')) continue;
+              
+              // Get date for this row
+              let rowDate: string | null = null;
+              if (dateCol >= 0 && row[dateCol]) {
+                rowDate = normalizeDate(row[dateCol]);
+              }
+              
+              // Extract songs from SONG columns
+              for (const songCol of songCols) {
+                if (songCol >= row.length) continue;
+                
+                const songData = extractSongFromCell(row[songCol]);
+                
+                if (songData.title) {
+                  const song: Partial<Song> = {
+                    title: songData.title,
+                    lyrics: songData.lyrics,
+                    date: rowDate || undefined,
+                    artist: undefined, // No artist in this format
+                  };
+                  songs.push(song);
+                }
+              }
+            }
+          } else if (fileName.endsWith('.docx')) {
+            // Parse Word document (.docx) - extract tables
+            const arrayBuffer = data as ArrayBuffer;
+            
+            mammoth.extractRawText({ arrayBuffer })
+              .then((result) => {
+              // Try to parse as table structure
+              const text = result.value;
+              const lines = text.split('\n').filter(line => line.trim());
+              
+              if (lines.length === 0) {
+                resolve([]);
+                return;
+              }
+              
+              // Find header row
+              let headerRow = 0;
+              for (let i = 0; i < Math.min(5, lines.length); i++) {
+                const line = lines[i].toLowerCase();
+                if (line.includes('date') && (line.includes('song') || line.includes('s/n'))) {
+                  headerRow = i;
+                  break;
+                }
+              }
+              
+              // Parse header to find column indices
+              const headerLine = lines[headerRow];
+              // Word tables are often tab-separated or have multiple spaces
+              let separator: string | RegExp = '\t';
+              if (!headerLine.includes('\t')) {
+                // Try to detect separator
+                if (headerLine.match(/\s{3,}/)) {
+                  separator = /\s{3,}/;
+                } else if (headerLine.includes('|')) {
+                  separator = '|';
+                }
+              }
+              
+              const headerParts = headerLine.split(separator).map(p => p.trim()).filter(p => p);
+              let dateCol = -1;
+              const songCols: number[] = [];
+              
+              headerParts.forEach((cell, idx) => {
+                const cellStr = cell.toLowerCase();
+                if (cellStr.includes('date') && !cellStr.includes('song')) {
+                  dateCol = idx;
+                } else if (cellStr.includes('song')) {
+                  songCols.push(idx);
+                }
+              });
+              
+              // If no SONG columns found but we have DATE, look for columns after DATE
+              if (songCols.length === 0 && dateCol >= 0) {
+                for (let i = dateCol + 1; i < headerParts.length; i++) {
+                  const cellStr = headerParts[i].toLowerCase();
+                  if (!cellStr.includes('date') && !cellStr.includes('s/n') && !cellStr.includes('serial')) {
+                    songCols.push(i);
+                  }
+                }
+              }
+              
+              // Helper function to normalize date
+              const normalizeDate = (dateValue: string): string | null => {
+                if (!dateValue) return null;
+                const datePattern = /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/;
+                const match = dateValue.match(datePattern);
+                if (match) {
+                  let month = match[1].padStart(2, '0');
+                  let day = match[2].padStart(2, '0');
+                  let year = match[3];
+                  if (year.length === 2) year = '20' + year;
+                  return `${year}-${month}-${day}`;
+                }
+                return null;
+              };
+              
+              // Helper function to extract title and lyrics (same as Excel/CSV version)
+              const extractSongFromCell = (cellValue: string): { title: string; lyrics: string } => {
+                if (!cellValue) return { title: '', lyrics: '' };
+                const cellText = cellValue.trim();
+                if (!cellText) return { title: '', lyrics: '' };
+                
+                const lines = cellText.split(/\r?\n/).map(l => l.trim()).filter(l => l);
+                if (lines.length === 0) return { title: '', lyrics: '' };
+                
+                let title = '';
+                let lyricsStartIdx = -1;
+                const sectionPattern = /^(verse|chorus|bridge|intro|outro|solo|pre-chorus|interlude|tag)\s*\d*/i;
+                
+                for (let i = 0; i < lines.length; i++) {
+                  const line = lines[i];
+                  const lowerLine = line.toLowerCase();
+                  
+                  if (sectionPattern.test(lowerLine)) {
+                    if (!title && i > 0) {
+                      title = lines[i - 1];
+                    }
+                    lyricsStartIdx = i + 1;
+                    break;
+                  }
+                  
+                  if (!title && !sectionPattern.test(lowerLine)) {
+                    title = line;
+                  }
+                }
+                
+                if (lyricsStartIdx === -1) {
+                  if (lines.length > 0) {
+                    title = lines[0];
+                    lyricsStartIdx = 1;
+                  }
+                }
+                
+                if (!title && lines.length > 0) {
+                  title = lines[0];
+                  lyricsStartIdx = 1;
+                }
+                
+                const lyrics = lyricsStartIdx >= 0 && lyricsStartIdx < lines.length 
+                  ? lines.slice(lyricsStartIdx).join('\n').trim()
+                  : '';
+                
+                return { title: title.trim(), lyrics };
+              };
+              
+              // Parse data rows
+              for (let i = headerRow + 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+                
+                // Parse the line with the same separator
+                let parts: string[] = [];
+                if (separator === '\t') {
+                  parts = line.split('\t').map(p => p.trim()).filter(p => p);
+                } else if (separator instanceof RegExp) {
+                  parts = line.split(separator).map(p => p.trim()).filter(p => p);
+                } else {
+                  parts = line.split(separator).map(p => p.trim()).filter(p => p);
+                }
+                
+                // Get date for this row
+                let rowDate: string | null = null;
+                if (dateCol >= 0 && parts[dateCol]) {
+                  rowDate = normalizeDate(parts[dateCol]);
+                }
+                
+                // Extract songs from SONG columns
+                for (const songCol of songCols) {
+                  if (songCol >= parts.length) continue;
+                  
+                  const songData = extractSongFromCell(parts[songCol]);
+                  
+                  if (songData.title) {
+                    const song: Partial<Song> = {
+                      title: songData.title,
+                      lyrics: songData.lyrics,
+                      date: rowDate || undefined,
+                      artist: undefined,
+                    };
+                    songs.push(song);
+                  }
+                }
+              }
+              
+                resolve(songs);
+              })
+              .catch((error: any) => {
+                reject(new Error(`Failed to parse Word document: ${error.message}`));
+              });
+            
+            return; // mammoth is async, so we return early
+          } else {
+            reject(new Error("Unsupported file format. Please use CSV, Excel (.xlsx, .xls), Word (.docx), or text files."));
+            return;
+          }
+
+          resolve(songs);
+        } catch (error: any) {
+          reject(new Error(`Failed to parse file: ${error.message}`));
+        }
+      };
+      reader.onerror = () => reject(new Error("Failed to read file"));
+      
+      if (file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls')) {
+        reader.readAsArrayBuffer(file);
+      } else {
+        reader.readAsText(file);
+      }
+    });
+  };
+
+  const handleBulkImport = async (file: File) => {
+    setBulkImportLoading(true);
+    setBulkImportError(null);
+    
+    try {
+      const songsToImport = await parseSongsFromFile(file);
+      
+      if (songsToImport.length === 0) {
+        setBulkImportError("No songs found in the file. Please check the file format.");
+        setBulkImportLoading(false);
+        return;
+      }
+      
+      // Create songs one by one
+      let successCount = 0;
+      let errorCount = 0;
+      
+      for (const song of songsToImport) {
+        try {
+          await createSong(song);
+          successCount++;
+        } catch (err: any) {
+          console.error("Error creating song:", err);
+          errorCount++;
+        }
+      }
+      
+      if (errorCount > 0) {
+        setBulkImportError(`Imported ${successCount} songs successfully. ${errorCount} songs failed to import.`);
+      } else {
+        setBulkImportError(null);
+        alert(`Successfully imported ${successCount} song${successCount === 1 ? '' : 's'}!`);
+      }
+    } catch (error: any) {
+      setBulkImportError(error.message || "Failed to import songs");
+    } finally {
+      setBulkImportLoading(false);
+    }
+  };
+
   // Auth UI
   const [mode, setMode] = useState<"login" | "register">("login");
   const [name, setName] = useState("");
@@ -590,6 +1167,43 @@ export default function AdminPage() {
 
       {tab === "songs" && (
         <section className="space-y-6">
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
+            <h3 className="text-lg font-bold text-[#54037C] mb-4">Bulk Import Songs</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Upload an Excel (.xlsx, .xls), Word (.docx), or CSV file with your song schedule. Expected format:
+            </p>
+            <ul className="text-sm text-gray-600 mb-4 list-disc list-inside space-y-1">
+              <li><strong>Columns:</strong> S/N, DATE, SONG 1, SONG 2, SONG 3, SONG 4, SONG 5, SONG 6 (and more if needed)</li>
+              <li><strong>Date format:</strong> M/D/YYYY (e.g., 4/12/2025)</li>
+              <li><strong>Each SONG column:</strong> Title at the top, then "Verse 1" label, followed by lyrics</li>
+              <li><strong>Multiple songs per row:</strong> One row can contain up to 6 songs (SONG 1-6) or more</li>
+              <li>No artist field needed - titles are extracted automatically</li>
+              <li><strong>Supported formats:</strong> Excel (.xlsx, .xls), Word (.docx), CSV (.csv), Text (.txt)</li>
+            </ul>
+            <div className="mb-4">
+              <input
+                type="file"
+                accept=".csv,.xlsx,.xls,.docx,.txt"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    handleBulkImport(file);
+                    e.target.value = ''; // Reset input
+                  }
+                }}
+                disabled={bulkImportLoading}
+                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-[#54037C] file:text-white hover:file:bg-[#54037C]/90 file:cursor-pointer disabled:opacity-50"
+              />
+            </div>
+            {bulkImportLoading && (
+              <div className="text-sm text-blue-600">Importing songs...</div>
+            )}
+            {bulkImportError && (
+              <div className={`text-sm ${bulkImportError.includes('Successfully') ? 'text-green-600' : 'text-red-600'}`}>
+                {bulkImportError}
+              </div>
+            )}
+          </div>
           <SongForm onSubmit={createSong} />
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
             <h2 className="text-xl font-bold text-[#54037C] mb-4">Songs ({songs.length})</h2>
