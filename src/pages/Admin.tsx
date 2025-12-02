@@ -349,9 +349,9 @@ export default function AdminPage() {
       return songs;
     }
     
-    // Find header row
+    // Find header row (more tolerant – Word docs may have cover pages before the table)
     let headerRow = 0;
-    for (let i = 0; i < Math.min(5, lines.length); i++) {
+    for (let i = 0; i < Math.min(100, lines.length); i++) {
       const line = lines[i].toLowerCase();
       if (line.includes('date') && (line.includes('song') || line.includes('s/n'))) {
         headerRow = i;
@@ -563,7 +563,11 @@ export default function AdminPage() {
             const text = typeof data === 'string' ? data : new TextDecoder().decode(data as ArrayBuffer);
             const lines = text.split('\n').filter(line => line.trim());
             
+            console.log('CSV File read - Total lines:', lines.length);
+            console.log('First 10 lines:', lines.slice(0, 10));
+            
             if (lines.length === 0) {
+              console.log('CSV: No lines found in file');
               resolve([]);
               return;
             }
@@ -592,13 +596,22 @@ export default function AdminPage() {
             
             // Parse header to find column indices
             const headerLine = lines[headerRow];
+            console.log('CSV Header line raw:', JSON.stringify(headerLine));
+            
             let separator: string | RegExp = ',';
-            if (headerLine.includes('\t')) separator = '\t';
-            else if (headerLine.includes(',')) separator = ',';
-            else if (headerLine.includes('|')) separator = '|';
-            else if (headerLine.match(/\s{2,}/)) {
+            if (headerLine.includes('\t')) {
+              separator = '\t';
+              console.log('CSV: Using tab separator');
+            } else if (headerLine.includes(',')) {
+              separator = ',';
+              console.log('CSV: Using comma separator');
+            } else if (headerLine.includes('|')) {
+              separator = '|';
+              console.log('CSV: Using pipe separator');
+            } else if (headerLine.match(/\s{2,}/)) {
               // Multiple spaces as separator
               separator = /\s{2,}/;
+              console.log('CSV: Using multiple spaces separator');
             }
             
             const headerParts = typeof separator === 'string' 
@@ -606,6 +619,7 @@ export default function AdminPage() {
               : headerLine.split(separator).map(p => p.trim().replace(/^"|"$/g, ''));
             
             console.log('CSV Header parts:', headerParts);
+            console.log('CSV Header parts count:', headerParts.length);
             
             let dateCol = -1;
             const songCols: number[] = [];
@@ -642,6 +656,13 @@ export default function AdminPage() {
             }
             
             console.log('CSV Date column:', dateCol, 'Song columns:', songCols);
+            
+            if (songCols.length === 0) {
+              console.warn('CSV: No song columns found! Header parts:', headerParts);
+            }
+            if (dateCol === -1) {
+              console.warn('CSV: No date column found! Header parts:', headerParts);
+            }
             
             // Helper function to normalize date
             const normalizeDate = (dateValue: string): string | null => {
@@ -717,9 +738,14 @@ export default function AdminPage() {
             };
             
             // Parse data rows
+            console.log('CSV: Starting to parse data rows from line', headerRow + 1, 'to', lines.length);
+            let rowsProcessed = 0;
             for (let i = headerRow + 1; i < lines.length; i++) {
               const line = lines[i].trim();
-              if (!line) continue;
+              if (!line) {
+                console.log(`CSV Row ${i}: Empty line, skipping`);
+                continue;
+              }
               
               // Parse the line with the same separator
               let parts: string[] = [];
@@ -737,8 +763,15 @@ export default function AdminPage() {
                 parts = line.split(separator).map(p => p.trim());
               }
               
+              console.log(`CSV Row ${i}: Parsed into ${parts.length} parts`);
+              
               // Skip if row has too few parts
-              if (parts.length < 2) continue;
+              if (parts.length < 2) {
+                console.log(`CSV Row ${i}: Too few parts (${parts.length}), skipping`);
+                continue;
+              }
+              
+              rowsProcessed++;
               
               // Get date for this row
               let rowDate: string | null = null;
@@ -770,80 +803,24 @@ export default function AdminPage() {
               }
             }
             
+            console.log('CSV: Processed', rowsProcessed, 'data rows');
             console.log('CSV Total songs found:', songs.length);
+            
+            if (songs.length === 0) {
+              console.error('CSV: No songs extracted! Debug info:');
+              console.error('- Header row:', headerRow);
+              console.error('- Date column:', dateCol);
+              console.error('- Song columns:', songCols);
+              console.error('- Rows processed:', rowsProcessed);
+              console.error('- Sample row data:', lines.slice(headerRow + 1, headerRow + 4));
+            }
           } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
             // Parse Excel file - handle format with S/N, DATE, SONG 1, SONG 2, SONG 3 columns
             const workbook = XLSX.read(data, { type: 'array' });
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' }) as any[][];
+            const sheetNames = workbook.SheetNames;
             
-            if (jsonData.length === 0) {
-              resolve([]);
-              return;
-            }
-            
-            // Find header row (look for DATE, SONG 1, SONG 2, etc.)
-            let headerRow = -1;
-            for (let i = 0; i < Math.min(10, jsonData.length); i++) {
-              const row = jsonData[i] || [];
-              const rowStr = row.map((cell: any) => String(cell).toLowerCase()).join(' ');
-              const hasDate = rowStr.includes('date');
-              const hasSong = rowStr.includes('song');
-              const hasSerial = rowStr.includes('s/n') || rowStr.includes('serial') || rowStr.includes('s.n');
-              
-              if (hasDate && (hasSong || hasSerial)) {
-                headerRow = i;
-                break;
-              }
-            }
-            
-            // If no header found, use first row
-            if (headerRow === -1) {
-              headerRow = 0;
-            }
-            
-            const headerRowData = jsonData[headerRow] || [];
-            console.log('Excel Header row:', headerRow, 'Data:', headerRowData.map((c: any) => String(c)));
-            
-            // Find DATE column
-            let dateCol = -1;
-            const songCols: number[] = [];
-            
-            headerRowData.forEach((cell: any, idx: number) => {
-              const cellStr = String(cell).toLowerCase().trim();
-              if (cellStr.includes('date') && !cellStr.includes('song')) {
-                dateCol = idx;
-              } else if (cellStr.includes('song')) {
-                songCols.push(idx);
-              }
-            });
-            
-            // If no SONG columns found but we have DATE, look for columns after DATE
-            if (songCols.length === 0 && dateCol >= 0) {
-              // Assume next 6 columns after DATE are songs (SONG 1-6)
-              for (let i = dateCol + 1; i < Math.min(dateCol + 7, headerRowData.length); i++) {
-                const cellStr = String(headerRowData[i] || '').toLowerCase();
-                if (!cellStr.includes('date') && !cellStr.includes('s/n') && !cellStr.includes('serial') && !cellStr.includes('s.n')) {
-                  songCols.push(i);
-                }
-              }
-            }
-            
-            // If still no song columns, try to find any columns that might be songs
-            if (songCols.length === 0) {
-              for (let i = 0; i < headerRowData.length; i++) {
-                const cellStr = String(headerRowData[i] || '').toLowerCase();
-                if (!cellStr.includes('date') && !cellStr.includes('s/n') && !cellStr.includes('serial') && !cellStr.includes('s.n') && cellStr.trim() !== '') {
-                  songCols.push(i);
-                }
-              }
-            }
-            
-            // Sort song columns to ensure proper order
-            songCols.sort((a, b) => a - b);
-            
-            console.log('Excel Date column:', dateCol, 'Song columns:', songCols);
+            console.log('Excel file opened. Total sheets:', sheetNames.length);
+            console.log('Sheet names:', sheetNames);
             
             // Helper function to normalize date
             const normalizeDate = (dateValue: any): string | null => {
@@ -936,37 +913,136 @@ export default function AdminPage() {
               return { title: title.trim(), lyrics };
             };
             
-            // Parse data rows
-            for (let i = headerRow + 1; i < jsonData.length; i++) {
-              const row = jsonData[i] || [];
+            // Process ALL sheets in the workbook
+            for (let sheetIndex = 0; sheetIndex < sheetNames.length; sheetIndex++) {
+              const sheetName = sheetNames[sheetIndex];
+              const worksheet = workbook.Sheets[sheetName];
+              const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' }) as any[][];
               
-              // Skip empty rows
-              if (row.every((cell: any) => !cell || String(cell).trim() === '')) continue;
+              console.log(`\n=== Processing Sheet ${sheetIndex + 1}/${sheetNames.length}: "${sheetName}" ===`);
+              console.log(`Total rows in sheet: ${jsonData.length}`);
               
-              // Get date for this row
-              let rowDate: string | null = null;
-              if (dateCol >= 0 && row[dateCol]) {
-                rowDate = normalizeDate(row[dateCol]);
+              if (jsonData.length === 0) {
+                console.log(`Sheet "${sheetName}": No rows found, skipping`);
+                continue;
               }
               
-              // Extract songs from SONG columns
-              for (const songCol of songCols) {
-                if (songCol >= row.length) continue;
+              // Find header row (look for DATE, SONG 1, SONG 2, etc.)
+              let headerRow = -1;
+              for (let i = 0; i < Math.min(10, jsonData.length); i++) {
+                const row = jsonData[i] || [];
+                const rowStr = row.map((cell: any) => String(cell).toLowerCase()).join(' ');
+                const hasDate = rowStr.includes('date');
+                const hasSong = rowStr.includes('song');
+                const hasSerial = rowStr.includes('s/n') || rowStr.includes('serial') || rowStr.includes('s.n');
                 
-                const songData = extractSongFromCell(row[songCol]);
-                
-                // Accept songs with either title or lyrics (or both)
-                if (songData.title || songData.lyrics) {
-                  const song: Partial<Song> = {
-                    title: songData.title || 'Untitled',
-                    lyrics: songData.lyrics,
-                    date: rowDate || undefined,
-                    artist: undefined, // No artist in this format
-                  };
-                  songs.push(song);
+                if (hasDate && (hasSong || hasSerial)) {
+                  headerRow = i;
+                  break;
                 }
               }
+              
+              // If no header found, use first row
+              if (headerRow === -1) {
+                headerRow = 0;
+                console.log(`Sheet "${sheetName}": No header row found with DATE and SONG, using first row`);
+              } else {
+                console.log(`Sheet "${sheetName}": Header row found at index ${headerRow}`);
+              }
+              
+              const headerRowData = jsonData[headerRow] || [];
+              console.log(`Sheet "${sheetName}": Header row data:`, headerRowData.map((c: any) => String(c)));
+              console.log(`Sheet "${sheetName}": Total columns in header: ${headerRowData.length}`);
+              
+              // Find DATE column
+              let dateCol = -1;
+              const songCols: number[] = [];
+              
+              headerRowData.forEach((cell: any, idx: number) => {
+                const cellStr = String(cell).toLowerCase().trim();
+                if (cellStr.includes('date') && !cellStr.includes('song')) {
+                  dateCol = idx;
+                } else if (cellStr.includes('song')) {
+                  songCols.push(idx);
+                }
+              });
+              
+              // If no SONG columns found but we have DATE, look for columns after DATE
+              if (songCols.length === 0 && dateCol >= 0) {
+                // Assume next 6 columns after DATE are songs (SONG 1-6)
+                for (let i = dateCol + 1; i < Math.min(dateCol + 7, headerRowData.length); i++) {
+                  const cellStr = String(headerRowData[i] || '').toLowerCase();
+                  if (!cellStr.includes('date') && !cellStr.includes('s/n') && !cellStr.includes('serial') && !cellStr.includes('s.n')) {
+                    songCols.push(i);
+                  }
+                }
+                console.log(`Sheet "${sheetName}": No explicit SONG columns found, assuming columns after DATE are songs:`, songCols);
+              }
+              
+              // If still no song columns, try to find any columns that might be songs
+              if (songCols.length === 0) {
+                for (let i = 0; i < headerRowData.length; i++) {
+                  const cellStr = String(headerRowData[i] || '').toLowerCase();
+                  if (!cellStr.includes('date') && !cellStr.includes('s/n') && !cellStr.includes('serial') && !cellStr.includes('s.n') && cellStr.trim() !== '') {
+                    songCols.push(i);
+                  }
+                }
+                console.log(`Sheet "${sheetName}": Still no song columns, using all non-date/serial columns:`, songCols);
+              }
+              
+              // Sort song columns to ensure proper order
+              songCols.sort((a, b) => a - b);
+              
+              console.log(`Sheet "${sheetName}": Date column: ${dateCol}, Song columns:`, songCols);
+              
+              if (songCols.length === 0) {
+                console.warn(`Sheet "${sheetName}": WARNING - No song columns detected!`);
+                console.warn(`Sheet "${sheetName}": Available columns:`, headerRowData.map((c: any, i: number) => `[${i}] "${String(c)}"`));
+              }
+              
+              // Parse data rows
+              let rowsProcessed = 0;
+              let songsFromThisSheet = 0;
+              for (let i = headerRow + 1; i < jsonData.length; i++) {
+                const row = jsonData[i] || [];
+                
+                // Skip empty rows
+                if (row.every((cell: any) => !cell || String(cell).trim() === '')) continue;
+                
+                rowsProcessed++;
+                
+                // Get date for this row
+                let rowDate: string | null = null;
+                if (dateCol >= 0 && row[dateCol]) {
+                  rowDate = normalizeDate(row[dateCol]);
+                }
+                
+                // Extract songs from SONG columns
+                for (const songCol of songCols) {
+                  if (songCol >= row.length) continue;
+                  
+                  const songData = extractSongFromCell(row[songCol]);
+                  
+                  // Accept songs with either title or lyrics (or both)
+                  if (songData.title || songData.lyrics) {
+                    const song: Partial<Song> = {
+                      title: songData.title || 'Untitled',
+                      lyrics: songData.lyrics,
+                      date: rowDate || undefined,
+                      artist: undefined, // No artist in this format
+                    };
+                    songs.push(song);
+                    songsFromThisSheet++;
+                  }
+                }
+              }
+              
+              console.log(`Sheet "${sheetName}": Processed ${rowsProcessed} data rows, extracted ${songsFromThisSheet} songs`);
             }
+            
+            console.log(`\n=== Excel Parsing Complete ===`);
+            console.log(`Total sheets processed: ${sheetNames.length}`);
+            console.log(`Total songs found across all sheets: ${songs.length}`);
           } else {
             // This should not be reached for .docx files as they're handled separately
             reject(new Error("Unsupported file format. Please use CSV, Excel (.xlsx, .xls), Word (.docx), or text files."));
