@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Printer, Download } from "lucide-react";
 
 type AnalyticsData = {
@@ -42,12 +42,17 @@ export default function Analytics({ headers }: AnalyticsProps) {
   const [error, setError] = useState<string | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
 
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const res = await fetch("/api/analytics/stats", { headers });
-      if (!res.ok) throw new Error("Failed to fetch analytics");
+      if (!res.ok) {
+        if (res.status === 401) {
+          throw new Error("Unauthorized. Please log in again.");
+        }
+        throw new Error("Failed to fetch analytics");
+      }
       const analyticsData = await res.json();
       setData(analyticsData);
     } catch (e: any) {
@@ -55,11 +60,11 @@ export default function Analytics({ headers }: AnalyticsProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [headers]);
 
   useEffect(() => {
     fetchAnalytics();
-  }, []);
+  }, [fetchAnalytics]);
 
   if (loading) {
     return (
