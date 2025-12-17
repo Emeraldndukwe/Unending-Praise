@@ -63,9 +63,12 @@ export default function DocumentViewer() {
       }
       setDoc(found);
       
-      // For PDFs, try to get actual page count using PDF.js
+      // For PDFs, try to get actual page count using PDF.js (non-blocking)
       if (found.document_url.toLowerCase().endsWith(".pdf") || found.document_type?.toLowerCase() === "pdf") {
-        await loadPDFPageCount(found.document_url);
+        // Load page count asynchronously (don't block UI)
+        loadPDFPageCount(found.document_url).catch(() => {
+          // Silently fail, will try again when iframe loads
+        });
       } else {
         setTotalPages(1); // Images are single page
       }
@@ -107,22 +110,32 @@ export default function DocumentViewer() {
       // Try to load the PDF to get page count
       // Use a timeout to avoid hanging if the PDF can't be loaded
       const timeoutPromise = new Promise((_, _reject) => 
-        setTimeout(() => _reject(new Error('Timeout loading PDF')), 10000)
+        setTimeout(() => _reject(new Error('Timeout loading PDF')), 15000)
       );
 
+      // For Cloudinary URLs, we might need to handle CORS differently
+      // Try fetching the PDF first to check if it's accessible
       const loadingTask = pdfjsLib.getDocument({
         url: pdfUrl,
         httpHeaders: {},
         withCredentials: false,
+        // Add CORS mode for Cloudinary
+        cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
+        cMapPacked: true,
       });
       
       const pdf = await Promise.race([loadingTask.promise, timeoutPromise]) as any;
-      setTotalPages(pdf.numPages);
+      if (pdf && pdf.numPages && pdf.numPages > 0) {
+        setTotalPages(pdf.numPages);
+      } else {
+        // If we can't get page count, set a reasonable default and let user navigate
+        setTotalPages(100); // Allow navigation, user will see actual limit
+      }
     } catch (e: any) {
       console.warn('Failed to load PDF page count:', e);
-      // Fallback: try to estimate or use a reasonable default
-      // For now, set to 1 and let user navigate - they'll see if there are more pages
-      setTotalPages(1);
+      // Fallback: set a high number so user can navigate and see actual pages
+      // The iframe will show the actual PDF and user can navigate
+      setTotalPages(100);
     }
   };
 
@@ -232,12 +245,17 @@ export default function DocumentViewer() {
           >
             {isPDF ? (
               <div className="w-full" style={{ transform: `scale(${zoom / 100})`, transformOrigin: "top center" }}>
-                <embed
-                  src={`${doc.document_url}#page=${currentPage}&zoom=${zoom}`}
-                  type="application/pdf"
+                <iframe
+                  src={`${doc.document_url}#page=${currentPage}`}
                   className="w-full border-0"
                   style={{ height: "80vh", minHeight: "600px" }}
                   title={doc.title}
+                  onLoad={() => {
+                    // Try to load page count after iframe loads
+                    if (totalPages === 1) {
+                      loadPDFPageCount(doc.document_url);
+                    }
+                  }}
                   onError={() => {
                     setError("Failed to load PDF. The document may not be accessible or your browser may not support PDF embedding.");
                   }}

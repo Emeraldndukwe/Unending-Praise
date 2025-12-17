@@ -249,7 +249,7 @@ export default function Meetings() {
                   </div>
 
                   {/* Tabs - Like Songs of the Day */}
-                  <div className="flex justify-start">
+                  <div className="flex justify-center">
                     <div className="px-1 py-1 rounded-full bg-black/5">
                       <button
                         onClick={() =>
