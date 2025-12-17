@@ -173,7 +173,7 @@ export default function Trainings() {
         <div className="max-w-md w-full bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-8 border border-purple-200">
           <div className="text-center mb-8">
             <img src="/logo.png" alt="Unending praise" className="h-16 mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-[#54037C] mb-2">Trainings and Recordings</h1>
+            <h1 className="text-2xl font-bold text-[#54037C] mb-2">Trainings & Resources</h1>
             <p className="text-gray-600 text-sm">
               {error ? error : "Loading..."}
             </p>
@@ -190,7 +190,7 @@ export default function Trainings() {
         <div className="max-w-md w-full bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-8 border border-purple-200">
           <div className="text-center mb-8">
             <img src="/logo.png" alt="Unending praise" className="h-16 mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-[#54037C] mb-2">Trainings and Recordings</h1>
+            <h1 className="text-2xl font-bold text-[#54037C] mb-2">Trainings & Resources</h1>
             <p className="text-gray-600 text-sm">Enter password to access</p>
           </div>
           {error && (
