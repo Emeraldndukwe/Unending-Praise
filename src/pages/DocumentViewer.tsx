@@ -19,7 +19,7 @@ interface Document {
 export default function DocumentViewer() {
   const { token, id } = useParams<{ token: string; id: string }>();
   const navigate = useNavigate();
-  const [document, setDocument] = useState<Document | null>(null);
+  const [doc, setDoc] = useState<Document | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useState(100);
@@ -61,7 +61,7 @@ export default function DocumentViewer() {
       if (!found) {
         throw new Error("Document not found");
       }
-      setDocument(found);
+      setDoc(found);
       
       // For PDFs, try to get actual page count using PDF.js
       if (found.document_url.toLowerCase().endsWith(".pdf") || found.document_type?.toLowerCase() === "pdf") {
@@ -84,7 +84,7 @@ export default function DocumentViewer() {
         script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
         script.async = true;
         
-        await new Promise<void>((resolve, reject) => {
+        await new Promise<void>((resolve) => {
           script.onload = () => resolve();
           script.onerror = () => {
             console.warn('PDF.js failed to load, using fallback');
@@ -106,8 +106,8 @@ export default function DocumentViewer() {
 
       // Try to load the PDF to get page count
       // Use a timeout to avoid hanging if the PDF can't be loaded
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout loading PDF')), 10000)
+      const timeoutPromise = new Promise((_, _reject) => 
+        setTimeout(() => _reject(new Error('Timeout loading PDF')), 10000)
       );
 
       const loadingTask = pdfjsLib.getDocument({
@@ -150,7 +150,7 @@ export default function DocumentViewer() {
     );
   }
 
-  if (error || !document) {
+  if (error || !doc) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center">
         <div className="text-red-600 text-xl">{error || "Document not found"}</div>
@@ -158,7 +158,7 @@ export default function DocumentViewer() {
     );
   }
 
-  const isPDF = document.document_url.toLowerCase().endsWith(".pdf") || document.document_type?.toLowerCase() === "pdf";
+  const isPDF = doc.document_url.toLowerCase().endsWith(".pdf") || doc.document_type?.toLowerCase() === "pdf";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50">
@@ -233,18 +233,18 @@ export default function DocumentViewer() {
             {isPDF ? (
               <div className="w-full" style={{ transform: `scale(${zoom / 100})`, transformOrigin: "top center" }}>
                 <embed
-                  src={`${document.document_url}#page=${currentPage}&zoom=${zoom}`}
+                  src={`${doc.document_url}#page=${currentPage}&zoom=${zoom}`}
                   type="application/pdf"
                   className="w-full border-0"
                   style={{ height: "80vh", minHeight: "600px" }}
-                  title={document.title}
+                  title={doc.title}
                   onError={() => {
                     setError("Failed to load PDF. The document may not be accessible or your browser may not support PDF embedding.");
                   }}
                 />
                 <div className="text-center mt-4 text-sm text-gray-600">
                   <p>If the PDF doesn't load, 
-                    <a href={document.document_url} target="_blank" rel="noopener noreferrer" className="text-[#54037C] underline ml-1">
+                    <a href={doc.document_url} target="_blank" rel="noopener noreferrer" className="text-[#54037C] underline ml-1">
                       click here to open it in a new tab
                     </a>
                   </p>
@@ -253,11 +253,11 @@ export default function DocumentViewer() {
             ) : (
               <div className="text-center" style={{ transform: `scale(${zoom / 100})`, transformOrigin: "center" }}>
                 <img
-                  src={document.document_url}
-                  alt={document.title}
+                  src={doc.document_url}
+                  alt={doc.title}
                   className="max-w-full h-auto"
                   style={{ maxHeight: "80vh" }}
-                  onError={(e) => {
+                  onError={() => {
                     setError("Failed to load document image");
                   }}
                 />
