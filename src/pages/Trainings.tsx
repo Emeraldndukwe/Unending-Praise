@@ -223,21 +223,12 @@ export default function Trainings() {
   // Main trainings page - same layout as Meetings
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50">
-      {/* Header Banner - Purple with rounded corners */}
-      <div className="bg-[#54037C] rounded-b-3xl shadow-lg mb-8">
-        <div className="max-w-7xl mx-auto px-4 md:px-8 py-6">
+      {/* Header Section - Below Navbar, no purple background */}
+      <div className="pt-24 pb-6">
+        <div className="max-w-7xl mx-auto px-4 md:px-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            {/* Logo - Left */}
-            <div className="flex items-center">
-              <img
-                src="/logo.png"
-                alt="Rhapsody of Realities PRAYER NETWORK"
-                className="h-12 md:h-16 object-contain"
-              />
-            </div>
-
-            {/* Title - Center */}
-            <h1 className="text-2xl md:text-3xl font-bold text-white uppercase tracking-wide">
+            {/* Title - Left/Center */}
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-800 uppercase tracking-wide">
               MEETING RECORDINGS
             </h1>
 
@@ -249,7 +240,7 @@ export default function Trainings() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search..."
-                className="w-full pl-4 pr-10 py-2 bg-purple-200 rounded-full border-0 focus:outline-none focus:ring-2 focus:ring-white/50 text-gray-800 placeholder-gray-600"
+                className="w-full pl-4 pr-10 py-2 bg-purple-200 rounded-full border-0 focus:outline-none focus:ring-2 focus:ring-[#54037C]/50 text-gray-800 placeholder-gray-600"
               />
             </div>
           </div>
