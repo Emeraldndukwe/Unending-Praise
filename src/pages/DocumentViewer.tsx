@@ -2,6 +2,12 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, ZoomIn, ZoomOut } from "lucide-react";
 
+declare global {
+  interface Window {
+    pdfjsLib?: any;
+  }
+}
+
 interface Document {
   id: string;
   title: string;
@@ -56,9 +62,10 @@ export default function DocumentViewer() {
         throw new Error("Document not found");
       }
       setDocument(found);
-      // For PDFs, try to estimate pages (this is a placeholder)
-      if (found.document_url.toLowerCase().endsWith(".pdf")) {
-        setTotalPages(62); // This would ideally come from PDF.js
+      
+      // For PDFs, try to get actual page count using PDF.js
+      if (found.document_url.toLowerCase().endsWith(".pdf") || found.document_type?.toLowerCase() === "pdf") {
+        await loadPDFPageCount(found.document_url);
       } else {
         setTotalPages(1); // Images are single page
       }
@@ -66,6 +73,56 @@ export default function DocumentViewer() {
       setError(e?.message || "Failed to load document");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadPDFPageCount = async (pdfUrl: string) => {
+    try {
+      // Load PDF.js from CDN
+      if (!window.pdfjsLib) {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+        script.async = true;
+        
+        await new Promise<void>((resolve, reject) => {
+          script.onload = () => resolve();
+          script.onerror = () => {
+            console.warn('PDF.js failed to load, using fallback');
+            resolve(); // Don't reject, just continue with fallback
+          };
+          document.head.appendChild(script);
+        });
+      }
+
+      // @ts-ignore - PDF.js is loaded dynamically
+      const pdfjsLib = window.pdfjsLib;
+      if (!pdfjsLib) {
+        // If PDF.js still didn't load, use fallback
+        setTotalPages(1);
+        return;
+      }
+
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+      // Try to load the PDF to get page count
+      // Use a timeout to avoid hanging if the PDF can't be loaded
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout loading PDF')), 10000)
+      );
+
+      const loadingTask = pdfjsLib.getDocument({
+        url: pdfUrl,
+        httpHeaders: {},
+        withCredentials: false,
+      });
+      
+      const pdf = await Promise.race([loadingTask.promise, timeoutPromise]) as any;
+      setTotalPages(pdf.numPages);
+    } catch (e: any) {
+      console.warn('Failed to load PDF page count:', e);
+      // Fallback: try to estimate or use a reasonable default
+      // For now, set to 1 and let user navigate - they'll see if there are more pages
+      setTotalPages(1);
     }
   };
 
@@ -102,7 +159,6 @@ export default function DocumentViewer() {
   }
 
   const isPDF = document.document_url.toLowerCase().endsWith(".pdf") || document.document_type?.toLowerCase() === "pdf";
-  const pdfUrl = isPDF ? `${document.document_url}#page=${currentPage}` : document.document_url;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50">
@@ -172,24 +228,38 @@ export default function DocumentViewer() {
             className="overflow-auto flex items-center justify-center p-8"
             style={{
               maxHeight: "calc(100vh - 200px)",
-              transform: `scale(${zoom / 100})`,
-              transformOrigin: "center",
             }}
           >
             {isPDF ? (
-              <iframe
-                src={pdfUrl}
-                className="w-full border-0"
-                style={{ height: "80vh", minHeight: "600px" }}
-                title={document.title}
-              />
+              <div className="w-full" style={{ transform: `scale(${zoom / 100})`, transformOrigin: "top center" }}>
+                <embed
+                  src={`${document.document_url}#page=${currentPage}&zoom=${zoom}`}
+                  type="application/pdf"
+                  className="w-full border-0"
+                  style={{ height: "80vh", minHeight: "600px" }}
+                  title={document.title}
+                  onError={() => {
+                    setError("Failed to load PDF. The document may not be accessible or your browser may not support PDF embedding.");
+                  }}
+                />
+                <div className="text-center mt-4 text-sm text-gray-600">
+                  <p>If the PDF doesn't load, 
+                    <a href={document.document_url} target="_blank" rel="noopener noreferrer" className="text-[#54037C] underline ml-1">
+                      click here to open it in a new tab
+                    </a>
+                  </p>
+                </div>
+              </div>
             ) : (
-              <div className="text-center">
+              <div className="text-center" style={{ transform: `scale(${zoom / 100})`, transformOrigin: "center" }}>
                 <img
                   src={document.document_url}
                   alt={document.title}
                   className="max-w-full h-auto"
                   style={{ maxHeight: "80vh" }}
+                  onError={(e) => {
+                    setError("Failed to load document image");
+                  }}
                 />
               </div>
             )}
