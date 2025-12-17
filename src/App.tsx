@@ -22,7 +22,7 @@ const DocumentViewer = lazy(() => import("./pages/DocumentViewer"));
 export default function App() {
   const location = useLocation();
   const isAdmin = location.pathname.startsWith('/admin');
-  const isMeetings = location.pathname.startsWith('/meetings') || location.pathname.startsWith('/trainings');
+  const isMeetings = location.pathname.startsWith('/meetings');
 
   // Scroll to top on route change
   useEffect(() => {

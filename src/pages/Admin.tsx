@@ -126,6 +126,11 @@ export default function AdminPage() {
     [uploadMedia]
   );
 
+  const uploadDocumentMedia = useCallback(
+    (dataUrl: string) => uploadMedia(dataUrl, 'documents'),
+    [uploadMedia]
+  );
+
   // Admin comments management
   const [commentEntityType, setCommentEntityType] = useState<"testimony" | "crusade">("testimony");
   const [commentEntityId, setCommentEntityId] = useState<string>("");
@@ -1811,35 +1816,22 @@ export default function AdminPage() {
               {/* Add New Document */}
               <div className="mb-6 p-4 bg-gray-50 rounded-xl border">
                 <h3 className="font-semibold mb-3">Add New Document</h3>
-                <form onSubmit={async (e) => {
-                  e.preventDefault();
-                  const formData = new FormData(e.target as HTMLFormElement);
-                  const title = formData.get('title') as string;
-                  const document_url = formData.get('document_url') as string;
-                  const document_type = formData.get('document_type') as string;
-                  const section = formData.get('section') as string;
-                  if (!title || !document_url) {
-                    alert('Please fill in title and document URL');
-                    return;
-                  }
-                  try {
-                    await fetch('/api/documents', {
-                      method: 'POST',
-                      headers: Object.assign({}, headers as Record<string, string>, { 'content-type': 'application/json' }),
-                      body: JSON.stringify({ title, document_url, document_type: document_type || null, section: section || null }),
-                    });
-                    await refreshDocuments();
-                    (e.target as HTMLFormElement).reset();
-                  } catch (e: any) {
-                    alert('Failed to create document: ' + (e?.message || 'Unknown error'));
-                  }
-                }} className="space-y-3">
-                  <input type="text" name="title" placeholder="Document title" required className="w-full px-4 py-2 border rounded-lg" />
-                  <input type="text" name="section" placeholder="Section (e.g., 1000 Days Crusade, Days of crusade)" className="w-full px-4 py-2 border rounded-lg" />
-                  <input type="url" name="document_url" placeholder="Document URL" required className="w-full px-4 py-2 border rounded-lg" />
-                  <input type="text" name="document_type" placeholder="Document type (e.g., PDF, DOC)" className="w-full px-4 py-2 border rounded-lg" />
-                  <button type="submit" className="px-4 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-lg">Add Document</button>
-                </form>
+                <DocumentForm 
+                  onSubmit={async (payload) => {
+                    try {
+                      await fetch('/api/documents', {
+                        method: 'POST',
+                        headers: Object.assign({}, headers as Record<string, string>, { 'content-type': 'application/json' }),
+                        body: JSON.stringify(payload),
+                      });
+                      await refreshDocuments();
+                    } catch (e: any) {
+                      alert('Failed to create document: ' + (e?.message || 'Unknown error'));
+                      throw e;
+                    }
+                  }}
+                  onUploadMedia={uploadDocumentMedia}
+                />
               </div>
 
               {/* Documents List */}
@@ -3520,6 +3512,129 @@ function MeetingForm({
         disabled={uploading}
       >
         Add Meeting Recording
+      </button>
+    </form>
+  );
+}
+
+function DocumentForm({ 
+  onSubmit, 
+  onUploadMedia 
+}: { 
+  onSubmit: (payload: { title: string; document_url: string; document_type?: string; section?: string }) => Promise<void>;
+  onUploadMedia: (dataUrl: string) => Promise<string>;
+}) {
+  const [title, setTitle] = useState("");
+  const [documentUrl, setDocumentUrl] = useState("");
+  const [documentType, setDocumentType] = useState("");
+  const [section, setSection] = useState("");
+  const [uploading, setUploading] = useState(false);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setUploading(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const dataUrl = event.target?.result as string;
+        if (dataUrl) {
+          const url = await onUploadMedia(dataUrl);
+          setDocumentUrl(url);
+          // Auto-detect document type from file extension
+          const fileName = file.name.toLowerCase();
+          if (fileName.endsWith('.pdf')) {
+            setDocumentType('PDF');
+          } else if (fileName.endsWith('.doc') || fileName.endsWith('.docx')) {
+            setDocumentType('DOC');
+          } else if (fileName.endsWith('.txt')) {
+            setDocumentType('TXT');
+          } else if (fileName.endsWith('.xls') || fileName.endsWith('.xlsx')) {
+            setDocumentType('XLS');
+          }
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (error: any) {
+      alert('Upload failed: ' + (error?.message || 'Unknown error'));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <form
+      className="space-y-3"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (!title || !documentUrl) {
+          alert('Please provide both title and document URL');
+          return;
+        }
+        await onSubmit({ 
+          title, 
+          document_url: documentUrl, 
+          document_type: documentType || undefined, 
+          section: section || undefined 
+        });
+        setTitle("");
+        setDocumentUrl("");
+        setDocumentType("");
+        setSection("");
+      }}
+    >
+      <input 
+        type="text" 
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Document title" 
+        required 
+        className="w-full px-4 py-2 border rounded-lg" 
+      />
+      <input 
+        type="text" 
+        value={section}
+        onChange={(e) => setSection(e.target.value)}
+        placeholder="Section (e.g., 1000 Days Crusade, Days of crusade)" 
+        className="w-full px-4 py-2 border rounded-lg" 
+      />
+      <div>
+        <label className="text-sm font-medium text-gray-700 mb-1 block">Document URL *</label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={documentUrl}
+            onChange={(e) => setDocumentUrl(e.target.value)}
+            placeholder="https://example.com/document.pdf or upload file"
+            className="flex-1 border border-gray-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
+            required
+          />
+          <label className="px-4 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-xl cursor-pointer text-sm whitespace-nowrap">
+            {uploading ? 'Uploading...' : 'Upload Document'}
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx,.txt,.xls,.xlsx"
+              className="hidden"
+              onChange={handleFileUpload}
+              disabled={uploading}
+            />
+          </label>
+        </div>
+      </div>
+      <input 
+        type="text" 
+        value={documentType}
+        onChange={(e) => setDocumentType(e.target.value)}
+        placeholder="Document type (e.g., PDF, DOC) - auto-detected on upload" 
+        className="w-full px-4 py-2 border rounded-lg" 
+      />
+      <button 
+        type="submit" 
+        className="w-full px-4 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-lg"
+        disabled={uploading}
+      >
+        Add Document
       </button>
     </form>
   );
