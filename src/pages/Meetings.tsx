@@ -143,7 +143,7 @@ export default function Meetings() {
     }
   };
 
-  const filterBySearch = (items: (Meeting | Document)[]) => {
+  const filterBySearch = <T extends Meeting | Document>(items: T[]): T[] => {
     if (!searchQuery) return items;
     return items.filter((item) =>
       item.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -235,8 +235,8 @@ export default function Meetings() {
           <div className="space-y-12">
             {sections.map((section) => {
               const activeTab = activeTabs[section.name] || "video";
-              const filteredVideos = filterBySearch(section.videos);
-              const filteredDocs = filterBySearch(section.documents);
+              const filteredVideos: Meeting[] = filterBySearch(section.videos);
+              const filteredDocs: Document[] = filterBySearch(section.documents);
 
               return (
                 <div key={section.name} className="space-y-4">

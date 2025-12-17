@@ -76,8 +76,8 @@ export default function AdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [users, setUsers] = useState<Array<{id:string; name:string; email:string; role:string; status:string; created_at?: string;}>>([]);
   const [crusadeTypes, setCrusadeTypes] = useState<Array<{id:string; name:string; description?:string; created_at?:string;}>>([]);
-  const [meetings, setMeetings] = useState<Array<{id:string; title:string; video_url:string; thumbnail_url?:string; created_at?:string; updated_at?:string}>>([]);
-  const [documents, setDocuments] = useState<Array<{id:string; title:string; document_url:string; document_type?:string; created_at?:string; updated_at?:string}>>([]);
+  const [meetings, setMeetings] = useState<Array<{id:string; title:string; video_url:string; thumbnail_url?:string; section?:string; created_at?:string; updated_at?:string}>>([]);
+  const [documents, setDocuments] = useState<Array<{id:string; title:string; document_url:string; document_type?:string; section?:string; created_at?:string; updated_at?:string}>>([]);
   const [meetingSettings, setMeetingSettings] = useState<{access_token?:string; updated_at?:string}>({});
   const [meetingPassword, setMeetingPassword] = useState("");
   const [meetingPasswordLoading, setMeetingPasswordLoading] = useState(false);
