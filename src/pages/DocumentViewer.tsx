@@ -65,10 +65,8 @@ export default function DocumentViewer() {
       
       // For PDFs, try to get actual page count using PDF.js (non-blocking)
       if (found.document_url.toLowerCase().endsWith(".pdf") || found.document_type?.toLowerCase() === "pdf") {
-        // Load page count asynchronously (don't block UI)
-        loadPDFPageCount(found.document_url).catch(() => {
-          // Silently fail, will try again when iframe loads
-        });
+        // Start loading page count immediately
+        loadPDFPageCount(found.document_url);
       } else {
         setTotalPages(1); // Images are single page
       }
@@ -81,6 +79,9 @@ export default function DocumentViewer() {
 
   const loadPDFPageCount = async (pdfUrl: string) => {
     try {
+      // First, try to fetch the PDF to check if it's accessible
+      const testResponse = await fetch(pdfUrl, { method: 'HEAD', mode: 'no-cors' }).catch(() => null);
+      
       // Load PDF.js from CDN
       if (!window.pdfjsLib) {
         const script = document.createElement('script');
@@ -88,6 +89,12 @@ export default function DocumentViewer() {
         script.async = true;
         
         await new Promise<void>((resolve) => {
+          // Check if script already exists
+          const existingScript = document.querySelector('script[src*="pdf.js"]');
+          if (existingScript) {
+            resolve();
+            return;
+          }
           script.onload = () => resolve();
           script.onerror = () => {
             console.warn('PDF.js failed to load, using fallback');
@@ -97,12 +104,14 @@ export default function DocumentViewer() {
         });
       }
 
+      // Wait a bit for PDF.js to initialize
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       // @ts-ignore - PDF.js is loaded dynamically
       const pdfjsLib = window.pdfjsLib;
       if (!pdfjsLib) {
-        // If PDF.js still didn't load, use fallback
-        setTotalPages(1);
-        return;
+        console.warn('PDF.js not available, cannot get page count');
+        return; // Keep default of 1
       }
 
       pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -110,11 +119,10 @@ export default function DocumentViewer() {
       // Try to load the PDF to get page count
       // Use a timeout to avoid hanging if the PDF can't be loaded
       const timeoutPromise = new Promise((_, _reject) => 
-        setTimeout(() => _reject(new Error('Timeout loading PDF')), 15000)
+        setTimeout(() => _reject(new Error('Timeout loading PDF')), 10000)
       );
 
       // For Cloudinary URLs, we might need to handle CORS differently
-      // Try fetching the PDF first to check if it's accessible
       const loadingTask = pdfjsLib.getDocument({
         url: pdfUrl,
         httpHeaders: {},
@@ -126,16 +134,16 @@ export default function DocumentViewer() {
       
       const pdf = await Promise.race([loadingTask.promise, timeoutPromise]) as any;
       if (pdf && pdf.numPages && pdf.numPages > 0) {
+        console.log('PDF page count detected:', pdf.numPages);
         setTotalPages(pdf.numPages);
       } else {
-        // If we can't get page count, set a reasonable default and let user navigate
-        setTotalPages(100); // Allow navigation, user will see actual limit
+        console.warn('Could not determine PDF page count');
+        // Don't set to 100, keep it at 1 until we can detect it
       }
     } catch (e: any) {
       console.warn('Failed to load PDF page count:', e);
-      // Fallback: set a high number so user can navigate and see actual pages
-      // The iframe will show the actual PDF and user can navigate
-      setTotalPages(100);
+      // Don't set to 100, keep default of 1
+      // The iframe will show the actual PDF and user can navigate manually
     }
   };
 
@@ -182,7 +190,15 @@ export default function DocumentViewer() {
             {/* Left: Back Button and Zoom Out */}
             <div className="flex items-center gap-4">
               <button
-                onClick={() => navigate(`/meetings/${token}`)}
+                onClick={() => {
+                  // Go back to previous page (could be /trainings or /meetings/:token)
+                  if (window.history.length > 1) {
+                    navigate(-1);
+                  } else {
+                    // Fallback: try to go to trainings first, then meetings
+                    navigate('/trainings');
+                  }
+                }}
                 className="flex items-center gap-2 text-white hover:text-purple-200 transition"
               >
                 <ArrowLeft className="w-5 h-5" />
@@ -251,9 +267,12 @@ export default function DocumentViewer() {
                   style={{ height: "80vh", minHeight: "600px" }}
                   title={doc.title}
                   onLoad={() => {
-                    // Try to load page count after iframe loads
+                    // Try to load page count after iframe loads if we don't have it yet
                     if (totalPages === 1) {
-                      loadPDFPageCount(doc.document_url);
+                      // Wait a bit for PDF to fully load in iframe
+                      setTimeout(() => {
+                        loadPDFPageCount(doc.document_url);
+                      }, 1000);
                     }
                   }}
                   onError={() => {
