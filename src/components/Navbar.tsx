@@ -68,20 +68,25 @@ const Navbar = () => {
 
       {/* ✅ Desktop Links */}
       <ul className="hidden md:flex gap-6 text-sm md:text-base text-amber-50">
-        {navLinks.map(({ name, path }) => (
-          <motion.li key={name} whileHover={{ scale: 1.05, y: -1 }}>
-            <Link
-              to={path}
-              className={`${
-                pathname === path || pathname.startsWith(path)
-                  ? "text-white font-semibold border-b-2 border-amber-400"
-                  : "text-white/70 hover:text-white"
-              } transition-colors duration-300 pb-1`}
-            >
-              {name}
-            </Link>
-          </motion.li>
-        ))}
+        {navLinks.map(({ name, path }) => {
+          const isActive = path === "/" 
+            ? pathname === "/" 
+            : pathname === path || pathname.startsWith(path + "/");
+          return (
+            <motion.li key={name} whileHover={{ scale: 1.05, y: -1 }}>
+              <Link
+                to={path}
+                className={`${
+                  isActive
+                    ? "text-white font-semibold border-b-2 border-amber-400"
+                    : "text-white/70 hover:text-white"
+                } transition-colors duration-300 pb-1`}
+              >
+                {name}
+              </Link>
+            </motion.li>
+          );
+        })}
       </ul>
 
       {/* ✅ Mobile Button */}
@@ -108,20 +113,25 @@ const Navbar = () => {
               flex flex-col items-center gap-4 text-white
             "
           >
-            {navLinks.map(({ name, path }) => (
-              <Link
-                key={name}
-                to={path}
-                onClick={() => setMenuOpen(false)}
-                className={`${
-                  pathname === path || pathname.startsWith(path)
-                    ? "text-amber-400 font-semibold"
-                    : "text-white/80 hover:text-white"
-                } text-base transition`}
-              >
-                {name}
-              </Link>
-            ))}
+            {navLinks.map(({ name, path }) => {
+              const isActive = path === "/" 
+                ? pathname === "/" 
+                : pathname === path || pathname.startsWith(path + "/");
+              return (
+                <Link
+                  key={name}
+                  to={path}
+                  onClick={() => setMenuOpen(false)}
+                  className={`${
+                    isActive
+                      ? "text-amber-400 font-semibold"
+                      : "text-white/80 hover:text-white"
+                  } text-base transition`}
+                >
+                  {name}
+                </Link>
+              );
+            })}
           </motion.div>
         )}
       </AnimatePresence>
