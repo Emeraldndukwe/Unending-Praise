@@ -1533,9 +1533,18 @@ app.delete('/api/documents/:id', requireAuth, requireSuperAdmin, async (req, res
 // Public API: Get access token (for navbar link)
 app.get('/api/meetings/token', async (_req, res) => {
   try {
-    const result = await pool.query('SELECT access_token FROM meeting_settings ORDER BY updated_at DESC LIMIT 1');
+    let result = await pool.query('SELECT access_token FROM meeting_settings ORDER BY updated_at DESC LIMIT 1');
     if (result.rowCount === 0) {
-      return res.status(404).json({ error: 'No settings found' });
+      // Initialize default settings if none exist
+      const crypto = await import('crypto');
+      const defaultToken = crypto.randomBytes(32).toString('hex');
+      const defaultPassword = 'password123';
+      const defaultHash = await bcrypt.hash(defaultPassword, 10);
+      await pool.query(
+        'INSERT INTO meeting_settings (password_hash, access_token) VALUES ($1, $2)',
+        [defaultHash, defaultToken]
+      );
+      result = await pool.query('SELECT access_token FROM meeting_settings ORDER BY updated_at DESC LIMIT 1');
     }
     res.json({ token: result.rows[0].access_token });
   } catch (e) {
