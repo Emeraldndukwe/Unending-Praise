@@ -119,9 +119,18 @@ export default function DocumentViewer() {
         setTimeout(() => _reject(new Error('Timeout loading PDF')), 10000)
       );
 
-      // For Cloudinary URLs, we might need to handle CORS differently
+      // For Cloudinary URLs, use proxy to bypass 401 errors
+      // Fix URL if PDF was uploaded as image (convert to raw)
+      let proxyUrl = pdfUrl;
+      if (pdfUrl.includes('/image/upload/') && pdfUrl.endsWith('.pdf')) {
+        proxyUrl = pdfUrl.replace('/image/upload/', '/raw/upload/');
+      }
+      
+      // Try proxy endpoint first to avoid 401 errors
+      const proxyEndpoint = `/api/proxy/pdf?url=${encodeURIComponent(proxyUrl)}`;
+      
       const loadingTask = pdfjsLib.getDocument({
-        url: pdfUrl,
+        url: proxyEndpoint,
         httpHeaders: {},
         withCredentials: false,
         // Add CORS mode for Cloudinary
@@ -259,7 +268,14 @@ export default function DocumentViewer() {
             {isPDF ? (
               <div className="w-full" style={{ transform: `scale(${zoom / 100})`, transformOrigin: "top center" }}>
                 <iframe
-                  src={`${doc.document_url}#page=${currentPage}`}
+                  src={(() => {
+                    // Fix Cloudinary URL if PDF was uploaded as image
+                    let pdfUrl = doc.document_url;
+                    if (pdfUrl.includes('/image/upload/') && pdfUrl.endsWith('.pdf')) {
+                      pdfUrl = pdfUrl.replace('/image/upload/', '/raw/upload/');
+                    }
+                    return `${pdfUrl}#page=${currentPage}`;
+                  })()}
                   className="w-full border-0"
                   style={{ height: "80vh", minHeight: "600px" }}
                   title={doc.title}

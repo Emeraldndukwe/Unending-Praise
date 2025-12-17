@@ -292,10 +292,22 @@ async function uploadMediaFromDataUrl(dataUrl, { folder = 'unendingpraise/upload
   if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) {
     throw new Error('Invalid data URL');
   }
-  const resourceType = dataUrl.startsWith('data:video/') ? 'video' : 'image';
+  
+  // Detect file type from data URL
+  let resourceType = 'auto';
+  if (dataUrl.startsWith('data:video/')) {
+    resourceType = 'video';
+  } else if (dataUrl.startsWith('data:image/')) {
+    resourceType = 'image';
+  } else if (dataUrl.startsWith('data:application/pdf') || dataUrl.includes('application/pdf')) {
+    resourceType = 'raw'; // PDFs should be uploaded as raw files
+  } else if (dataUrl.startsWith('data:application/') || dataUrl.startsWith('data:text/')) {
+    resourceType = 'raw'; // Other documents (doc, docx, txt, etc.) as raw
+  }
+  
   const upload = await cloudinary.uploader.upload(dataUrl, {
     folder,
-    resource_type: 'auto',
+    resource_type: resourceType,
     overwrite: false,
   });
   return {
@@ -471,6 +483,43 @@ app.post('/api/admin/upload', requireAuth, requireRole('crusade', 'testimony', '
   } catch (e) {
     console.error('Cloudinary upload failed', e);
     res.status(500).json({ error: 'Upload failed', details: e?.message || 'Unknown error' });
+  }
+});
+
+// Proxy endpoint for PDFs to bypass Cloudinary access restrictions
+app.get('/api/proxy/pdf', async (req, res) => {
+  const { url } = req.query;
+  if (!url || typeof url !== 'string') {
+    return res.status(400).json({ error: 'Missing or invalid URL parameter' });
+  }
+  
+  try {
+    // Fix Cloudinary URLs: if PDF was uploaded as image, convert to raw
+    let pdfUrl = url;
+    if (pdfUrl.includes('/image/upload/') && pdfUrl.endsWith('.pdf')) {
+      pdfUrl = pdfUrl.replace('/image/upload/', '/raw/upload/');
+    }
+    
+    const response = await fetch(pdfUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; UnendingPraise/1.0)',
+      },
+    });
+    
+    if (!response.ok) {
+      return res.status(response.status).json({ error: 'Failed to fetch PDF' });
+    }
+    
+    const contentType = response.headers.get('content-type') || 'application/pdf';
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    
+    const buffer = await response.arrayBuffer();
+    res.send(Buffer.from(buffer));
+  } catch (e) {
+    console.error('PDF proxy error:', e);
+    res.status(500).json({ error: 'Proxy failed', details: e?.message || 'Unknown error' });
   }
 });
 
