@@ -79,9 +79,6 @@ export default function DocumentViewer() {
 
   const loadPDFPageCount = async (pdfUrl: string) => {
     try {
-      // First, try to fetch the PDF to check if it's accessible
-      const testResponse = await fetch(pdfUrl, { method: 'HEAD', mode: 'no-cors' }).catch(() => null);
-      
       // Load PDF.js from CDN
       if (!window.pdfjsLib) {
         const script = document.createElement('script');
