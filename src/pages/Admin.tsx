@@ -83,7 +83,7 @@ export default function AdminPage() {
   const [meetingPasswordLoading, setMeetingPasswordLoading] = useState(false);
 
   const uploadMedia = useCallback(
-    async (dataUrl: string, scope: 'testimonies' | 'crusades') => {
+    async (dataUrl: string, scope: 'testimonies' | 'crusades' | 'documents') => {
       if (!dataUrl || !dataUrl.startsWith('data:')) return dataUrl;
       const authHeaders: Record<string, string> = {};
       const headerSource = headers as HeadersInit;
