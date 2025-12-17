@@ -3421,7 +3421,10 @@ function MeetingForm({
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  const uploadLargeFile = async (file: File, resourceType: 'video' | 'image'): Promise<string> => {
+  const uploadLargeFile = async (file: File, resourceType: 'video' | 'image', retryCount = 0): Promise<string> => {
+    const MAX_RETRIES = 2;
+    const UPLOAD_TIMEOUT = 60 * 60 * 1000; // 60 minutes for very large files (1GB+)
+    
     // Get upload signature from server
     const authHeaders: Record<string, string> = {};
     if (headers) {
@@ -3439,61 +3442,138 @@ function MeetingForm({
       }
     }
 
-    const sigRes = await fetch('/api/admin/upload-signature', {
-      method: 'POST',
-      headers: { ...authHeaders, 'content-type': 'application/json' },
-      body: JSON.stringify({ 
-        folder: 'unendingpraise/meetings',
-        resourceType 
-      }),
-    });
-
-    if (!sigRes.ok) {
-      const errorText = await sigRes.text();
-      throw new Error(`Failed to get upload signature: ${errorText || 'Unknown error'}`);
-    }
-
-    const sigData = await sigRes.json();
-
-    // Upload directly to Cloudinary with progress tracking
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('folder', sigData.folder);
-    formData.append('resource_type', resourceType);
-    formData.append('timestamp', sigData.timestamp.toString());
-    formData.append('signature', sigData.signature);
-    formData.append('api_key', sigData.apiKey);
-
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      
-      xhr.upload.addEventListener('progress', (e) => {
-        if (e.lengthComputable) {
-          const percentComplete = (e.loaded / e.total) * 100;
-          setUploadProgress(percentComplete);
-        }
+    try {
+      const sigRes = await fetch('/api/admin/upload-signature', {
+        method: 'POST',
+        headers: { ...authHeaders, 'content-type': 'application/json' },
+        body: JSON.stringify({ 
+          folder: 'unendingpraise/meetings',
+          resourceType 
+        }),
       });
 
-      xhr.addEventListener('load', () => {
-        if (xhr.status === 200) {
-          try {
-            const response = JSON.parse(xhr.responseText);
-            resolve(response.secure_url || response.url);
-          } catch (e) {
-            reject(new Error('Invalid response from Cloudinary'));
+      if (!sigRes.ok) {
+        const errorText = await sigRes.text();
+        throw new Error(`Failed to get upload signature: ${errorText || 'Unknown error'}`);
+      }
+
+      const sigData = await sigRes.json();
+
+      // Upload directly to Cloudinary with progress tracking
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('folder', sigData.folder);
+      formData.append('resource_type', resourceType);
+      formData.append('timestamp', sigData.timestamp.toString());
+      formData.append('signature', sigData.signature);
+      formData.append('api_key', sigData.apiKey);
+
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+        let isAborted = false;
+        
+        // Set timeout for the upload (60 minutes for very large files)
+        timeoutId = setTimeout(() => {
+          if (!isAborted) {
+            isAborted = true;
+            xhr.abort();
+            reject(new Error('Upload timeout: The upload took too long. Please try again or use a smaller file.'));
           }
-        } else {
-          reject(new Error(`Upload failed: ${xhr.statusText}`));
-        }
-      });
+        }, UPLOAD_TIMEOUT);
+        
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable && !isAborted) {
+            const percentComplete = (e.loaded / e.total) * 100;
+            setUploadProgress(percentComplete);
+          }
+        });
 
-      xhr.addEventListener('error', () => {
-        reject(new Error('Upload failed: Network error'));
-      });
+        xhr.addEventListener('load', () => {
+          if (timeoutId) clearTimeout(timeoutId);
+          if (isAborted) return;
+          
+          if (xhr.status === 200) {
+            try {
+              const response = JSON.parse(xhr.responseText);
+              resolve(response.secure_url || response.url);
+            } catch (e) {
+              reject(new Error('Invalid response from Cloudinary'));
+            }
+          } else {
+            // Retry on server errors (5xx) if we haven't exceeded max retries
+            if (xhr.status >= 500 && retryCount < MAX_RETRIES) {
+              console.log(`Retrying upload (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+              setTimeout(() => {
+                uploadLargeFile(file, resourceType, retryCount + 1)
+                  .then(resolve)
+                  .catch(reject);
+              }, 2000 * (retryCount + 1)); // Exponential backoff
+            } else {
+              reject(new Error(`Upload failed: ${xhr.statusText} (Status: ${xhr.status})`));
+            }
+          }
+        });
 
-      xhr.open('POST', sigData.uploadUrl);
-      xhr.send(formData);
-    });
+        xhr.addEventListener('error', () => {
+          if (timeoutId) clearTimeout(timeoutId);
+          if (isAborted) return;
+          
+          // Retry on network errors if we haven't exceeded max retries
+          if (retryCount < MAX_RETRIES) {
+            console.log(`Retrying upload after network error (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+            setTimeout(() => {
+              uploadLargeFile(file, resourceType, retryCount + 1)
+                .then(resolve)
+                .catch(reject);
+            }, 2000 * (retryCount + 1)); // Exponential backoff
+          } else {
+            reject(new Error('Upload failed: Network error. Please check your internet connection and try again.'));
+          }
+        });
+
+        xhr.addEventListener('abort', () => {
+          if (timeoutId) clearTimeout(timeoutId);
+          if (!isAborted) {
+            isAborted = true;
+            reject(new Error('Upload was cancelled or aborted'));
+          }
+        });
+
+        xhr.addEventListener('timeout', () => {
+          if (timeoutId) clearTimeout(timeoutId);
+          if (!isAborted) {
+            isAborted = true;
+            xhr.abort();
+            // Retry on timeout if we haven't exceeded max retries
+            if (retryCount < MAX_RETRIES) {
+              console.log(`Retrying upload after timeout (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+              setTimeout(() => {
+                uploadLargeFile(file, resourceType, retryCount + 1)
+                  .then(resolve)
+                  .catch(reject);
+              }, 2000 * (retryCount + 1));
+            } else {
+              reject(new Error('Upload timeout: The connection timed out. Please try again.'));
+            }
+          }
+        });
+
+        // Set a timeout on the XHR object itself (though we're using our own timeout above)
+        xhr.timeout = UPLOAD_TIMEOUT;
+        
+        xhr.open('POST', sigData.uploadUrl);
+        xhr.send(formData);
+      });
+    } catch (error: any) {
+      // Retry on signature fetch errors if we haven't exceeded max retries
+      if (retryCount < MAX_RETRIES && error.message?.includes('signature')) {
+        console.log(`Retrying signature fetch (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+        await new Promise(resolve => setTimeout(resolve, 2000 * (retryCount + 1)));
+        return uploadLargeFile(file, resourceType, retryCount + 1);
+      }
+      throw error;
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'video' | 'thumbnail') => {

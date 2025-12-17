@@ -946,6 +946,10 @@ async function initializeDefaultAdmin() {
 
 const PORT = process.env.PORT || 5000;
 const server = http.createServer(app);
+// Increase timeout for large file uploads (60 minutes for 1GB+ files)
+server.timeout = 60 * 60 * 1000; // 60 minutes
+server.keepAliveTimeout = 65 * 60 * 1000; // 65 minutes
+server.headersTimeout = 66 * 60 * 1000; // 66 minutes
 
 // --- WebSocket Live Chat ---
 let WebSocketServer = null;
