@@ -9,6 +9,7 @@ const Navbar = () => {
     { name: "About us", path: "/about" },
     { name: "Crusades", path: "/crusades" },
     { name: "Testimonies", path: "/testimonies" },
+    { name: "Trainings and Recordings", path: "/trainings" },
     { name: "Contact", path: "/contact" },
   ];
 
@@ -72,7 +73,7 @@ const Navbar = () => {
             <Link
               to={path}
               className={`${
-                pathname === path
+                pathname === path || pathname.startsWith(path)
                   ? "text-white font-semibold border-b-2 border-amber-400"
                   : "text-white/70 hover:text-white"
               } transition-colors duration-300 pb-1`}
@@ -113,7 +114,7 @@ const Navbar = () => {
                 to={path}
                 onClick={() => setMenuOpen(false)}
                 className={`${
-                  pathname === path
+                  pathname === path || pathname.startsWith(path)
                     ? "text-amber-400 font-semibold"
                     : "text-white/80 hover:text-white"
                 } text-base transition`}

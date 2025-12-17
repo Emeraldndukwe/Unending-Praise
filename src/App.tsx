@@ -14,19 +14,24 @@ const Crusades = lazy(() => import("./pages/Crusades"));
 const CrusadeListPage = lazy(() => import("./pages/CrusadeListPage"));
 const CrusadeDetails = lazy(() => import("./pages/CrusadeDetails"));
 const AdminPage = lazy(() => import("./pages/Admin"));
+const Meetings = lazy(() => import("./pages/Meetings"));
+const MeetingVideoPlayer = lazy(() => import("./pages/MeetingVideoPlayer"));
+const Trainings = lazy(() => import("./pages/Trainings"));
+const DocumentViewer = lazy(() => import("./pages/DocumentViewer"));
 
 export default function App() {
   const location = useLocation();
   const isAdmin = location.pathname.startsWith('/admin');
+  const isMeetings = location.pathname.startsWith('/meetings') || location.pathname.startsWith('/trainings');
 
   // Scroll to top on route change
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [location.pathname]);
 
-  // Track page views for analytics (don't track admin pages)
+  // Track page views for analytics (don't track admin or meetings pages)
   useEffect(() => {
-    if (!isAdmin && location.pathname) {
+    if (!isAdmin && !isMeetings && location.pathname) {
       // Track page view asynchronously (don't block navigation)
       fetch('/api/analytics/track', {
         method: 'POST',
@@ -36,11 +41,11 @@ export default function App() {
         // Silently fail - analytics should not block user experience
       });
     }
-  }, [location.pathname, isAdmin]);
+  }, [location.pathname, isAdmin, isMeetings]);
 
   return (
     <div className="min-h-screen flex flex-col">
-      {!isAdmin && <Navbar />}
+      {!isAdmin && !isMeetings && <Navbar />}
       <main className="flex-grow">
         <AnimatePresence mode="wait">
           <Suspense
@@ -184,12 +189,32 @@ export default function App() {
                 </motion.div>
               }
             />
+
+            {/* Trainings Route */}
+            <Route
+              path="/trainings"
+              element={<Trainings />}
+            />
+
+            {/* Private Meetings Routes */}
+            <Route
+              path="/meetings/:token"
+              element={<Meetings />}
+            />
+            <Route
+              path="/meetings/:token/video/:id"
+              element={<MeetingVideoPlayer />}
+            />
+            <Route
+              path="/meetings/:token/document/:id"
+              element={<DocumentViewer />}
+            />
             </Routes>
           </Suspense>
         </AnimatePresence>
       </main>
-      {!isAdmin && <ScrollToTopButton />}
-      {!isAdmin && <Footer />}
+      {!isAdmin && !isMeetings && <ScrollToTopButton />}
+      {!isAdmin && !isMeetings && <Footer />}
     </div>
   );
 }

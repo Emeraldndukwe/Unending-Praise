@@ -1,0 +1,201 @@
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { ArrowLeft, ZoomIn, ZoomOut } from "lucide-react";
+
+interface Document {
+  id: string;
+  title: string;
+  document_url: string;
+  document_type?: string;
+  created_at?: string;
+}
+
+export default function DocumentViewer() {
+  const { token, id } = useParams<{ token: string; id: string }>();
+  const navigate = useNavigate();
+  const [document, setDocument] = useState<Document | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(100);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
+  useEffect(() => {
+    if (!token || !id) {
+      setError("Invalid link");
+      setLoading(false);
+      return;
+    }
+
+    // Check authentication
+    const authKey = `meetings_auth_${token}`;
+    const isAuth = sessionStorage.getItem(authKey) === "true";
+    if (!isAuth) {
+      navigate(`/meetings/${token}`);
+      return;
+    }
+
+    loadDocument();
+  }, [token, id, navigate]);
+
+  // Note: For accurate PDF page counting, you would integrate PDF.js
+  // For now, we use a default value that can be set per document
+
+  const loadDocument = async () => {
+    if (!token) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/meetings/public/${token}`);
+      if (!res.ok) {
+        throw new Error("Failed to load documents");
+      }
+      const data = await res.json();
+      const found = data.documents?.find((d: Document) => d.id === id);
+      if (!found) {
+        throw new Error("Document not found");
+      }
+      setDocument(found);
+      // For PDFs, try to estimate pages (this is a placeholder)
+      if (found.document_url.toLowerCase().endsWith(".pdf")) {
+        setTotalPages(62); // This would ideally come from PDF.js
+      } else {
+        setTotalPages(1); // Images are single page
+      }
+    } catch (e: any) {
+      setError(e?.message || "Failed to load document");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleZoomIn = () => {
+    setZoom((prev) => Math.min(prev + 25, 200));
+  };
+
+  const handleZoomOut = () => {
+    setZoom((prev) => Math.max(prev - 25, 50));
+  };
+
+  const handlePrevPage = () => {
+    setCurrentPage((prev) => Math.max(1, prev - 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage((prev) => Math.min(totalPages, prev + 1));
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center">
+        <div className="text-[#54037C] text-xl">Loading document...</div>
+      </div>
+    );
+  }
+
+  if (error || !document) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center">
+        <div className="text-red-600 text-xl">{error || "Document not found"}</div>
+      </div>
+    );
+  }
+
+  const isPDF = document.document_url.toLowerCase().endsWith(".pdf") || document.document_type?.toLowerCase() === "pdf";
+  const pdfUrl = isPDF ? `${document.document_url}#page=${currentPage}` : document.document_url;
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50">
+      {/* Top Navigation Bar - Matching Navbar Color */}
+      <div className="sticky top-0 z-50 bg-[#54037C]/70 backdrop-blur-sm border-b border-[#54037C]/20 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 py-4">
+          <div className="flex items-center justify-between">
+            {/* Left: Back Button and Zoom Out */}
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => navigate(`/meetings/${token}`)}
+                className="flex items-center gap-2 text-white hover:text-purple-200 transition"
+              >
+                <ArrowLeft className="w-5 h-5" />
+                <span>Back</span>
+              </button>
+              <button
+                onClick={handleZoomOut}
+                disabled={zoom <= 50}
+                className="p-2 text-white hover:bg-white/20 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Zoom Out"
+              >
+                <ZoomOut className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Center: Page Navigation */}
+            <div className="flex items-center gap-4">
+              <button
+                onClick={handlePrevPage}
+                disabled={currentPage <= 1}
+                className="px-4 py-2 text-white hover:bg-white/20 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                ←
+              </button>
+              <span className="text-white font-semibold min-w-[120px] text-center">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={handleNextPage}
+                disabled={currentPage >= totalPages}
+                className="px-4 py-2 text-white hover:bg-white/20 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                →
+              </button>
+            </div>
+
+            {/* Right: Zoom In */}
+            <div className="flex items-center gap-4">
+              <button
+                onClick={handleZoomIn}
+                disabled={zoom >= 200}
+                className="p-2 text-white hover:bg-white/20 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Zoom In"
+              >
+                <ZoomIn className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Document Viewer */}
+      <div className="max-w-7xl mx-auto px-4 md:px-8 py-6">
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+          <div
+            className="overflow-auto flex items-center justify-center p-8"
+            style={{
+              maxHeight: "calc(100vh - 200px)",
+              transform: `scale(${zoom / 100})`,
+              transformOrigin: "center",
+            }}
+          >
+            {isPDF ? (
+              <iframe
+                src={pdfUrl}
+                className="w-full border-0"
+                style={{ height: "80vh", minHeight: "600px" }}
+                title={document.title}
+              />
+            ) : (
+              <div className="text-center">
+                <img
+                  src={document.document_url}
+                  alt={document.title}
+                  className="max-w-full h-auto"
+                  style={{ maxHeight: "80vh" }}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

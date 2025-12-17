@@ -60,7 +60,7 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 
 export default function AdminPage() {
   const { token, setToken, headers } = useAuthToken();
-  const [tab, setTab] = useState<"testimonies" | "crusades" | "messages" | "songs" | "comments" | "users" | "crusade-types" | "analytics">("testimonies");
+  const [tab, setTab] = useState<"testimonies" | "crusades" | "messages" | "songs" | "comments" | "users" | "crusade-types" | "analytics" | "meetings">("testimonies");
   const [role, setRole] = useState<string>("");
   const [testimonies, setTestimonies] = useState<Testimony[]>([]);
   const [crusades, setCrusades] = useState<Crusade[]>([]);
@@ -76,6 +76,11 @@ export default function AdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [users, setUsers] = useState<Array<{id:string; name:string; email:string; role:string; status:string; created_at?: string;}>>([]);
   const [crusadeTypes, setCrusadeTypes] = useState<Array<{id:string; name:string; description?:string; created_at?:string;}>>([]);
+  const [meetings, setMeetings] = useState<Array<{id:string; title:string; video_url:string; thumbnail_url?:string; created_at?:string; updated_at?:string}>>([]);
+  const [documents, setDocuments] = useState<Array<{id:string; title:string; document_url:string; document_type?:string; created_at?:string; updated_at?:string}>>([]);
+  const [meetingSettings, setMeetingSettings] = useState<{access_token?:string; updated_at?:string}>({});
+  const [meetingPassword, setMeetingPassword] = useState("");
+  const [meetingPasswordLoading, setMeetingPasswordLoading] = useState(false);
 
   const uploadMedia = useCallback(
     async (dataUrl: string, scope: 'testimonies' | 'crusades') => {
@@ -233,6 +238,36 @@ export default function AdminPage() {
     }
   };
 
+  const refreshMeetings = async () => {
+    if (role !== 'superadmin') return;
+    try {
+      const list = await api<typeof meetings>("/api/meetings", { headers: headers as HeadersInit });
+      setMeetings(list);
+    } catch (e: any) {
+      console.error("Failed to load meetings:", e);
+    }
+  };
+
+  const refreshDocuments = async () => {
+    if (role !== 'superadmin') return;
+    try {
+      const list = await api<typeof documents>("/api/documents", { headers: headers as HeadersInit });
+      setDocuments(list);
+    } catch (e: any) {
+      console.error("Failed to load documents:", e);
+    }
+  };
+
+  const refreshMeetingSettings = async () => {
+    if (role !== 'superadmin') return;
+    try {
+      const settings = await api<typeof meetingSettings>("/api/meetings/settings", { headers: headers as HeadersInit });
+      setMeetingSettings(settings);
+    } catch (e: any) {
+      console.error("Failed to load meeting settings:", e);
+    }
+  };
+
   useEffect(() => {
     refresh();
     // load current user role if logged in
@@ -249,6 +284,14 @@ export default function AdminPage() {
     loadRole();
     refreshCrusadeTypes();
   }, [token]); // Re-run when token changes
+
+  useEffect(() => {
+    if (role === 'superadmin' && tab === 'meetings') {
+      refreshMeetings();
+      refreshDocuments();
+      refreshMeetingSettings();
+    }
+  }, [role, tab]);
 
   const approveTestimony = async (id: string) => {
     await api<Testimony>(`/api/testimonies/${id}/approve`, { method: "POST", headers: headers as HeadersInit });
@@ -1214,7 +1257,7 @@ export default function AdminPage() {
         <div className="flex flex-wrap gap-2 mb-6 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-2 border border-[#54037C]/10">
           {((() => {
             const base = ["testimonies", "crusades", "messages", "songs", "comments"] as const;
-            if (role === 'superadmin') return ([...base, 'crusade-types', 'users', 'analytics'] as const);
+            if (role === 'superadmin') return ([...base, 'crusade-types', 'users', 'analytics', 'meetings'] as const);
             if (!role || role === 'admin') return ([...base, 'crusade-types', 'analytics'] as const);
             if (role === 'testimony') return ["testimonies", "comments"] as const;
             if (role === 'crusade') return (["crusades", "crusade-types", "comments"] as const);
@@ -1650,6 +1693,213 @@ export default function AdminPage() {
       {tab === "analytics" && (
         <section className="space-y-6">
           <Analytics headers={headers} />
+        </section>
+      )}
+
+      {tab === "meetings" && role === 'superadmin' && (
+        <section className="space-y-6">
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
+            <h2 className="text-xl font-bold text-[#54037C] mb-4">Meeting Recordings</h2>
+            
+            {/* Password Management */}
+            <div className="mb-6 p-4 bg-purple-50 rounded-xl border border-purple-200">
+              <h3 className="font-semibold text-[#54037C] mb-3">Page Password</h3>
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={meetingPassword}
+                  onChange={(e) => setMeetingPassword(e.target.value)}
+                  placeholder="New password"
+                  className="flex-1 px-4 py-2 border rounded-lg"
+                />
+                <button
+                  className="px-4 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-lg"
+                  onClick={async () => {
+                    if (!meetingPassword) {
+                      alert('Please enter a password');
+                      return;
+                    }
+                    setMeetingPasswordLoading(true);
+                    try {
+                      await fetch('/api/meetings/password', {
+                        method: 'PUT',
+                        headers: Object.assign({}, headers as Record<string, string>, { 'content-type': 'application/json' }),
+                        body: JSON.stringify({ password: meetingPassword }),
+                      });
+                      setMeetingPassword('');
+                      alert('Password updated successfully');
+                      await refreshMeetingSettings();
+                    } catch (e: any) {
+                      alert('Failed to update password: ' + (e?.message || 'Unknown error'));
+                    } finally {
+                      setMeetingPasswordLoading(false);
+                    }
+                  }}
+                  disabled={meetingPasswordLoading}
+                >
+                  {meetingPasswordLoading ? 'Updating...' : 'Update Password'}
+                </button>
+              </div>
+              {meetingSettings.access_token && (
+                <div className="mt-3 text-sm text-gray-600">
+                  <p>Share link: <code className="bg-white px-2 py-1 rounded">{window.location.origin}/meetings/{meetingSettings.access_token}</code></p>
+                </div>
+              )}
+            </div>
+
+            {/* Add New Meeting */}
+            <div className="mb-6 p-4 bg-gray-50 rounded-xl border">
+              <h3 className="font-semibold mb-3">Add New Meeting Recording</h3>
+              <MeetingForm
+                onSubmit={async (data) => {
+                  try {
+                    await fetch('/api/meetings', {
+                      method: 'POST',
+                      headers: Object.assign({}, headers as Record<string, string>, { 'content-type': 'application/json' }),
+                      body: JSON.stringify(data),
+                    });
+                    await refreshMeetings();
+                  } catch (e: any) {
+                    alert('Failed to create meeting: ' + (e?.message || 'Unknown error'));
+                  }
+                }}
+                onUploadMedia={uploadCrusadeMedia}
+              />
+            </div>
+
+            {/* Meetings List */}
+            <div className="space-y-3 mb-8">
+              <h3 className="font-semibold">Existing Video Recordings ({meetings.length})</h3>
+              {meetings.length === 0 && <div className="text-sm text-gray-500 text-center py-8">No meetings yet</div>}
+              {meetings.map((meeting) => (
+                <MeetingItem
+                  key={meeting.id}
+                  meeting={meeting}
+                  onUpdate={async (data) => {
+                    try {
+                      await fetch(`/api/meetings/${meeting.id}`, {
+                        method: 'PUT',
+                        headers: Object.assign({}, headers as Record<string, string>, { 'content-type': 'application/json' }),
+                        body: JSON.stringify(data),
+                      });
+                      await refreshMeetings();
+                    } catch (e: any) {
+                      alert('Failed to update meeting: ' + (e?.message || 'Unknown error'));
+                    }
+                  }}
+                  onDelete={async () => {
+                    if (!confirm('Are you sure you want to delete this meeting?')) return;
+                    try {
+                      await fetch(`/api/meetings/${meeting.id}`, {
+                        method: 'DELETE',
+                        headers: headers as HeadersInit,
+                      });
+                      await refreshMeetings();
+                    } catch (e: any) {
+                      alert('Failed to delete meeting: ' + (e?.message || 'Unknown error'));
+                    }
+                  }}
+                  onUploadMedia={uploadCrusadeMedia}
+                />
+              ))}
+            </div>
+
+            {/* Documents Section */}
+            <div className="border-t pt-6">
+              <h2 className="text-xl font-bold text-[#54037C] mb-4">Documents</h2>
+              
+              {/* Add New Document */}
+              <div className="mb-6 p-4 bg-gray-50 rounded-xl border">
+                <h3 className="font-semibold mb-3">Add New Document</h3>
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.target as HTMLFormElement);
+                  const title = formData.get('title') as string;
+                  const document_url = formData.get('document_url') as string;
+                  const document_type = formData.get('document_type') as string;
+                  const section = formData.get('section') as string;
+                  if (!title || !document_url) {
+                    alert('Please fill in title and document URL');
+                    return;
+                  }
+                  try {
+                    await fetch('/api/documents', {
+                      method: 'POST',
+                      headers: Object.assign({}, headers as Record<string, string>, { 'content-type': 'application/json' }),
+                      body: JSON.stringify({ title, document_url, document_type: document_type || null, section: section || null }),
+                    });
+                    await refreshDocuments();
+                    (e.target as HTMLFormElement).reset();
+                  } catch (e: any) {
+                    alert('Failed to create document: ' + (e?.message || 'Unknown error'));
+                  }
+                }} className="space-y-3">
+                  <input type="text" name="title" placeholder="Document title" required className="w-full px-4 py-2 border rounded-lg" />
+                  <input type="text" name="section" placeholder="Section (e.g., 1000 Days Crusade, Days of crusade)" className="w-full px-4 py-2 border rounded-lg" />
+                  <input type="url" name="document_url" placeholder="Document URL" required className="w-full px-4 py-2 border rounded-lg" />
+                  <input type="text" name="document_type" placeholder="Document type (e.g., PDF, DOC)" className="w-full px-4 py-2 border rounded-lg" />
+                  <button type="submit" className="px-4 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-lg">Add Document</button>
+                </form>
+              </div>
+
+              {/* Documents List */}
+              <div className="space-y-3">
+                <h3 className="font-semibold">Existing Documents ({documents.length})</h3>
+                {documents.length === 0 && <div className="text-sm text-gray-500 text-center py-8">No documents yet</div>}
+                {documents.map((doc) => (
+                  <div key={doc.id} className="p-4 border border-gray-200 rounded-xl bg-white hover:shadow-md transition">
+                    <div className="flex flex-col md:flex-row justify-between gap-4">
+                      <div className="flex-1">
+                        <h3 className="font-bold text-lg mb-2">{doc.title}</h3>
+                        <div className="text-xs text-gray-500">
+                          {doc.document_type && <span className="mr-2">Type: {doc.document_type}</span>}
+                          {doc.created_at && `Created: ${new Date(doc.created_at).toLocaleString()}`}
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <button 
+                          className="px-3 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-xl text-sm" 
+                          onClick={async () => {
+                            const title = prompt('New title:', doc.title);
+                            if (!title || title === doc.title) return;
+                            try {
+                              await fetch(`/api/documents/${doc.id}`, {
+                                method: 'PUT',
+                                headers: Object.assign({}, headers as Record<string, string>, { 'content-type': 'application/json' }),
+                                body: JSON.stringify({ title, document_url: doc.document_url, document_type: doc.document_type || null, section: doc.section || null }),
+                              });
+                              await refreshDocuments();
+                            } catch (e: any) {
+                              alert('Failed to update document: ' + (e?.message || 'Unknown error'));
+                            }
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button 
+                          className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm" 
+                          onClick={async () => {
+                            if (!confirm('Are you sure you want to delete this document?')) return;
+                            try {
+                              await fetch(`/api/documents/${doc.id}`, {
+                                method: 'DELETE',
+                                headers: headers as HeadersInit,
+                              });
+                              await refreshDocuments();
+                            } catch (e: any) {
+                              alert('Failed to delete document: ' + (e?.message || 'Unknown error'));
+                            }
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </section>
       )}
 
@@ -3159,6 +3409,276 @@ function SongForm({ onSubmit }: { onSubmit: (payload: Partial<Song>) => Promise<
       <Input label="Date" value={date} onChange={setDate} placeholder="YYYY-MM-DD" />
       <button className="px-4 py-2 bg-blue-600 text-white rounded">Add Song</button>
     </form>
+  );
+}
+
+function MeetingForm({ 
+  onSubmit, 
+  onUploadMedia 
+}: { 
+  onSubmit: (payload: { title: string; video_url: string; thumbnail_url?: string; section?: string }) => Promise<void>;
+  onUploadMedia: (dataUrl: string) => Promise<string>;
+}) {
+  const [title, setTitle] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
+  const [thumbnailUrl, setThumbnailUrl] = useState("");
+  const [section, setSection] = useState("");
+  const [uploading, setUploading] = useState(false);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'video' | 'thumbnail') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setUploading(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const dataUrl = event.target?.result as string;
+        if (dataUrl) {
+          const url = await onUploadMedia(dataUrl);
+          if (type === 'video') {
+            setVideoUrl(url);
+          } else {
+            setThumbnailUrl(url);
+          }
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (error: any) {
+      alert('Upload failed: ' + (error?.message || 'Unknown error'));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <form
+      className="space-y-4"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (!title || !videoUrl) {
+          alert('Please provide both title and video URL');
+          return;
+        }
+        await onSubmit({ title, video_url: videoUrl, thumbnail_url: thumbnailUrl || undefined, section: section || undefined });
+        setTitle("");
+        setVideoUrl("");
+        setThumbnailUrl("");
+        setSection("");
+      }}
+    >
+      <Input label="Title *" value={title} onChange={setTitle} placeholder="e.g., PASTOR CHRIS LIVE UNENDING PRAISE ONLINE CRUSADE" required />
+      <Input label="Section" value={section} onChange={setSection} placeholder="e.g., 1000 Days Crusade, Days of crusade" />
+      <div>
+        <label className="text-sm font-medium text-gray-700 mb-1 block">Video URL *</label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={videoUrl}
+            onChange={(e) => setVideoUrl(e.target.value)}
+            placeholder="https://example.com/video.mp4 or upload file"
+            className="flex-1 border border-gray-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
+            required
+          />
+          <label className="px-4 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-xl cursor-pointer text-sm">
+            {uploading ? 'Uploading...' : 'Upload Video'}
+            <input
+              type="file"
+              accept="video/*"
+              className="hidden"
+              onChange={(e) => handleFileUpload(e, 'video')}
+              disabled={uploading}
+            />
+          </label>
+        </div>
+      </div>
+      <div>
+        <label className="text-sm font-medium text-gray-700 mb-1 block">Thumbnail URL (Optional)</label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={thumbnailUrl}
+            onChange={(e) => setThumbnailUrl(e.target.value)}
+            placeholder="https://example.com/thumbnail.jpg or upload file"
+            className="flex-1 border border-gray-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
+          />
+          <label className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-xl cursor-pointer text-sm">
+            {uploading ? 'Uploading...' : 'Upload Image'}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => handleFileUpload(e, 'thumbnail')}
+              disabled={uploading}
+            />
+          </label>
+        </div>
+      </div>
+      <button 
+        type="submit" 
+        className="w-full px-4 py-3 bg-[#54037C] hover:bg-[#54037C]/90 text-white font-semibold rounded-xl transition shadow-md"
+        disabled={uploading}
+      >
+        Add Meeting Recording
+      </button>
+    </form>
+  );
+}
+
+function MeetingItem({ 
+  meeting, 
+  onUpdate, 
+  onDelete, 
+  onUploadMedia 
+}: { 
+  meeting: { id: string; title: string; video_url: string; thumbnail_url?: string; section?: string; created_at?: string; updated_at?: string };
+  onUpdate: (data: { title: string; video_url: string; thumbnail_url?: string; section?: string }) => Promise<void>;
+  onDelete: () => void;
+  onUploadMedia: (dataUrl: string) => Promise<string>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState(meeting.title);
+  const [videoUrl, setVideoUrl] = useState(meeting.video_url);
+  const [thumbnailUrl, setThumbnailUrl] = useState(meeting.thumbnail_url || "");
+  const [section, setSection] = useState(meeting.section || "");
+  const [uploading, setUploading] = useState(false);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'video' | 'thumbnail') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setUploading(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const dataUrl = event.target?.result as string;
+        if (dataUrl) {
+          const url = await onUploadMedia(dataUrl);
+          if (type === 'video') {
+            setVideoUrl(url);
+          } else {
+            setThumbnailUrl(url);
+          }
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (error: any) {
+      alert('Upload failed: ' + (error?.message || 'Unknown error'));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  if (editing) {
+    return (
+      <div className="p-4 border-2 border-[#54037C] rounded-xl bg-white">
+        <div className="space-y-3">
+          <Input label="Title *" value={title} onChange={setTitle} required />
+          <Input label="Section" value={section} onChange={setSection} placeholder="e.g., 1000 Days Crusade" />
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">Video URL *</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={videoUrl}
+                onChange={(e) => setVideoUrl(e.target.value)}
+                className="flex-1 border border-gray-300 rounded-xl px-4 py-2"
+                required
+              />
+              <label className="px-3 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-xl cursor-pointer text-sm">
+                {uploading ? '...' : 'Upload'}
+                <input
+                  type="file"
+                  accept="video/*"
+                  className="hidden"
+                  onChange={(e) => handleFileUpload(e, 'video')}
+                  disabled={uploading}
+                />
+              </label>
+            </div>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">Thumbnail URL</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={thumbnailUrl}
+                onChange={(e) => setThumbnailUrl(e.target.value)}
+                className="flex-1 border border-gray-300 rounded-xl px-4 py-2"
+              />
+              <label className="px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-xl cursor-pointer text-sm">
+                {uploading ? '...' : 'Upload'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => handleFileUpload(e, 'thumbnail')}
+                  disabled={uploading}
+                />
+              </label>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              className="px-4 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-xl text-sm"
+              onClick={async () => {
+                if (!title || !videoUrl) {
+                  alert('Please provide both title and video URL');
+                  return;
+                }
+                await onUpdate({ title, video_url: videoUrl, thumbnail_url: thumbnailUrl || undefined, section: section || undefined });
+                setEditing(false);
+              }}
+              disabled={uploading}
+            >
+              Save
+            </button>
+            <button
+              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-xl text-sm"
+              onClick={() => {
+                setTitle(meeting.title);
+                setVideoUrl(meeting.video_url);
+                setThumbnailUrl(meeting.thumbnail_url || "");
+                setSection(meeting.section || "");
+                setEditing(false);
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 border border-gray-200 rounded-xl bg-white hover:shadow-md transition">
+      <div className="flex flex-col md:flex-row justify-between gap-4">
+        <div className="flex-1">
+          <h3 className="font-bold text-lg mb-2">{meeting.title}</h3>
+          {meeting.thumbnail_url && (
+            <img src={meeting.thumbnail_url} alt="Thumbnail" className="w-32 h-20 object-cover rounded-lg mb-2" />
+          )}
+          <div className="text-xs text-gray-500">
+            {meeting.created_at && `Created: ${new Date(meeting.created_at).toLocaleString()}`}
+          </div>
+        </div>
+        <div className="flex flex-col gap-2">
+          <button 
+            className="px-3 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-xl text-sm" 
+            onClick={() => setEditing(true)}
+          >
+            Edit
+          </button>
+          <button 
+            className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm" 
+            onClick={onDelete}
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
