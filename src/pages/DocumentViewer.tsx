@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, ZoomIn, ZoomOut } from "lucide-react";
 
@@ -25,6 +25,9 @@ export default function DocumentViewer() {
   const [zoom, setZoom] = useState(100);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [pdfDoc, setPdfDoc] = useState<any>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     if (!token || !id) {
@@ -65,8 +68,8 @@ export default function DocumentViewer() {
       
       // For PDFs, try to get actual page count using PDF.js (non-blocking)
       if (found.document_url.toLowerCase().endsWith(".pdf") || found.document_type?.toLowerCase() === "pdf") {
-        // Start loading page count immediately
-        loadPDFPageCount(found.document_url);
+        // Load the PDF document for rendering
+        await loadPDFDocument(found.document_url);
       } else {
         setTotalPages(1); // Images are single page
       }
@@ -77,7 +80,8 @@ export default function DocumentViewer() {
     }
   };
 
-  const loadPDFPageCount = async (pdfUrl: string) => {
+  const loadPDFDocument = async (pdfUrl: string) => {
+    setPdfLoading(true);
     try {
       // Load PDF.js from CDN
       if (!window.pdfjsLib) {
@@ -86,7 +90,6 @@ export default function DocumentViewer() {
         script.async = true;
         
         await new Promise<void>((resolve) => {
-          // Check if script already exists
           const existingScript = document.querySelector('script[src*="pdf.js"]');
           if (existingScript) {
             resolve();
@@ -94,64 +97,52 @@ export default function DocumentViewer() {
           }
           script.onload = () => resolve();
           script.onerror = () => {
-            console.warn('PDF.js failed to load, using fallback');
-            resolve(); // Don't reject, just continue with fallback
+            console.warn('PDF.js failed to load');
+            resolve();
           };
           document.head.appendChild(script);
         });
       }
 
-      // Wait a bit for PDF.js to initialize
       await new Promise(resolve => setTimeout(resolve, 500));
 
-      // @ts-ignore - PDF.js is loaded dynamically
       const pdfjsLib = window.pdfjsLib;
       if (!pdfjsLib) {
-        console.warn('PDF.js not available, cannot get page count');
-        return; // Keep default of 1
+        throw new Error('PDF.js not available');
       }
 
       pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-      // Try to load the PDF to get page count
-      // Use a timeout to avoid hanging if the PDF can't be loaded
-      const timeoutPromise = new Promise((_, _reject) => 
-        setTimeout(() => _reject(new Error('Timeout loading PDF')), 10000)
-      );
-
-      // For Cloudinary URLs, use proxy to bypass 401 errors
-      // Fix URL if PDF was uploaded as image (convert to raw)
+      // Fix Cloudinary URL if needed
       let proxyUrl = pdfUrl;
       if (pdfUrl.includes('/image/upload/') && pdfUrl.endsWith('.pdf')) {
         proxyUrl = pdfUrl.replace('/image/upload/', '/raw/upload/');
       }
       
-      // Try proxy endpoint first to avoid 401 errors
+      // Use proxy endpoint to avoid 401 errors
       const proxyEndpoint = `/api/proxy/pdf?url=${encodeURIComponent(proxyUrl)}`;
       
       const loadingTask = pdfjsLib.getDocument({
         url: proxyEndpoint,
         httpHeaders: {},
         withCredentials: false,
-        // Add CORS mode for Cloudinary
         cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
         cMapPacked: true,
       });
       
-      const pdf = await Promise.race([loadingTask.promise, timeoutPromise]) as any;
-      if (pdf && pdf.numPages && pdf.numPages > 0) {
-        console.log('PDF page count detected:', pdf.numPages);
+      const pdf = await loadingTask.promise;
+      setPdfDoc(pdf);
+      if (pdf && pdf.numPages) {
         setTotalPages(pdf.numPages);
-      } else {
-        console.warn('Could not determine PDF page count');
-        // Don't set to 100, keep it at 1 until we can detect it
       }
     } catch (e: any) {
-      console.warn('Failed to load PDF page count:', e);
-      // Don't set to 100, keep default of 1
-      // The iframe will show the actual PDF and user can navigate manually
+      console.error('Failed to load PDF:', e);
+      setError('Failed to load PDF: ' + (e?.message || 'Unknown error'));
+    } finally {
+      setPdfLoading(false);
     }
   };
+
 
   const handleZoomIn = () => {
     setZoom((prev) => Math.min(prev + 25, 200));
@@ -168,6 +159,42 @@ export default function DocumentViewer() {
   const handleNextPage = () => {
     setCurrentPage((prev) => Math.min(totalPages, prev + 1));
   };
+
+  // Render PDF page when currentPage or pdfDoc changes
+  useEffect(() => {
+    if (!pdfDoc || !canvasRef.current) return;
+    
+    const docUrl = doc?.document_url || '';
+    const isPDFFile = docUrl.toLowerCase().endsWith(".pdf") || doc?.document_type?.toLowerCase() === "pdf";
+    if (!isPDFFile) return;
+
+    const renderPage = async () => {
+      try {
+        const page = await pdfDoc.getPage(currentPage);
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const context = canvas.getContext('2d');
+        if (!context) return;
+
+        const viewport = page.getViewport({ scale: zoom / 100 });
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        const renderContext = {
+          canvasContext: context,
+          viewport: viewport,
+        };
+
+        await page.render(renderContext).promise;
+      } catch (e: any) {
+        console.error('Failed to render PDF page:', e);
+        setError('Failed to render PDF page: ' + (e?.message || 'Unknown error'));
+      }
+    };
+
+    renderPage();
+  }, [pdfDoc, currentPage, zoom, doc]);
 
   if (loading) {
     return (
@@ -266,39 +293,30 @@ export default function DocumentViewer() {
             }}
           >
             {isPDF ? (
-              <div className="w-full" style={{ transform: `scale(${zoom / 100})`, transformOrigin: "top center" }}>
-                <iframe
-                  src={(() => {
-                    // Fix Cloudinary URL if PDF was uploaded as image
-                    let pdfUrl = doc.document_url;
-                    if (pdfUrl.includes('/image/upload/') && pdfUrl.endsWith('.pdf')) {
-                      pdfUrl = pdfUrl.replace('/image/upload/', '/raw/upload/');
-                    }
-                    return `${pdfUrl}#page=${currentPage}`;
-                  })()}
-                  className="w-full border-0"
-                  style={{ height: "80vh", minHeight: "600px" }}
-                  title={doc.title}
-                  onLoad={() => {
-                    // Try to load page count after iframe loads if we don't have it yet
-                    if (totalPages === 1) {
-                      // Wait a bit for PDF to fully load in iframe
-                      setTimeout(() => {
-                        loadPDFPageCount(doc.document_url);
-                      }, 1000);
-                    }
-                  }}
-                  onError={() => {
-                    setError("Failed to load PDF. The document may not be accessible or your browser may not support PDF embedding.");
-                  }}
-                />
-                <div className="text-center mt-4 text-sm text-gray-600">
-                  <p>If the PDF doesn't load, 
-                    <a href={doc.document_url} target="_blank" rel="noopener noreferrer" className="text-[#54037C] underline ml-1">
-                      click here to open it in a new tab
+              <div className="w-full flex flex-col items-center">
+                {pdfLoading ? (
+                  <div className="text-center py-16 text-gray-500">Loading PDF...</div>
+                ) : pdfDoc ? (
+                  <div className="flex justify-center" style={{ transform: `scale(${zoom / 100})`, transformOrigin: "top center" }}>
+                    <canvas
+                      ref={canvasRef}
+                      className="border border-gray-300 shadow-lg"
+                      style={{ maxWidth: "100%" }}
+                    />
+                  </div>
+                ) : (
+                  <div className="text-center py-16">
+                    <p className="text-gray-600 mb-4">PDF failed to load</p>
+                    <a 
+                      href={doc.document_url} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="text-[#54037C] underline"
+                    >
+                      Click here to open in a new tab
                     </a>
-                  </p>
-                </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="text-center" style={{ transform: `scale(${zoom / 100})`, transformOrigin: "center" }}>
