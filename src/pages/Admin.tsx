@@ -1769,6 +1769,7 @@ export default function AdminPage() {
                   }
                 }}
                 onUploadMedia={uploadCrusadeMedia}
+                headers={headers}
               />
             </div>
 
@@ -3406,40 +3407,176 @@ function SongForm({ onSubmit }: { onSubmit: (payload: Partial<Song>) => Promise<
 
 function MeetingForm({ 
   onSubmit, 
-  onUploadMedia 
+  onUploadMedia,
+  headers
 }: { 
   onSubmit: (payload: { title: string; video_url: string; thumbnail_url?: string; section?: string }) => Promise<void>;
   onUploadMedia: (dataUrl: string) => Promise<string>;
+  headers?: HeadersInit;
 }) {
   const [title, setTitle] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [thumbnailUrl, setThumbnailUrl] = useState("");
   const [section, setSection] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  const uploadLargeFile = async (file: File, resourceType: 'video' | 'image'): Promise<string> => {
+    // Get upload signature from server
+    const authHeaders: Record<string, string> = {};
+    if (headers) {
+      const headerSource = headers as HeadersInit;
+      if (headerSource instanceof Headers) {
+        headerSource.forEach((value, key) => {
+          authHeaders[key] = value;
+        });
+      } else if (Array.isArray(headerSource)) {
+        headerSource.forEach(([key, value]) => {
+          authHeaders[key] = value;
+        });
+      } else if (headerSource && typeof headerSource === 'object') {
+        Object.assign(authHeaders, headerSource as Record<string, string>);
+      }
+    }
+
+    const sigRes = await fetch('/api/admin/upload-signature', {
+      method: 'POST',
+      headers: { ...authHeaders, 'content-type': 'application/json' },
+      body: JSON.stringify({ 
+        folder: 'unendingpraise/meetings',
+        resourceType 
+      }),
+    });
+
+    if (!sigRes.ok) {
+      const errorText = await sigRes.text();
+      throw new Error(`Failed to get upload signature: ${errorText || 'Unknown error'}`);
+    }
+
+    const sigData = await sigRes.json();
+
+    // Upload directly to Cloudinary with progress tracking
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('folder', sigData.folder);
+    formData.append('resource_type', resourceType);
+    formData.append('timestamp', sigData.timestamp.toString());
+    formData.append('signature', sigData.signature);
+    formData.append('api_key', sigData.apiKey);
+
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          const percentComplete = (e.loaded / e.total) * 100;
+          setUploadProgress(percentComplete);
+        }
+      });
+
+      xhr.addEventListener('load', () => {
+        if (xhr.status === 200) {
+          try {
+            const response = JSON.parse(xhr.responseText);
+            resolve(response.secure_url || response.url);
+          } catch (e) {
+            reject(new Error('Invalid response from Cloudinary'));
+          }
+        } else {
+          reject(new Error(`Upload failed: ${xhr.statusText}`));
+        }
+      });
+
+      xhr.addEventListener('error', () => {
+        reject(new Error('Upload failed: Network error'));
+      });
+
+      xhr.open('POST', sigData.uploadUrl);
+      xhr.send(formData);
+    });
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'video' | 'thumbnail') => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
     
     setUploading(true);
+    setUploadProgress(0);
+    
     try {
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        const dataUrl = event.target?.result as string;
-        if (dataUrl) {
-          const url = await onUploadMedia(dataUrl);
+      // Handle multiple files for videos
+      if (type === 'video' && files.length > 1) {
+        // For multiple videos, upload them sequentially
+        const urls: string[] = [];
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const fileSizeMB = file.size / (1024 * 1024);
+          const useDirectUpload = fileSizeMB > 100;
+          
+          let url: string;
+          if (useDirectUpload) {
+            url = await uploadLargeFile(file, 'video');
+          } else {
+            // Use existing method for smaller files
+            const reader = new FileReader();
+            url = await new Promise((resolve, reject) => {
+              reader.onload = async (event) => {
+                const dataUrl = event.target?.result as string;
+                if (dataUrl) {
+                  try {
+                    const uploadedUrl = await onUploadMedia(dataUrl);
+                    resolve(uploadedUrl);
+                  } catch (err) {
+                    reject(err);
+                  }
+                }
+              };
+              reader.onerror = reject;
+              reader.readAsDataURL(file);
+            });
+          }
+          urls.push(url);
+        }
+        // For multiple videos, use the first one as the main URL
+        // You might want to change this behavior
+        setVideoUrl(urls[0]);
+        if (urls.length > 1) {
+          alert(`Uploaded ${urls.length} videos. Using first video URL. Other URLs: ${urls.slice(1).join(', ')}`);
+        }
+      } else {
+        // Single file upload
+        const file = files[0];
+        const fileSizeMB = file.size / (1024 * 1024);
+        const useDirectUpload = fileSizeMB > 100 || (type === 'video' && fileSizeMB > 50);
+        
+        if (useDirectUpload) {
+          const url = await uploadLargeFile(file, type === 'video' ? 'video' : 'image');
           if (type === 'video') {
             setVideoUrl(url);
           } else {
             setThumbnailUrl(url);
           }
+        } else {
+          const reader = new FileReader();
+          reader.onload = async (event) => {
+            const dataUrl = event.target?.result as string;
+            if (dataUrl) {
+              const url = await onUploadMedia(dataUrl);
+              if (type === 'video') {
+                setVideoUrl(url);
+              } else {
+                setThumbnailUrl(url);
+              }
+            }
+          };
+          reader.readAsDataURL(file);
         }
-      };
-      reader.readAsDataURL(file);
+      }
     } catch (error: any) {
       alert('Upload failed: ' + (error?.message || 'Unknown error'));
     } finally {
       setUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -3473,15 +3610,28 @@ function MeetingForm({
             required
           />
           <label className="px-4 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-xl cursor-pointer text-sm">
-            {uploading ? 'Uploading...' : 'Upload Video'}
+            {uploading ? `Uploading... ${Math.round(uploadProgress)}%` : 'Upload Video(s)'}
             <input
               type="file"
               accept="video/*"
               className="hidden"
               onChange={(e) => handleFileUpload(e, 'video')}
               disabled={uploading}
+              multiple
             />
           </label>
+        </div>
+        <div className="text-xs text-gray-500 mt-1">
+          Supports large files (1GB+). You can select multiple videos at once.
+        </div>
+        {uploading && uploadProgress > 0 && (
+          <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+            <div 
+              className="bg-[#54037C] h-2 rounded-full transition-all duration-300"
+              style={{ width: `${uploadProgress}%` }}
+            />
+          </div>
+        )}
         </div>
       </div>
       <div>

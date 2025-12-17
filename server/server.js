@@ -486,6 +486,53 @@ app.post('/api/admin/upload', requireAuth, requireRole('crusade', 'testimony', '
   }
 });
 
+// Get Cloudinary upload signature for direct uploads (for large files)
+app.post('/api/admin/upload-signature', requireAuth, requireRole('crusade', 'testimony', 'songs'), async (req, res) => {
+  if (!cloudinaryEnabled) {
+    return res.status(503).json({ error: 'Cloudinary not configured' });
+  }
+  const { folder = 'unendingpraise/uploads', resourceType = 'auto' } = req.body || {};
+  
+  try {
+    // Generate upload signature for unsigned uploads
+    // Note: You'll need to create an unsigned upload preset in Cloudinary dashboard
+    // For now, we'll use a timestamp-based signature
+    const timestamp = Math.round(new Date().getTime() / 1000);
+    const signature = cloudinary.utils.api_sign_request(
+      { timestamp, folder, resource_type: resourceType },
+      process.env.CLOUDINARY_API_SECRET || ''
+    );
+    
+    const cloudName = cloudinary.config().cloud_name;
+    const apiKey = cloudinary.config().api_key;
+    
+    res.json({
+      signature,
+      timestamp,
+      folder,
+      resourceType,
+      cloudName,
+      apiKey,
+      // Upload URL for direct uploads
+      uploadUrl: `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType === 'video' ? 'video' : 'image'}/upload`,
+    });
+  } catch (e) {
+    console.error('Failed to generate upload signature:', e);
+    res.status(500).json({ error: 'Failed to generate upload signature', details: e?.message || 'Unknown error' });
+  }
+});
+
+// Direct upload endpoint for large files (multipart/form-data)
+app.post('/api/admin/upload-direct', requireAuth, requireRole('crusade', 'testimony', 'songs'), async (req, res) => {
+  if (!cloudinaryEnabled) {
+    return res.status(503).json({ error: 'Cloudinary not configured' });
+  }
+  
+  // Note: For multipart uploads, we need to use multer or similar
+  // For now, this is a placeholder - we'll use direct browser upload instead
+  res.status(501).json({ error: 'Use direct Cloudinary upload from browser' });
+});
+
 // Proxy endpoint for PDFs to bypass Cloudinary access restrictions
 app.get('/api/proxy/pdf', async (req, res) => {
   const { url } = req.query;
