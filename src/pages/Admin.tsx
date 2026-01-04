@@ -3376,20 +3376,31 @@ function Input({ label, value, onChange, placeholder, type = "text", required }:
 }
 
 function SongForm({ onSubmit }: { onSubmit: (payload: Partial<Song>) => Promise<void> }) {
+  // Default date to today in YYYY-MM-DD format
+  const getTodayDate = () => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
   const [lyrics, setLyrics] = useState("");
-  const [date, setDate] = useState("");
+  const [date, setDate] = useState(getTodayDate());
   return (
     <form
       className="grid gap-2 md:grid-cols-4 items-end"
       onSubmit={(e) => {
         e.preventDefault();
-        onSubmit({ title, artist, lyrics, date }).then(() => {
+        // Ensure date is set - use today if empty
+        const finalDate = date.trim() || getTodayDate();
+        onSubmit({ title, artist, lyrics, date: finalDate }).then(() => {
           setTitle("");
           setArtist("");
           setLyrics("");
-          setDate("");
+          setDate(getTodayDate());
         });
       }}
     >
@@ -3399,7 +3410,15 @@ function SongForm({ onSubmit }: { onSubmit: (payload: Partial<Song>) => Promise<
         <div className="mb-1">Lyrics</div>
         <textarea className="w-full border rounded px-3 py-2 h-[88px]" value={lyrics} onChange={(e) => setLyrics(e.target.value)} />
       </label>
-      <Input label="Date" value={date} onChange={setDate} placeholder="YYYY-MM-DD" />
+      <label className="text-sm">
+        <div className="mb-1">Date</div>
+        <input
+          type="date"
+          className="w-full border rounded px-3 py-2"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+        />
+      </label>
       <button className="px-4 py-2 bg-blue-600 text-white rounded">Add Song</button>
     </form>
   );

@@ -20,9 +20,19 @@ export default function SongList() {
         const mm = String(d.getMonth() + 1).padStart(2, '0');
         const dd = String(d.getDate()).padStart(2, '0');
         const today = `${yyyy}-${mm}-${dd}`;
-        const todaysSongs = data.filter(s => (s.date || '').slice(0, 10) === today);
+        // Filter songs where date matches today (handle both date strings and date objects)
+        const todaysSongs = data.filter(s => {
+          if (!s.date) return false;
+          // Handle date string (YYYY-MM-DD or ISO format)
+          const songDate = typeof s.date === 'string' 
+            ? s.date.slice(0, 10) 
+            : new Date(s.date).toISOString().slice(0, 10);
+          return songDate === today;
+        });
         if (!cancelled) setSongs(todaysSongs);
-      } catch {}
+      } catch (err) {
+        console.error('Failed to load songs:', err);
+      }
     })();
     return () => { cancelled = true; };
   }, []);

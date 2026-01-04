@@ -14,6 +14,7 @@ const Crusades = lazy(() => import("./pages/Crusades"));
 const CrusadeListPage = lazy(() => import("./pages/CrusadeListPage"));
 const CrusadeDetails = lazy(() => import("./pages/CrusadeDetails"));
 const AdminPage = lazy(() => import("./pages/Admin"));
+const Event = lazy(() => import("./pages/Event"));
 const Meetings = lazy(() => import("./pages/Meetings"));
 const MeetingVideoPlayer = lazy(() => import("./pages/MeetingVideoPlayer"));
 const Trainings = lazy(() => import("./pages/Trainings"));
@@ -186,6 +187,21 @@ export default function App() {
                   transition={{ duration: 0.5, ease: "easeInOut" }}
                 >
                   <AdminPage />
+                </motion.div>
+              }
+            />
+
+            {/* Hidden Event Route - no links point here, will be moved to main page later */}
+            <Route
+              path="/event"
+              element={
+                <motion.div
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -30 }}
+                  transition={{ duration: 0.5, ease: "easeInOut" }}
+                >
+                  <Event />
                 </motion.div>
               }
             />
