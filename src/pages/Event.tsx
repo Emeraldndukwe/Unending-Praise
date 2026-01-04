@@ -108,22 +108,32 @@ export default function Event() {
     if (!showCountdownModal || !countdownEvent) return;
 
     const updateCountdown = () => {
-      if (!countdownEvent.date || !countdownEvent.startTime) {
+      if (!countdownEvent.date) {
         setTimeRemaining("");
         return;
       }
 
       const now = new Date();
-      const eventDate = new Date(countdownEvent.date);
-      const [hours, minutes] = countdownEvent.startTime.split(':').map(Number);
-      eventDate.setHours(hours, minutes, 0, 0);
+      let targetDateTime: Date;
 
-      const diff = eventDate.getTime() - now.getTime();
+      if (countdownEvent.startTime) {
+        const eventDate = new Date(countdownEvent.date);
+        const [hours, minutes] = countdownEvent.startTime.split(':').map(Number);
+        eventDate.setHours(hours, minutes, 0, 0);
+        targetDateTime = eventDate;
+      } else {
+        // If no startTime, use the date at midnight
+        const eventDate = new Date(countdownEvent.date);
+        eventDate.setHours(0, 0, 0, 0);
+        targetDateTime = eventDate;
+      }
+
+      const diff = targetDateTime.getTime() - now.getTime();
 
       if (diff <= 0) {
         setTimeRemaining("");
         setShowCountdownModal(false);
-        // Auto-start if time has passed
+        // Auto-start if time has passed and streamUrl exists
         if (countdownEvent.streamUrl) {
           setSelectedEvent(countdownEvent);
           setShowEventVideo(true);
@@ -151,13 +161,13 @@ export default function Event() {
     return () => clearInterval(interval);
   }, [showCountdownModal, countdownEvent]);
 
-  // Get the current/next scheduled event (one that has a streamUrl)
+  // Get the next scheduled event (even if it's tomorrow - first event in the list)
+  // Returns event even if it doesn't have a streamUrl
   const getCurrentScheduledEvent = (): StreamEvent | null => {
     if (streamEvents.length === 0) return null;
     
-    // Find the first event with a streamUrl
-    const eventWithStream = streamEvents.find(event => event.streamUrl);
-    return eventWithStream || null;
+    // Return the first event (they're already ordered by date)
+    return streamEvents[0] || null;
   };
 
   const handlePlayClick = () => {
@@ -173,13 +183,21 @@ export default function Event() {
       return;
     }
     
-    // Check if it's the event date and if startTime is set
+    // Check if event is in the future or if it's today but before start time
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
     if (currentEvent.date) {
       const eventDate = new Date(currentEvent.date);
       eventDate.setHours(0, 0, 0, 0);
+      
+      // If event is in the future
+      if (eventDate.getTime() > today.getTime()) {
+        // Show countdown modal
+        setCountdownEvent(currentEvent);
+        setShowCountdownModal(true);
+        return;
+      }
       
       // If it's the event date
       if (eventDate.getTime() === today.getTime()) {
@@ -198,11 +216,6 @@ export default function Event() {
             return;
           }
         }
-      } else if (eventDate.getTime() > today.getTime()) {
-        // Event is in the future - show countdown
-        setCountdownEvent(currentEvent);
-        setShowCountdownModal(true);
-        return;
       }
     }
     
@@ -224,6 +237,14 @@ export default function Event() {
     if (event.date) {
       const eventDate = new Date(event.date);
       eventDate.setHours(0, 0, 0, 0);
+      
+      // If event is in the future
+      if (eventDate.getTime() > today.getTime()) {
+        // Show countdown modal
+        setCountdownEvent(event);
+        setShowCountdownModal(true);
+        return;
+      }
       
       // If it's the event date
       if (eventDate.getTime() === today.getTime()) {
@@ -268,7 +289,7 @@ export default function Event() {
     <div className="w-full min-h-screen bg-[#FFF5E6]">
       {/* Banner Section with Multiple Events Carousel */}
       {streamEvents.length > 0 && (
-        <div className="relative w-full h-[70vh] min-h-[600px] overflow-hidden">
+        <div className="relative w-full h-[80vh] min-h-[700px] overflow-hidden">
           <AnimatePresence mode="wait">
             {streamEvents.map((event, index) => {
               if (index !== activeBannerIndex) return null;
@@ -283,11 +304,14 @@ export default function Event() {
                   className="absolute inset-0 w-full h-full"
                 >
                   {event.imageUrl ? (
-                    <img
-                      src={event.imageUrl}
-                      alt={event.name}
-                      className="absolute inset-0 w-full h-full object-cover"
-                    />
+                    <>
+                      <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-[#54037C] via-[#6f3aa6] to-[#8A4EBF]"></div>
+                      <img
+                        src={event.imageUrl}
+                        alt={event.name}
+                        className="absolute inset-0 w-full h-full object-contain"
+                      />
+                    </>
                   ) : (
                     <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-[#54037C] via-[#6f3aa6] to-[#8A4EBF]" />
                   )}
@@ -360,11 +384,14 @@ export default function Event() {
             <div className="w-full">
               <div className="relative w-full aspect-video rounded-3xl shadow-lg overflow-hidden bg-black">
                 {currentScheduledEvent?.imageUrl ? (
-                  <img
-                    src={currentScheduledEvent.imageUrl}
-                    alt={currentScheduledEvent.name}
-                    className="absolute inset-0 w-full h-full object-cover"
-                  />
+                  <>
+                    <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-[#54037C] via-[#6f3aa6] to-[#8A4EBF]"></div>
+                    <img
+                      src={currentScheduledEvent.imageUrl}
+                      alt={currentScheduledEvent.name}
+                      className="absolute inset-0 w-full h-full object-contain"
+                    />
+                  </>
                 ) : (
                   <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-[#54037C] via-[#6f3aa6] to-[#8A4EBF]" />
                 )}
@@ -545,14 +572,14 @@ export default function Event() {
               <div className="text-4xl font-bold text-[#54037C] mb-6 text-center">
                 {timeRemaining || "Starting now..."}
               </div>
-              {countdownEvent.date && countdownEvent.startTime && (
+              {countdownEvent.date && (
                 <p className="text-sm text-gray-500 text-center mb-6">
                   {new Date(countdownEvent.date).toLocaleDateString('en-US', { 
                     weekday: 'long', 
                     year: 'numeric', 
                     month: 'long', 
                     day: 'numeric' 
-                  })} at {countdownEvent.startTime}
+                  })}{countdownEvent.startTime ? ` at ${countdownEvent.startTime}` : ''}
                 </p>
               )}
               <button
