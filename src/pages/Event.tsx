@@ -247,7 +247,7 @@ export default function Event() {
                     <img
                       src={event.imageUrl}
                       alt={event.name}
-                      className="absolute inset-0 w-full h-full object-cover"
+                      className="absolute inset-0 w-full h-full object-contain"
                     />
                   ) : (
                     <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-[#54037C] via-[#6f3aa6] to-[#8A4EBF]" />
