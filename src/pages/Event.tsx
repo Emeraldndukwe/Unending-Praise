@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { ArrowUpRight, Play, X } from "lucide-react";
+import { ArrowUpRight, Play, X, AlertCircle, XCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { lazy, Suspense } from "react";
 
@@ -284,6 +284,20 @@ export default function Event() {
 
   const embedUrl = selectedEvent?.streamUrl ? getEmbedUrl(selectedEvent.streamUrl) : null;
   const currentScheduledEvent = getCurrentScheduledEvent();
+  const isYouTubeEmbed = embedUrl?.includes('youtube.com/embed') || embedUrl?.includes('youtu.be');
+
+  // Show embed notice when YouTube video is loaded
+  useEffect(() => {
+    if (showEventVideo && isYouTubeEmbed && !showEmbedNotice) {
+      // Show notice after a short delay to check if video loads
+      const timer = setTimeout(() => {
+        setShowEmbedNotice(true);
+        // Auto-hide after 10 seconds
+        setTimeout(() => setShowEmbedNotice(false), 10000);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [showEventVideo, isYouTubeEmbed, showEmbedNotice]);
 
   return (
     <div className="w-full min-h-screen bg-[#FFF5E6]">
