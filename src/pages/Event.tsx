@@ -470,15 +470,14 @@ export default function Event() {
                               initial={{ opacity: 0, y: -10 }}
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: -10 }}
-                              className="absolute top-4 left-4 right-4 bg-blue-600/95 text-white rounded-lg p-4 shadow-lg z-20 max-w-md"
+                              className="absolute top-4 left-4 right-4 bg-amber-600/95 text-white rounded-lg p-4 shadow-lg z-20 max-w-md"
                             >
                               <div className="flex items-start gap-3">
                                 <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />
                                 <div className="flex-1">
-                                  <h4 className="font-semibold text-sm mb-1">Console Errors Detected</h4>
+                                  <h4 className="font-semibold text-sm mb-1">Video Not Loading?</h4>
                                   <p className="text-xs leading-relaxed">
-                                    If you see YouTube-related errors in the console, they're likely caused by ad blockers. 
-                                    The video should still play normally. If playback issues occur, try disabling your ad blocker for this site.
+                                    The video may be blocked by an ad blocker. Please disable your ad blocker for this site and refresh the page to watch the video.
                                   </p>
                                 </div>
                                 <button
