@@ -163,11 +163,50 @@ export default function Event() {
   const handlePlayClick = () => {
     const currentEvent = getCurrentScheduledEvent();
     
-    if (!currentEvent || !currentEvent.streamUrl) {
+    if (!currentEvent) {
       setShowNoStreamModal(true);
       return;
     }
     
+    if (!currentEvent.streamUrl) {
+      setShowNoStreamModal(true);
+      return;
+    }
+    
+    // Check if it's the event date and if startTime is set
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (currentEvent.date) {
+      const eventDate = new Date(currentEvent.date);
+      eventDate.setHours(0, 0, 0, 0);
+      
+      // If it's the event date
+      if (eventDate.getTime() === today.getTime()) {
+        // Check if startTime is set and if current time is before start time
+        if (currentEvent.startTime) {
+          const [hours, minutes] = currentEvent.startTime.split(':').map(Number);
+          const startDateTime = new Date(eventDate);
+          startDateTime.setHours(hours, minutes, 0, 0);
+          
+          const now = new Date();
+          
+          if (now.getTime() < startDateTime.getTime()) {
+            // Show countdown modal
+            setCountdownEvent(currentEvent);
+            setShowCountdownModal(true);
+            return;
+          }
+        }
+      } else if (eventDate.getTime() > today.getTime()) {
+        // Event is in the future - show countdown
+        setCountdownEvent(currentEvent);
+        setShowCountdownModal(true);
+        return;
+      }
+    }
+    
+    // Time has passed or no date/startTime, start normally
     setSelectedEvent(currentEvent);
     setShowEventVideo(true);
   };
@@ -229,7 +268,7 @@ export default function Event() {
     <div className="w-full min-h-screen bg-[#FFF5E6]">
       {/* Banner Section with Multiple Events Carousel */}
       {streamEvents.length > 0 && (
-        <div className="relative w-full h-[500px] md:h-[600px] overflow-hidden">
+        <div className="relative w-full h-[70vh] min-h-[600px] overflow-hidden">
           <AnimatePresence mode="wait">
             {streamEvents.map((event, index) => {
               if (index !== activeBannerIndex) return null;
@@ -247,7 +286,7 @@ export default function Event() {
                     <img
                       src={event.imageUrl}
                       alt={event.name}
-                      className="absolute inset-0 w-full h-full object-contain"
+                      className="absolute inset-0 w-full h-full object-cover"
                     />
                   ) : (
                     <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-[#54037C] via-[#6f3aa6] to-[#8A4EBF]" />
