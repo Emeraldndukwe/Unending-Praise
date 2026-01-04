@@ -11,6 +11,7 @@ type StreamEvent = {
   streamUrl?: string;
   imageUrl?: string;
   date?: string;
+  startTime?: string;
   description?: string;
 };
 
@@ -59,7 +60,11 @@ export default function Event() {
   const [selectedEvent, setSelectedEvent] = useState<StreamEvent | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [showNoStreamModal, setShowNoStreamModal] = useState(false);
+  const [showCountdownModal, setShowCountdownModal] = useState(false);
+  const [countdownEvent, setCountdownEvent] = useState<StreamEvent | null>(null);
+  const [timeRemaining, setTimeRemaining] = useState<string>("");
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
+  const tvSectionRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
@@ -98,6 +103,54 @@ export default function Event() {
     return () => clearInterval(interval);
   }, [streamEvents.length]);
 
+  // Countdown timer for stream start
+  useEffect(() => {
+    if (!showCountdownModal || !countdownEvent) return;
+
+    const updateCountdown = () => {
+      if (!countdownEvent.date || !countdownEvent.startTime) {
+        setTimeRemaining("");
+        return;
+      }
+
+      const now = new Date();
+      const eventDate = new Date(countdownEvent.date);
+      const [hours, minutes] = countdownEvent.startTime.split(':').map(Number);
+      eventDate.setHours(hours, minutes, 0, 0);
+
+      const diff = eventDate.getTime() - now.getTime();
+
+      if (diff <= 0) {
+        setTimeRemaining("");
+        setShowCountdownModal(false);
+        // Auto-start if time has passed
+        if (countdownEvent.streamUrl) {
+          setSelectedEvent(countdownEvent);
+          setShowEventVideo(true);
+          tvSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
+        return;
+      }
+
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hrs = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const secs = Math.floor((diff % (1000 * 60)) / 1000);
+
+      let timeStr = "";
+      if (days > 0) timeStr += `${days}d `;
+      if (hrs > 0 || days > 0) timeStr += `${hrs}h `;
+      if (mins > 0 || hrs > 0 || days > 0) timeStr += `${mins}m `;
+      timeStr += `${secs}s`;
+
+      setTimeRemaining(timeStr);
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [showCountdownModal, countdownEvent]);
+
   // Get the current/next scheduled event (one that has a streamUrl)
   const getCurrentScheduledEvent = (): StreamEvent | null => {
     if (streamEvents.length === 0) return null;
@@ -120,12 +173,53 @@ export default function Event() {
   };
 
   const handleWatchLive = (event: StreamEvent) => {
-    if (event.streamUrl) {
-      setSelectedEvent(event);
-      setShowEventVideo(true);
-    } else {
+    if (!event.streamUrl) {
       setShowNoStreamModal(true);
+      return;
     }
+
+    // Check if it's the event date
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (event.date) {
+      const eventDate = new Date(event.date);
+      eventDate.setHours(0, 0, 0, 0);
+      
+      // If it's the event date
+      if (eventDate.getTime() === today.getTime()) {
+        // Check if startTime is set and if current time is before start time
+        if (event.startTime) {
+          const [hours, minutes] = event.startTime.split(':').map(Number);
+          const startDateTime = new Date(eventDate);
+          startDateTime.setHours(hours, minutes, 0, 0);
+          
+          const now = new Date();
+          
+          if (now.getTime() < startDateTime.getTime()) {
+            // Show countdown modal
+            setCountdownEvent(event);
+            setShowCountdownModal(true);
+            return;
+          }
+        }
+        
+        // Time has passed or no startTime, scroll to TV section and start
+        setSelectedEvent(event);
+        setShowEventVideo(true);
+        setTimeout(() => {
+          tvSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+        return;
+      }
+    }
+    
+    // Not the event date or no date, just start normally
+    setSelectedEvent(event);
+    setShowEventVideo(true);
+    setTimeout(() => {
+      tvSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
   };
 
   const embedUrl = selectedEvent?.streamUrl ? getEmbedUrl(selectedEvent.streamUrl) : null;
@@ -215,7 +309,7 @@ export default function Event() {
       )}
 
       {/* TV Section with Video Player */}
-      <section className="relative w-full px-4 md:px-10 pt-10 pb-10 bg-white">
+      <section ref={tvSectionRef} className="relative w-full px-4 md:px-10 pt-10 pb-10 bg-white">
         {/* TV Header - Centered */}
         <div className="max-w-7xl mx-auto mb-6">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-800 text-center">TV</h2>
@@ -340,31 +434,6 @@ export default function Event() {
         </div>
       </section>
 
-      {/* Additional Content Section */}
-      {streamEvents.length > 0 && (
-        <div className="max-w-6xl mx-auto px-4 md:px-8 py-12">
-          {streamEvents.map((event) => (
-            <div key={event.id} className="mb-8">
-              {event.description && (
-                <div className="text-center text-gray-700 text-lg mb-4">
-                  <p>{event.description}</p>
-                </div>
-              )}
-              {event.date && (
-                <div className="text-center text-gray-600">
-                  <p>Date: {new Date(event.date).toLocaleDateString('en-US', { 
-                    weekday: 'long', 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
-                  })}</p>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* No Stream Scheduled Modal */}
       <AnimatePresence>
         {showNoStreamModal && (
@@ -396,6 +465,59 @@ export default function Event() {
               </p>
               <button
                 onClick={() => setShowNoStreamModal(false)}
+                className="w-full bg-[#54037C] hover:bg-purple-800 text-white px-6 py-3 rounded-xl font-semibold transition-colors"
+              >
+                Close
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Countdown Modal */}
+      <AnimatePresence>
+        {showCountdownModal && countdownEvent && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowCountdownModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl p-8 max-w-md w-full shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-2xl font-bold text-gray-800">Stream Starting Soon</h3>
+                <button
+                  onClick={() => setShowCountdownModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              <p className="text-gray-600 mb-4">
+                The stream "{countdownEvent.name}" will start in:
+              </p>
+              <div className="text-4xl font-bold text-[#54037C] mb-6 text-center">
+                {timeRemaining || "Starting now..."}
+              </div>
+              {countdownEvent.date && countdownEvent.startTime && (
+                <p className="text-sm text-gray-500 text-center mb-6">
+                  {new Date(countdownEvent.date).toLocaleDateString('en-US', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })} at {countdownEvent.startTime}
+                </p>
+              )}
+              <button
+                onClick={() => setShowCountdownModal(false)}
                 className="w-full bg-[#54037C] hover:bg-purple-800 text-white px-6 py-3 rounded-xl font-semibold transition-colors"
               >
                 Close

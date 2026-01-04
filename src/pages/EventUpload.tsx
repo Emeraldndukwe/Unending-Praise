@@ -7,6 +7,7 @@ type StreamEvent = {
   streamUrl?: string;
   imageUrl?: string;
   date?: string;
+  startTime?: string;
   description?: string;
   isActive: boolean;
   displayOrder: number;
@@ -49,6 +50,7 @@ export default function EventUpload() {
     streamUrl: "",
     imageUrl: "",
     date: "",
+    startTime: "",
     description: "",
     displayOrder: 0,
   });
@@ -171,6 +173,7 @@ export default function EventUpload() {
       streamUrl: event.streamUrl || "",
       imageUrl: event.imageUrl || "",
       date: event.date || "",
+      startTime: event.startTime || "",
       description: event.description || "",
       displayOrder: event.displayOrder || 0,
     });
