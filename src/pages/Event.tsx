@@ -59,6 +59,7 @@ export default function Event() {
   const [selectedEvent, setSelectedEvent] = useState<StreamEvent | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [showNoStreamModal, setShowNoStreamModal] = useState(false);
+  const [activeBannerIndex, setActiveBannerIndex] = useState(0);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
@@ -87,6 +88,15 @@ export default function Event() {
     };
     fetchEvents();
   }, []);
+
+  // Auto-rotate banner
+  useEffect(() => {
+    if (streamEvents.length <= 1) return;
+    const interval = setInterval(() => {
+      setActiveBannerIndex((prev) => (prev + 1) % streamEvents.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [streamEvents.length]);
 
   // Get the current/next scheduled event (one that has a streamUrl)
   const getCurrentScheduledEvent = (): StreamEvent | null => {
@@ -123,52 +133,84 @@ export default function Event() {
 
   return (
     <div className="w-full min-h-screen bg-[#FFF5E6]">
-      {/* Banner Section with Multiple Events */}
+      {/* Banner Section with Multiple Events Carousel */}
       {streamEvents.length > 0 && (
         <div className="relative w-full h-[500px] md:h-[600px] overflow-hidden">
-          {/* Show first active event as banner */}
-          <div className="relative w-full h-full">
-            {streamEvents[0].imageUrl ? (
-              <img
-                src={streamEvents[0].imageUrl}
-                alt={streamEvents[0].name}
-                className="absolute inset-0 w-full h-full object-cover"
-              />
-            ) : (
-              <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-[#54037C] via-[#6f3aa6] to-[#8A4EBF]" />
-            )}
-            
-            {/* Dark Overlay */}
-            <div className="absolute inset-0 bg-black/40"></div>
+          <AnimatePresence mode="wait">
+            {streamEvents.map((event, index) => {
+              if (index !== activeBannerIndex) return null;
+              
+              return (
+                <motion.div
+                  key={event.id}
+                  initial={{ opacity: 0, x: 100 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -100 }}
+                  transition={{ duration: 0.5 }}
+                  className="absolute inset-0 w-full h-full"
+                >
+                  {event.imageUrl ? (
+                    <img
+                      src={event.imageUrl}
+                      alt={event.name}
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-[#54037C] via-[#6f3aa6] to-[#8A4EBF]" />
+                  )}
+                  
+                  {/* Dark Overlay */}
+                  <div className="absolute inset-0 bg-black/40"></div>
 
-            {/* Content at Bottom Left */}
-            <div className="absolute bottom-0 left-0 p-6 md:p-8 lg:p-12 text-white">
-              {/* UPCOMING STREAM with Date - Smaller Text */}
-              <div className="mb-3">
-                <p className="text-xs md:text-sm font-medium uppercase tracking-wider">
-                  {streamEvents[0].date 
-                    ? `UPCOMING STREAM ${formatDate(streamEvents[0].date)}`
-                    : "UPCOMING STREAM"}
-                </p>
-              </div>
+                  {/* Content at Bottom Left */}
+                  <div className="absolute bottom-0 left-0 p-6 md:p-8 lg:p-12 text-white">
+                    {/* UPCOMING STREAM with Date - Smaller Text */}
+                    <div className="mb-3">
+                      <p className="text-xs md:text-sm font-medium uppercase tracking-wider">
+                        {event.date 
+                          ? `UPCOMING STREAM ${formatDate(event.date)}`
+                          : "UPCOMING STREAM"}
+                      </p>
+                    </div>
 
-              {/* Main Stream Name - Larger Text */}
-              <div className="mb-6">
-                <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold leading-tight max-w-3xl">
-                  {streamEvents[0].name}
-                </h1>
-              </div>
+                    {/* Main Stream Name - Larger Text */}
+                    <div className="mb-6">
+                      <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold leading-tight max-w-3xl">
+                        {event.name}
+                      </h1>
+                    </div>
 
-              {/* Watch Live Button */}
-              <button
-                onClick={() => handleWatchLive(streamEvents[0])}
-                className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-6 py-3 md:px-8 md:py-4 rounded-full font-semibold text-sm md:text-base transition-all duration-300 shadow-md hover:shadow-lg"
-              >
-                WATCH LIVE
-                <ArrowUpRight size={18} className="inline" strokeWidth={2.5} />
-              </button>
+                    {/* Watch Live Button */}
+                    <button
+                      onClick={() => handleWatchLive(event)}
+                      className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-6 py-3 md:px-8 md:py-4 rounded-full font-semibold text-sm md:text-base transition-all duration-300 shadow-md hover:shadow-lg"
+                    >
+                      WATCH LIVE
+                      <ArrowUpRight size={18} className="inline" strokeWidth={2.5} />
+                    </button>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+
+          {/* Pagination Dots */}
+          {streamEvents.length > 1 && (
+            <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex gap-2 z-10">
+              {streamEvents.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setActiveBannerIndex(index)}
+                  className={`transition-all duration-300 rounded-full ${
+                    index === activeBannerIndex
+                      ? "bg-white w-8 h-2"
+                      : "bg-white/50 w-2 h-2 hover:bg-white/75"
+                  }`}
+                  aria-label={`Go to slide ${index + 1}`}
+                />
+              ))}
             </div>
-          </div>
+          )}
         </div>
       )}
 
