@@ -304,14 +304,13 @@ export default function Event() {
                   className="absolute inset-0 w-full h-full"
                 >
                   {event.imageUrl ? (
-                    <>
-                      <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-[#54037C] via-[#6f3aa6] to-[#8A4EBF]"></div>
+                    <div className="absolute inset-0 w-full h-full bg-black flex items-center justify-center">
                       <img
                         src={event.imageUrl}
                         alt={event.name}
-                        className="absolute inset-0 w-full h-full object-contain"
+                        className="w-full h-full object-contain"
                       />
-                    </>
+                    </div>
                   ) : (
                     <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-[#54037C] via-[#6f3aa6] to-[#8A4EBF]" />
                   )}
@@ -384,14 +383,13 @@ export default function Event() {
             <div className="w-full">
               <div className="relative w-full aspect-video rounded-3xl shadow-lg overflow-hidden bg-black">
                 {currentScheduledEvent?.imageUrl ? (
-                  <>
-                    <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-[#54037C] via-[#6f3aa6] to-[#8A4EBF]"></div>
+                  <div className="absolute inset-0 w-full h-full bg-black flex items-center justify-center">
                     <img
                       src={currentScheduledEvent.imageUrl}
                       alt={currentScheduledEvent.name}
-                      className="absolute inset-0 w-full h-full object-contain"
+                      className="w-full h-full object-contain"
                     />
-                  </>
+                  </div>
                 ) : (
                   <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-[#54037C] via-[#6f3aa6] to-[#8A4EBF]" />
                 )}
