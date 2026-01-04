@@ -210,14 +210,15 @@ async function ensureSchema() {
       );
     `);
     
-    -- Migrate stream_events table
-    DO $$ 
-    BEGIN
-      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='stream_events' AND column_name='display_order') THEN
-        ALTER TABLE stream_events ADD COLUMN display_order INTEGER NOT NULL DEFAULT 0;
-      END IF;
-      -- Note: embed_link column can remain but won't be used
-    END $$;
+    // Migrate stream_events table - add display_order column if it doesn't exist
+    await client.query(`
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='stream_events' AND column_name='display_order') THEN
+          ALTER TABLE stream_events ADD COLUMN display_order INTEGER NOT NULL DEFAULT 0;
+        END IF;
+      END $$;
+    `);
     
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
       ALTER TABLE crusades ADD COLUMN IF NOT EXISTS zone TEXT;
