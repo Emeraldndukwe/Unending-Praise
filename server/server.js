@@ -1615,10 +1615,14 @@ app.get('/api/stream-events', async (_req, res) => {
 });
 
 // Get active stream events (for public Event page - returns multiple)
+// Events are active if date is today or in the future, or if no date is set
 app.get('/api/stream-events/active', async (_req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, name, stream_url, image_url, date, description FROM stream_events WHERE is_active = true ORDER BY display_order ASC, date DESC NULLS LAST, created_at DESC'
+      `SELECT id, name, stream_url, image_url, date, description 
+       FROM stream_events 
+       WHERE (date IS NULL OR date >= CURRENT_DATE)
+       ORDER BY display_order ASC, date ASC NULLS LAST, created_at DESC`
     );
     res.json(result.rows.map(r => ({
       id: r.id,
@@ -1635,15 +1639,16 @@ app.get('/api/stream-events/active', async (_req, res) => {
 });
 
 // Create stream event
+// is_active is automatically set to true (events are active until date passes)
 app.post('/api/stream-events', requireAuth, requireAdmin, async (req, res) => {
-  const { name, streamUrl, imageUrl, date, description, isActive, displayOrder } = req.body || {};
+  const { name, streamUrl, imageUrl, date, description, displayOrder } = req.body || {};
   if (!name) {
     return res.status(400).json({ error: 'Missing name' });
   }
   try {
     const result = await pool.query(
       'INSERT INTO stream_events (name, stream_url, image_url, date, description, is_active, display_order) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, name, stream_url, image_url, date, description, is_active, display_order, created_at, updated_at',
-      [name, streamUrl || null, imageUrl || null, date || null, description || null, isActive !== undefined ? isActive : true, displayOrder !== undefined ? displayOrder : 0]
+      [name, streamUrl || null, imageUrl || null, date || null, description || null, true, displayOrder !== undefined ? displayOrder : 0]
     );
     const r = result.rows[0];
     res.status(201).json({
@@ -1665,10 +1670,12 @@ app.post('/api/stream-events', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // Update stream event
+// is_active is automatically managed based on date
 app.put('/api/stream-events/:id', requireAuth, requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const { name, streamUrl, imageUrl, date, description, isActive, displayOrder } = req.body || {};
+  const { name, streamUrl, imageUrl, date, description, displayOrder } = req.body || {};
   try {
+    // Automatically set is_active based on date (active if date is today or future, or no date)
     const result = await pool.query(
       `UPDATE stream_events SET
         name = COALESCE($2, name),
@@ -1676,12 +1683,16 @@ app.put('/api/stream-events/:id', requireAuth, requireAdmin, async (req, res) =>
         image_url = COALESCE($4, image_url),
         date = COALESCE($5, date),
         description = COALESCE($6, description),
-        is_active = COALESCE($7, is_active),
-        display_order = COALESCE($8, display_order),
+        is_active = CASE 
+          WHEN $5 IS NULL THEN true
+          WHEN $5::date >= CURRENT_DATE THEN true
+          ELSE false
+        END,
+        display_order = COALESCE($7, display_order),
         updated_at = NOW()
        WHERE id = $1
        RETURNING id, name, stream_url, image_url, date, description, is_active, display_order, created_at, updated_at`,
-      [id, name ?? null, streamUrl ?? null, imageUrl ?? null, date ?? null, description ?? null, isActive ?? null, displayOrder ?? null]
+      [id, name ?? null, streamUrl ?? null, imageUrl ?? null, date ?? null, description ?? null, displayOrder ?? null]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
     const r = result.rows[0];

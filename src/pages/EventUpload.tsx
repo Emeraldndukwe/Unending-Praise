@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { compressImage } from "../utils/mediaOptimizer";
 
 type StreamEvent = {
   id: string;
@@ -48,7 +49,6 @@ export default function EventUpload() {
     imageUrl: "",
     date: "",
     description: "",
-    isActive: true,
     displayOrder: 0,
   });
 
@@ -94,26 +94,26 @@ export default function EventUpload() {
 
   const resetForm = () => {
     setEditingId(null);
+    setImagePreview("");
     setFormData({
       name: "",
       streamUrl: "",
       imageUrl: "",
       date: "",
       description: "",
-      isActive: true,
       displayOrder: 0,
     });
   };
 
   const handleEdit = (event: StreamEvent) => {
     setEditingId(event.id);
+    setImagePreview(event.imageUrl || "");
     setFormData({
       name: event.name || "",
       streamUrl: event.streamUrl || "",
       imageUrl: event.imageUrl || "",
       date: event.date || "",
       description: event.description || "",
-      isActive: event.isActive,
       displayOrder: event.displayOrder || 0,
     });
   };
@@ -135,7 +135,6 @@ export default function EventUpload() {
             imageUrl: formData.imageUrl || null,
             date: formData.date || null,
             description: formData.description || null,
-            isActive: formData.isActive,
             displayOrder: formData.displayOrder,
           }),
         });
@@ -150,7 +149,6 @@ export default function EventUpload() {
             imageUrl: formData.imageUrl || null,
             date: formData.date || null,
             description: formData.description || null,
-            isActive: formData.isActive,
             displayOrder: formData.displayOrder,
           }),
         });
@@ -256,16 +254,20 @@ export default function EventUpload() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Background Image URL
+                Background Image / Thumbnail
               </label>
               <input
-                type="url"
-                value={formData.imageUrl}
-                onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
-                placeholder="https://example.com/image.jpg"
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent text-sm"
               />
-              <p className="mt-1 text-sm text-gray-500">Background image for the banner</p>
+              {imagePreview && (
+                <div className="mt-2">
+                  <img src={imagePreview} alt="Preview" className="max-w-xs h-32 object-cover rounded-lg border border-gray-300" />
+                </div>
+              )}
+              <p className="mt-1 text-sm text-gray-500">Upload image for banner background and video thumbnail</p>
             </div>
 
             <div>
@@ -307,34 +309,19 @@ export default function EventUpload() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="isActive"
-                  checked={formData.isActive}
-                  onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                  className="w-4 h-4 text-[#54037C] border-gray-300 rounded focus:ring-[#54037C]"
-                />
-                <label htmlFor="isActive" className="ml-2 text-sm font-medium text-gray-700">
-                  Active
-                </label>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Display Order
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={formData.displayOrder}
-                  onChange={(e) => setFormData({ ...formData, displayOrder: parseInt(e.target.value) || 0 })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
-                  placeholder="0"
-                />
-                <p className="mt-1 text-sm text-gray-500">Lower numbers appear first</p>
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Display Order
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={formData.displayOrder}
+                onChange={(e) => setFormData({ ...formData, displayOrder: parseInt(e.target.value) || 0 })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
+                placeholder="0"
+              />
+              <p className="mt-1 text-sm text-gray-500">Lower numbers appear first. Events are automatically active until deleted or after the date has passed.</p>
             </div>
 
             <div className="flex gap-4">
@@ -371,13 +358,13 @@ export default function EventUpload() {
               {events.map((event) => (
                 <div
                   key={event.id}
-                  className={`border rounded-xl p-4 ${event.isActive ? "border-green-300 bg-green-50" : "border-gray-200 bg-white"}`}
+                  className={`border rounded-xl p-4 ${(!event.date || new Date(event.date) >= new Date()) ? "border-green-300 bg-green-50" : "border-gray-200 bg-white"}`}
                 >
                   <div className="flex justify-between items-start mb-2">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="text-xl font-bold text-gray-800">{event.name}</h3>
-                        {event.isActive && (
+                        {(!event.date || new Date(event.date) >= new Date()) && (
                           <span className="px-2 py-1 bg-green-500 text-white text-xs font-semibold rounded">
                             ACTIVE
                           </span>

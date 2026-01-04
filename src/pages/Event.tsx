@@ -261,6 +261,14 @@ export default function Event() {
                 )}
               </AnimatePresence>
             </div>
+            {/* Event Title Below Video Player */}
+            {selectedEvent && (
+              <div className="mt-4 text-center">
+                <h2 className="text-2xl md:text-3xl font-bold text-gray-800">
+                  {selectedEvent.name}
+                </h2>
+              </div>
+            )}
           </div>
 
           {/* RIGHT SIDE (TABS + CONTENT) */}
