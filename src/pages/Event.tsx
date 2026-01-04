@@ -308,20 +308,6 @@ export default function Event() {
       clearTimeout(timeoutId);
     };
   }, [showEventVideo, isYouTubeEmbed, embedUrl]);
-  const isYouTubeEmbed = embedUrl?.includes('youtube.com/embed') || embedUrl?.includes('youtu.be');
-
-  // Show embed notice when YouTube video is loaded
-  useEffect(() => {
-    if (showEventVideo && isYouTubeEmbed && !showEmbedNotice) {
-      // Show notice after a short delay to check if video loads
-      const timer = setTimeout(() => {
-        setShowEmbedNotice(true);
-        // Auto-hide after 10 seconds
-        setTimeout(() => setShowEmbedNotice(false), 10000);
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [showEventVideo, isYouTubeEmbed, showEmbedNotice]);
 
   return (
     <div className="w-full min-h-screen bg-[#FFF5E6]">
