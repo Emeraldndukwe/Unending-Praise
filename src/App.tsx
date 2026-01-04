@@ -15,6 +15,7 @@ const CrusadeListPage = lazy(() => import("./pages/CrusadeListPage"));
 const CrusadeDetails = lazy(() => import("./pages/CrusadeDetails"));
 const AdminPage = lazy(() => import("./pages/Admin"));
 const Event = lazy(() => import("./pages/Event"));
+const EventUpload = lazy(() => import("./pages/EventUpload"));
 const Meetings = lazy(() => import("./pages/Meetings"));
 const MeetingVideoPlayer = lazy(() => import("./pages/MeetingVideoPlayer"));
 const Trainings = lazy(() => import("./pages/Trainings"));
@@ -23,6 +24,7 @@ const DocumentViewer = lazy(() => import("./pages/DocumentViewer"));
 export default function App() {
   const location = useLocation();
   const isAdmin = location.pathname.startsWith('/admin');
+  const isEventUpload = location.pathname.startsWith('/event-upload');
   const isMeetings = location.pathname.startsWith('/meetings');
 
   // Scroll to top on route change
@@ -32,7 +34,7 @@ export default function App() {
 
   // Track page views for analytics (don't track admin or meetings pages)
   useEffect(() => {
-    if (!isAdmin && !isMeetings && location.pathname) {
+    if (!isAdmin && !isEventUpload && !isMeetings && location.pathname) {
       // Track page view asynchronously (don't block navigation)
       fetch('/api/analytics/track', {
         method: 'POST',
@@ -42,11 +44,11 @@ export default function App() {
         // Silently fail - analytics should not block user experience
       });
     }
-  }, [location.pathname, isAdmin, isMeetings]);
+  }, [location.pathname, isAdmin, isEventUpload, isMeetings]);
 
   return (
     <div className="min-h-screen flex flex-col">
-      {!isAdmin && !isMeetings && <Navbar />}
+      {!isAdmin && !isEventUpload && !isMeetings && <Navbar />}
       <main className="flex-grow">
         <AnimatePresence mode="wait">
           <Suspense
@@ -206,6 +208,21 @@ export default function App() {
               }
             />
 
+            {/* Hidden Event Upload Route - no links point here */}
+            <Route
+              path="/event-upload"
+              element={
+                <motion.div
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -30 }}
+                  transition={{ duration: 0.5, ease: "easeInOut" }}
+                >
+                  <EventUpload />
+                </motion.div>
+              }
+            />
+
             {/* Trainings Route */}
             <Route
               path="/trainings"
@@ -229,8 +246,8 @@ export default function App() {
           </Suspense>
         </AnimatePresence>
       </main>
-      {!isAdmin && !isMeetings && <ScrollToTopButton />}
-      {!isAdmin && !isMeetings && <Footer />}
+      {!isAdmin && !isEventUpload && !isMeetings && <ScrollToTopButton />}
+      {!isAdmin && !isEventUpload && !isMeetings && <Footer />}
     </div>
   );
 }

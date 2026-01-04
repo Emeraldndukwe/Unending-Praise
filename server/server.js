@@ -194,6 +194,19 @@ async function ensureSchema() {
         access_token TEXT UNIQUE NOT NULL,
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+
+      -- Stream events (upcoming streams)
+      CREATE TABLE IF NOT EXISTS stream_events (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        name TEXT NOT NULL,
+        stream_url TEXT,
+        embed_link TEXT,
+        date TEXT,
+        description TEXT,
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
     `);
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
       ALTER TABLE crusades ADD COLUMN IF NOT EXISTS zone TEXT;
@@ -1557,6 +1570,133 @@ app.get('/api/meetings/public/:token', async (req, res) => {
     res.json({ videos: videos.rows, documents: documents.rows });
   } catch (e) {
     console.error('Get public meetings error:', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Stream Events API - Admin only
+// Get all stream events
+app.get('/api/stream-events', async (_req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, name, stream_url, embed_link, date, description, is_active, created_at, updated_at FROM stream_events ORDER BY date DESC NULLS LAST, created_at DESC'
+    );
+    res.json(result.rows.map(r => ({
+      id: r.id,
+      name: r.name,
+      streamUrl: r.stream_url,
+      embedLink: r.embed_link,
+      date: r.date,
+      description: r.description,
+      isActive: r.is_active,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at
+    })));
+  } catch (e) {
+    console.error('Get stream events error:', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get active stream event (for public Event page)
+app.get('/api/stream-events/active', async (_req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, name, stream_url, embed_link, date, description FROM stream_events WHERE is_active = true ORDER BY date DESC NULLS LAST, created_at DESC LIMIT 1'
+    );
+    if (result.rowCount === 0) {
+      return res.json(null);
+    }
+    const r = result.rows[0];
+    res.json({
+      id: r.id,
+      name: r.name,
+      streamUrl: r.stream_url,
+      embedLink: r.embed_link,
+      date: r.date,
+      description: r.description
+    });
+  } catch (e) {
+    console.error('Get active stream event error:', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Create stream event
+app.post('/api/stream-events', requireAuth, requireAdmin, async (req, res) => {
+  const { name, streamUrl, embedLink, date, description, isActive } = req.body || {};
+  if (!name) {
+    return res.status(400).json({ error: 'Missing name' });
+  }
+  try {
+    const result = await pool.query(
+      'INSERT INTO stream_events (name, stream_url, embed_link, date, description, is_active) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, stream_url, embed_link, date, description, is_active, created_at, updated_at',
+      [name, streamUrl || null, embedLink || null, date || null, description || null, isActive !== undefined ? isActive : true]
+    );
+    const r = result.rows[0];
+    res.status(201).json({
+      id: r.id,
+      name: r.name,
+      streamUrl: r.stream_url,
+      embedLink: r.embed_link,
+      date: r.date,
+      description: r.description,
+      isActive: r.is_active,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at
+    });
+  } catch (e) {
+    console.error('Create stream event error:', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Update stream event
+app.put('/api/stream-events/:id', requireAuth, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { name, streamUrl, embedLink, date, description, isActive } = req.body || {};
+  try {
+    const result = await pool.query(
+      `UPDATE stream_events SET
+        name = COALESCE($2, name),
+        stream_url = COALESCE($3, stream_url),
+        embed_link = COALESCE($4, embed_link),
+        date = COALESCE($5, date),
+        description = COALESCE($6, description),
+        is_active = COALESCE($7, is_active),
+        updated_at = NOW()
+       WHERE id = $1
+       RETURNING id, name, stream_url, embed_link, date, description, is_active, created_at, updated_at`,
+      [id, name ?? null, streamUrl ?? null, embedLink ?? null, date ?? null, description ?? null, isActive ?? null]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    const r = result.rows[0];
+    res.json({
+      id: r.id,
+      name: r.name,
+      streamUrl: r.stream_url,
+      embedLink: r.embed_link,
+      date: r.date,
+      description: r.description,
+      isActive: r.is_active,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at
+    });
+  } catch (e) {
+    console.error('Update stream event error:', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Delete stream event
+app.delete('/api/stream-events/:id', requireAuth, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query('DELETE FROM stream_events WHERE id=$1', [id]);
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    res.status(204).end();
+  } catch (e) {
+    console.error('Delete stream event error:', e);
     res.status(500).json({ error: 'Server error' });
   }
 });

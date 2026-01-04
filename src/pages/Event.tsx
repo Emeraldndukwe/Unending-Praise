@@ -14,18 +14,23 @@ export default function Event() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // TODO: Fetch stream event from API
-    // For now, using mock data
-    setTimeout(() => {
-      setStreamEvent({
-        id: "1",
-        name: "PASTOR CHRIS LIVE UNENDING PRAISE ONLINE CRUSADE",
-        streamUrl: "/",
-        date: "2025-01-15",
-        description: "Join us for an amazing time of worship and praise"
-      });
-      setLoading(false);
-    }, 100);
+    const fetchEvent = async () => {
+      try {
+        const response = await fetch("/api/stream-events/active");
+        if (response.ok) {
+          const data = await response.json();
+          setStreamEvent(data);
+        } else {
+          setStreamEvent(null);
+        }
+      } catch (error) {
+        console.error("Failed to fetch stream event:", error);
+        setStreamEvent(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchEvent();
   }, []);
 
   const handleWatchLive = () => {
