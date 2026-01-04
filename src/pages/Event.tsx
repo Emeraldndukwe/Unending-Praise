@@ -183,7 +183,7 @@ export default function Event() {
                     {/* Watch Live Button */}
                     <button
                       onClick={() => handleWatchLive(event)}
-                      className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-6 py-3 md:px-8 md:py-4 rounded-full font-semibold text-sm md:text-base transition-all duration-300 shadow-md hover:shadow-lg"
+                      className="inline-flex items-center gap-2 bg-[#54037C]/70 hover:bg-[#54037C]/90 text-white px-6 py-3 md:px-8 md:py-4 rounded-full font-semibold text-sm md:text-base transition-all duration-300 shadow-md hover:shadow-lg"
                     >
                       WATCH LIVE
                       <ArrowUpRight size={18} className="inline" strokeWidth={2.5} />
