@@ -64,6 +64,7 @@ export default function Event() {
   const [countdownEvent, setCountdownEvent] = useState<StreamEvent | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<string>("");
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
+  const [showEmbedNotice, setShowEmbedNotice] = useState(false);
   const tvSectionRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -298,6 +299,20 @@ export default function Event() {
       return () => clearTimeout(timer);
     }
   }, [showEventVideo, isYouTubeEmbed, showEmbedNotice]);
+  const isYouTubeEmbed = embedUrl?.includes('youtube.com/embed') || embedUrl?.includes('youtu.be');
+
+  // Show embed notice when YouTube video is loaded
+  useEffect(() => {
+    if (showEventVideo && isYouTubeEmbed && !showEmbedNotice) {
+      // Show notice after a short delay to check if video loads
+      const timer = setTimeout(() => {
+        setShowEmbedNotice(true);
+        // Auto-hide after 10 seconds
+        setTimeout(() => setShowEmbedNotice(false), 10000);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [showEventVideo, isYouTubeEmbed, showEmbedNotice]);
 
   return (
     <div className="w-full min-h-screen bg-[#FFF5E6]">
@@ -445,14 +460,43 @@ export default function Event() {
                       className="absolute inset-0 rounded-3xl overflow-hidden bg-black"
                     >
                       {embedUrl ? (
-                        <iframe
-                          ref={iframeRef}
-                          src={embedUrl}
-                          className="w-full h-full rounded-3xl"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                          title={selectedEvent?.name || "Event Video"}
-                        />
+                        <>
+                          <iframe
+                            ref={iframeRef}
+                            src={embedUrl}
+                            className="w-full h-full rounded-3xl"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                            title={selectedEvent?.name || "Event Video"}
+                          />
+                          {/* YouTube Embed Notice */}
+                          {isYouTubeEmbed && showEmbedNotice && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -10 }}
+                              className="absolute top-4 left-4 right-4 bg-blue-600/95 text-white rounded-lg p-4 shadow-lg z-20 max-w-md"
+                            >
+                              <div className="flex items-start gap-3">
+                                <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />
+                                <div className="flex-1">
+                                  <h4 className="font-semibold text-sm mb-1">Console Errors Detected</h4>
+                                  <p className="text-xs leading-relaxed">
+                                    If you see YouTube-related errors in the console, they're likely caused by ad blockers. 
+                                    The video should still play normally. If playback issues occur, try disabling your ad blocker for this site.
+                                  </p>
+                                </div>
+                                <button
+                                  onClick={() => setShowEmbedNotice(false)}
+                                  className="flex-shrink-0 text-white/80 hover:text-white transition-colors"
+                                  aria-label="Close notice"
+                                >
+                                  <XCircle size={18} />
+                                </button>
+                              </div>
+                            </motion.div>
+                          )}
+                        </>
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-white">
                           <p>Video URL not available</p>
@@ -462,6 +506,7 @@ export default function Event() {
                       <button
                         onClick={() => {
                           setShowEventVideo(false);
+                          setShowEmbedNotice(false);
                         }}
                         className="absolute top-4 right-4 bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700 z-10"
                       >
