@@ -128,11 +128,9 @@ export default function LiveChat({ eventId }: LiveChatProps) {
           messages.map((m) => (
             <div
               key={m.id || Math.random()}
-              className={`flex items-start gap-2 w-full ${
-                m.fromMe ? "justify-end" : "justify-start"
-              }`}
+              className="flex items-start gap-2 w-full justify-start"
             >
-              <div className={`flex items-start gap-2 ${m.fromMe ? "flex-row-reverse" : ""}`}>
+              <div className="flex items-start gap-2">
                 {/* ✅ Icon stays visible, never shrinks */}
                 <User size={18} className="text-purple-900 flex-shrink-0" />
 
