@@ -160,6 +160,7 @@ export default function EventUpload() {
       streamUrl: "",
       imageUrl: "",
       date: "",
+      startTime: "",
       description: "",
       displayOrder: 0,
     });
