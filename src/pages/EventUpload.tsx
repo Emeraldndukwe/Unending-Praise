@@ -43,6 +43,7 @@ export default function EventUpload() {
   
   // Form state
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
   const [formData, setFormData] = useState({
     name: "",
     streamUrl: "",
@@ -51,6 +52,63 @@ export default function EventUpload() {
     description: "",
     displayOrder: 0,
   });
+
+  const uploadMedia = useCallback(
+    async (dataUrl: string) => {
+      if (!dataUrl || !dataUrl.startsWith('data:')) return dataUrl;
+      const authHeaders: Record<string, string> = {};
+      const headerSource = headers as HeadersInit;
+      if (headerSource instanceof Headers) {
+        headerSource.forEach((value, key) => {
+          authHeaders[key] = value;
+        });
+      } else if (Array.isArray(headerSource)) {
+        headerSource.forEach(([key, value]) => {
+          authHeaders[key] = value;
+        });
+      } else if (headerSource && typeof headerSource === 'object') {
+        Object.assign(authHeaders, headerSource as Record<string, string>);
+      }
+
+      const res = await fetch('/api/admin/upload', {
+        method: 'POST',
+        headers: { ...authHeaders, 'content-type': 'application/json' },
+        body: JSON.stringify({ dataUrl, folder: 'unendingpraise/events' }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || 'Upload failed');
+      }
+
+      const payload = await res.json();
+      return (payload?.url as string) || dataUrl;
+    },
+    [headers]
+  );
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    if (!file.type.startsWith("image/")) {
+      alert("Please select an image file");
+      return;
+    }
+    try {
+      setLoading(true);
+      const compressed = await compressImage(file);
+      setImagePreview(compressed);
+      const uploaded = await uploadMedia(compressed);
+      setFormData({ ...formData, imageUrl: uploaded });
+      setImagePreview(uploaded);
+    } catch (err: any) {
+      console.error('Image upload failed', err);
+      alert(`Error uploading image: ${err?.message || 'Upload failed'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!token) {
