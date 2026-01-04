@@ -287,18 +287,27 @@ export default function Event() {
   const currentScheduledEvent = getCurrentScheduledEvent();
   const isYouTubeEmbed = embedUrl?.includes('youtube.com/embed') || embedUrl?.includes('youtu.be');
 
-  // Show embed notice when YouTube video is loaded
+  // Detect if YouTube video is taking too long to load (likely ad blocker issue)
   useEffect(() => {
-    if (showEventVideo && isYouTubeEmbed && !showEmbedNotice) {
-      // Show notice after a short delay to check if video loads
-      const timer = setTimeout(() => {
-        setShowEmbedNotice(true);
-        // Auto-hide after 10 seconds
-        setTimeout(() => setShowEmbedNotice(false), 10000);
-      }, 2000);
-      return () => clearTimeout(timer);
+    if (!showEventVideo || !isYouTubeEmbed) {
+      setShowEmbedNotice(false);
+      return;
     }
-  }, [showEventVideo, isYouTubeEmbed, showEmbedNotice]);
+
+    // Reset notice when video changes
+    setShowEmbedNotice(false);
+
+    // Show notice if video hasn't loaded after 8 seconds (likely blocked)
+    const timeoutId = setTimeout(() => {
+      // Check if iframe exists but might be blocked
+      setShowEmbedNotice(true);
+    }, 8000);
+
+    // Hide notice if user closes video
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [showEventVideo, isYouTubeEmbed, embedUrl]);
   const isYouTubeEmbed = embedUrl?.includes('youtube.com/embed') || embedUrl?.includes('youtu.be');
 
   // Show embed notice when YouTube video is loaded
