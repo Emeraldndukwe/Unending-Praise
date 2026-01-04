@@ -32,6 +32,7 @@ function useAuthToken() {
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
   if (!res.ok) throw new Error(await res.text());
+  if (res.status === 204) return undefined as T;
   return res.json();
 }
 
