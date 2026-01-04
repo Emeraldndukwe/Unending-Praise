@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { lazy, Suspense } from "react";
@@ -320,7 +320,7 @@ export default function Event() {
       {/* Additional Content Section */}
       {streamEvents.length > 0 && (
         <div className="max-w-6xl mx-auto px-4 md:px-8 py-12">
-          {streamEvents.map((event, index) => (
+          {streamEvents.map((event) => (
             <div key={event.id} className="mb-8">
               {event.description && (
                 <div className="text-center text-gray-700 text-lg mb-4">

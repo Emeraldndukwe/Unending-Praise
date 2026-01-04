@@ -39,7 +39,6 @@ export default function EventUpload() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [role, setRole] = useState<string>("");
   
   // Form state
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -61,22 +60,9 @@ export default function EventUpload() {
         login(email, password);
       }
     } else {
-      checkRole();
       refresh();
     }
   }, [token]);
-
-  const checkRole = async () => {
-    try {
-      const res = await fetch("/api/admin/me", { headers });
-      if (res.ok) {
-        const data = await res.json();
-        setRole(data.role || "");
-      }
-    } catch (e) {
-      console.error("Failed to check role:", e);
-    }
-  };
 
   const login = async (email: string, password: string) => {
     try {
