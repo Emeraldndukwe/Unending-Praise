@@ -304,11 +304,13 @@ export default function Event() {
                   className="absolute inset-0 w-full h-full"
                 >
                   {event.imageUrl ? (
-                    <img
-                      src={event.imageUrl}
-                      alt={event.name}
-                      className="absolute inset-0 w-full h-full object-cover"
-                    />
+                    <div className="absolute inset-0 w-full h-full bg-black flex items-center justify-center">
+                      <img
+                        src={event.imageUrl}
+                        alt={event.name}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
                   ) : (
                     <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-[#54037C] via-[#6f3aa6] to-[#8A4EBF]" />
                   )}
