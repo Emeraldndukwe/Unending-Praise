@@ -8,7 +8,11 @@ interface Message {
   createdAt?: string;
 }
 
-export default function LiveChat() {
+interface LiveChatProps {
+  eventId?: string;
+}
+
+export default function LiveChat({ eventId }: LiveChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState<string>("");
   const [loading, setLoading] = useState(false);
@@ -21,14 +25,16 @@ export default function LiveChat() {
     const host = location.hostname;
     const port = location.port || (location.protocol === 'https:' ? '' : '5000');
     const base = port ? `${host}:${port}` : host;
-    const wsUrl = `${protocol}://${base}/ws/livechat`;
+    const wsPath = eventId ? `/ws/livechat/${eventId}` : '/ws/livechat';
+    const wsUrl = `${protocol}://${base}${wsPath}`;
 
     let pollInterval: number | null = null;
 
     const startPolling = () => {
       const loadMessages = async () => {
         try {
-          const res = await fetch('/api/livechat');
+          const url = eventId ? `/api/livechat/${eventId}` : '/api/livechat';
+          const res = await fetch(url);
           if (res.ok) {
             const data = await res.json();
             setMessages(data || []);
@@ -73,7 +79,7 @@ export default function LiveChat() {
       startPolling();
       return () => { if (pollInterval) window.clearInterval(pollInterval); };
     }
-  }, []);
+  }, [eventId]);
 
   const sendMessage = async (e: FormEvent) => {
     e.preventDefault();
@@ -86,9 +92,10 @@ export default function LiveChat() {
     try {
       // Prefer WebSocket if connected
       if (connected && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({ text: messageText, fromMe: true }));
+        wsRef.current.send(JSON.stringify({ text: messageText, fromMe: true, eventId }));
       } else {
-        const res = await fetch('/api/livechat', {
+        const url = eventId ? `/api/livechat/${eventId}` : '/api/livechat';
+        const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text: messageText, fromMe: true }),
@@ -109,28 +116,34 @@ export default function LiveChat() {
 
   return (
     <div className="flex flex-col h-full border border-[#E2B6FF] rounded-3xl p-4 bg-white">
-      <h2 className="font-bold text-sm text-black/70 mb-2">Live Chat</h2>
+      <h2 className="font-bold text-sm text-black/70 mb-2">Live Comment</h2>
 
       {/* ✅ CHAT LIST */}
-      <div className="flex-1 overflow-y-auto space-y-2 pb-2  bg-[#54037C]/5 rounded-2xl p-3">
-        {messages.map((m) => (
-          <div
-            key={m.id || Math.random()}
-            className={`flex items-start gap-2 w-full ${
-              m.fromMe ? "justify-end" : "justify-start"
-            }`}
-          >
-            <div className={`flex items-start gap-2 ${m.fromMe ? "flex-row-reverse" : ""}`}>
-              {/* ✅ Icon stays visible, never shrinks */}
-              <User size={18} className="text-purple-900 flex-shrink-0" />
-
-              {/* ✅ Text wraps properly */}
-              <p className="text-sm leading-tight max-w-[80%] break-words">
-                {m.text}
-              </p>
-            </div>
+      <div className="flex-1 overflow-y-auto space-y-2 pb-2 bg-[#54037C]/5 rounded-2xl p-3">
+        {messages.length === 0 ? (
+          <div className="text-center text-gray-500 text-sm py-8">
+            No comments yet. Be the first to comment!
           </div>
-        ))}
+        ) : (
+          messages.map((m) => (
+            <div
+              key={m.id || Math.random()}
+              className={`flex items-start gap-2 w-full ${
+                m.fromMe ? "justify-end" : "justify-start"
+              }`}
+            >
+              <div className={`flex items-start gap-2 ${m.fromMe ? "flex-row-reverse" : ""}`}>
+                {/* ✅ Icon stays visible, never shrinks */}
+                <User size={18} className="text-purple-900 flex-shrink-0" />
+
+                {/* ✅ Text wraps properly */}
+                <p className="text-sm leading-tight max-w-[80%] break-words">
+                  {m.text}
+                </p>
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       {/* ✅ INPUT BAR */}

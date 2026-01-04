@@ -129,8 +129,16 @@ async function ensureSchema() {
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         text TEXT NOT NULL,
         from_me BOOLEAN DEFAULT FALSE,
+        event_id UUID,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+      -- Add event_id column if it doesn't exist (migration)
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='livechat' AND column_name='event_id') THEN
+          ALTER TABLE livechat ADD COLUMN event_id UUID;
+        END IF;
+      END $$;
 
       -- Comments (persistent)
       CREATE TABLE IF NOT EXISTS comments (
@@ -786,20 +794,37 @@ app.delete('/api/crusades/:id', requireAuth, requireRole('crusade'), async (req,
   }
 });
 
-// LiveChat API with 1000 message limit
-app.get('/api/livechat', async (_req, res) => {
+// LiveChat API with event-specific support
+app.get('/api/livechat/:eventId?', async (req, res) => {
+  const { eventId } = req.params;
   try {
-    const result = await pool.query('SELECT id, text, from_me, created_at FROM livechat ORDER BY created_at DESC LIMIT 100');
+    let query = 'SELECT id, text, from_me, created_at FROM livechat';
+    let params = [];
+    
+    if (eventId) {
+      query += ' WHERE event_id = $1';
+      params.push(eventId);
+    } else {
+      query += ' WHERE event_id IS NULL';
+    }
+    
+    query += ' ORDER BY created_at DESC LIMIT 100';
+    
+    const result = await pool.query(query, params);
     const rows = result.rows.reverse().map(r => ({ id: r.id, text: r.text, fromMe: r.from_me, createdAt: r.created_at }));
     res.json(rows);
   } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
 });
 
-app.post('/api/livechat', async (req, res) => {
+app.post('/api/livechat/:eventId?', async (req, res) => {
+  const { eventId } = req.params;
   const { text, fromMe } = req.body || {};
   if (!text) return res.status(400).json({ error: 'Missing text' });
   try {
-    const result = await pool.query('INSERT INTO livechat (text, from_me) VALUES ($1,$2) RETURNING id, text, from_me, created_at', [text, Boolean(fromMe)]);
+    const result = await pool.query(
+      'INSERT INTO livechat (text, from_me, event_id) VALUES ($1, $2, $3) RETURNING id, text, from_me, created_at',
+      [text, Boolean(fromMe), eventId || null]
+    );
     const r = result.rows[0];
     res.status(201).json({ id: r.id, text: r.text, fromMe: r.from_me, createdAt: r.created_at });
   } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
@@ -987,11 +1012,51 @@ try {
 } catch {}
 
 if (WebSocketServer) {
-  const wss = new WebSocketServer({ server, path: '/ws/livechat' });
+  const wss = new WebSocketServer({ noServer: true });
+  const eventWssMap = new Map(); // Store event-specific WebSocket servers
+  
+  // Helper to get or create event-specific server
+  function getEventWss(eventId) {
+    if (!eventId) return null;
+    if (!eventWssMap.has(eventId)) {
+      const eventWss = new WebSocketServer({ noServer: true });
+      eventWssMap.set(eventId, eventWss);
+      
+      eventWss.on('connection', (ws) => {
+        (async () => {
+          try {
+            const result = await pool.query('SELECT id, text, from_me, created_at FROM livechat WHERE event_id = $1 ORDER BY created_at DESC LIMIT 100', [eventId]);
+            const recent = result.rows.reverse().map(r => ({ id: r.id, text: r.text, fromMe: r.from_me, createdAt: r.created_at }));
+            ws.send(JSON.stringify({ type: 'init', messages: recent }));
+          } catch {}
+        })();
+
+        ws.on('message', (data) => {
+          (async () => {
+            try {
+              const parsed = JSON.parse(data.toString());
+              if (parsed && typeof parsed.text === 'string' && parsed.text.trim()) {
+                const ins = await pool.query('INSERT INTO livechat (text, from_me, event_id) VALUES ($1, $2, $3) RETURNING id, text, from_me, created_at', [parsed.text.trim(), !!parsed.fromMe, eventId]);
+                const r = ins.rows[0];
+                const message = { id: r.id, text: r.text, fromMe: r.from_me, createdAt: r.created_at };
+                const payload = JSON.stringify({ type: 'new_message', message });
+                eventWss.clients.forEach((client) => {
+                  try { client.readyState === 1 && client.send(payload); } catch {}
+                });
+              }
+            } catch {}
+          })();
+        });
+      });
+    }
+    return eventWssMap.get(eventId);
+  }
+  
+  // General livechat (no event ID)
   wss.on('connection', (ws) => {
     (async () => {
       try {
-        const result = await pool.query('SELECT id, text, from_me, created_at FROM livechat ORDER BY created_at DESC LIMIT 100');
+        const result = await pool.query('SELECT id, text, from_me, created_at FROM livechat WHERE event_id IS NULL ORDER BY created_at DESC LIMIT 100');
         const recent = result.rows.reverse().map(r => ({ id: r.id, text: r.text, fromMe: r.from_me, createdAt: r.created_at }));
         ws.send(JSON.stringify({ type: 'init', messages: recent }));
       } catch {}
@@ -1002,7 +1067,7 @@ if (WebSocketServer) {
         try {
           const parsed = JSON.parse(data.toString());
           if (parsed && typeof parsed.text === 'string' && parsed.text.trim()) {
-            const ins = await pool.query('INSERT INTO livechat (text, from_me) VALUES ($1,$2) RETURNING id, text, from_me, created_at', [parsed.text.trim(), !!parsed.fromMe]);
+            const ins = await pool.query('INSERT INTO livechat (text, from_me, event_id) VALUES ($1, $2, $3) RETURNING id, text, from_me, created_at', [parsed.text.trim(), !!parsed.fromMe, null]);
             const r = ins.rows[0];
             const message = { id: r.id, text: r.text, fromMe: r.from_me, createdAt: r.created_at };
             const payload = JSON.stringify({ type: 'new_message', message });
@@ -1013,6 +1078,31 @@ if (WebSocketServer) {
         } catch {}
       })();
     });
+  });
+  
+  // Handle WebSocket upgrade requests
+  server.on('upgrade', (request, socket, head) => {
+    const pathname = new URL(request.url, `http://${request.headers.host}`).pathname;
+    
+    // Match /ws/livechat/:eventId pattern
+    const eventMatch = pathname.match(/^\/ws\/livechat\/(.+)$/);
+    if (eventMatch) {
+      const eventId = eventMatch[1];
+      const eventWss = getEventWss(eventId);
+      if (eventWss) {
+        eventWss.handleUpgrade(request, socket, head, (ws) => {
+          eventWss.emit('connection', ws, request);
+        });
+        return;
+      }
+    }
+    
+    // Default to general livechat
+    if (pathname === '/ws/livechat' || pathname.startsWith('/ws/livechat')) {
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+      });
+    }
   });
 }
 

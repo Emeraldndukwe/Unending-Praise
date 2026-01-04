@@ -260,10 +260,10 @@ export default function Event() {
               )}
             </div>
           ) : (
-            // Expanded State: Homepage-style layout with bigger video player and Live Comment
+            // Expanded State: Layout matching screenshot - video player (2/3) and live chat (1/3)
             <div className="flex flex-col lg:flex-row lg:items-start gap-6">
-              {/* LEFT SIDE - Bigger Video Player */}
-              <div className="flex-[1.5] relative flex flex-col">
+              {/* LEFT SIDE - Video Player (2/3 width) */}
+              <div className="w-full lg:flex-[2] relative flex flex-col">
                 <div className="w-full aspect-video rounded-3xl shadow-lg overflow-hidden relative bg-black">
                   <AnimatePresence mode="wait">
                     <motion.div
@@ -303,35 +303,26 @@ export default function Event() {
                 
                 {/* Event Title Below Video Player */}
                 {selectedEvent && (
-                  <div className="mt-4 text-center">
-                    <h3 className="text-2xl md:text-3xl font-bold text-gray-800">
+                  <div className="mt-4">
+                    <h3 className="text-xl md:text-2xl font-bold text-gray-800">
                       {selectedEvent.name}
                     </h3>
                   </div>
                 )}
               </div>
 
-              {/* RIGHT SIDE - Live Comment */}
-              <div className="w-full lg:w-[35%] flex justify-center">
+              {/* RIGHT SIDE - Live Comment (1/3 width) */}
+              <div className="w-full lg:flex-1 flex justify-center">
                 <div
-                  className="w-full max-w-sm rounded-xl overflow-hidden flex flex-col"
+                  className="w-full rounded-xl overflow-hidden flex flex-col bg-white"
                   style={{
                     height: isMobile
                       ? `calc(100vh - ${72 + 24}px)`
                       : "34rem",
                   }}
                 >
-                  {/* Live Comment Header */}
-                  <div className="flex justify-center gap-3 py-3">
-                    <div className="px-1 py-1 rounded-full bg-black/5">
-                      <div className="px-4 py-1.5 rounded-full text-sm font-semibold bg-[#54037C]/70 text-white">
-                        LIVE COMMENT
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Scrollable Content */}
-                  <div className="flex-1 overflow-y-auto px-4 pb-4">
+                  {/* Scrollable Content - Full height for chat */}
+                  <div className="flex-1 overflow-hidden flex flex-col">
                     <Suspense
                       fallback={
                         <div className="h-full flex items-center justify-center text-sm text-black/60">
@@ -339,7 +330,7 @@ export default function Event() {
                         </div>
                       }
                     >
-                      <LiveChat />
+                      <LiveChat eventId={selectedEvent?.id} />
                     </Suspense>
                   </div>
                 </div>
