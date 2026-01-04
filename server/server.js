@@ -1621,7 +1621,7 @@ app.get('/api/stream-events/active', async (_req, res) => {
     const result = await pool.query(
       `SELECT id, name, stream_url, image_url, date, description 
        FROM stream_events 
-       WHERE (date IS NULL OR date >= CURRENT_DATE)
+       WHERE (date IS NULL OR date = '' OR date::date >= CURRENT_DATE)
        ORDER BY display_order ASC, date ASC NULLS LAST, created_at DESC`
     );
     res.json(result.rows.map(r => ({
