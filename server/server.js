@@ -201,6 +201,7 @@ async function ensureSchema() {
         name TEXT NOT NULL,
         stream_url TEXT,
         embed_link TEXT,
+        image_url TEXT,
         date TEXT,
         description TEXT,
         is_active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -1579,13 +1580,14 @@ app.get('/api/meetings/public/:token', async (req, res) => {
 app.get('/api/stream-events', async (_req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, name, stream_url, embed_link, date, description, is_active, created_at, updated_at FROM stream_events ORDER BY date DESC NULLS LAST, created_at DESC'
+      'SELECT id, name, stream_url, embed_link, image_url, date, description, is_active, created_at, updated_at FROM stream_events ORDER BY date DESC NULLS LAST, created_at DESC'
     );
     res.json(result.rows.map(r => ({
       id: r.id,
       name: r.name,
       streamUrl: r.stream_url,
       embedLink: r.embed_link,
+      imageUrl: r.image_url,
       date: r.date,
       description: r.description,
       isActive: r.is_active,
@@ -1602,7 +1604,7 @@ app.get('/api/stream-events', async (_req, res) => {
 app.get('/api/stream-events/active', async (_req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, name, stream_url, embed_link, date, description FROM stream_events WHERE is_active = true ORDER BY date DESC NULLS LAST, created_at DESC LIMIT 1'
+      'SELECT id, name, stream_url, embed_link, image_url, date, description FROM stream_events WHERE is_active = true ORDER BY date DESC NULLS LAST, created_at DESC LIMIT 1'
     );
     if (result.rowCount === 0) {
       return res.json(null);
@@ -1613,6 +1615,7 @@ app.get('/api/stream-events/active', async (_req, res) => {
       name: r.name,
       streamUrl: r.stream_url,
       embedLink: r.embed_link,
+      imageUrl: r.image_url,
       date: r.date,
       description: r.description
     });
@@ -1624,14 +1627,14 @@ app.get('/api/stream-events/active', async (_req, res) => {
 
 // Create stream event
 app.post('/api/stream-events', requireAuth, requireAdmin, async (req, res) => {
-  const { name, streamUrl, embedLink, date, description, isActive } = req.body || {};
+  const { name, streamUrl, embedLink, imageUrl, date, description, isActive } = req.body || {};
   if (!name) {
     return res.status(400).json({ error: 'Missing name' });
   }
   try {
     const result = await pool.query(
-      'INSERT INTO stream_events (name, stream_url, embed_link, date, description, is_active) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, stream_url, embed_link, date, description, is_active, created_at, updated_at',
-      [name, streamUrl || null, embedLink || null, date || null, description || null, isActive !== undefined ? isActive : true]
+      'INSERT INTO stream_events (name, stream_url, embed_link, image_url, date, description, is_active) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, name, stream_url, embed_link, image_url, date, description, is_active, created_at, updated_at',
+      [name, streamUrl || null, embedLink || null, imageUrl || null, date || null, description || null, isActive !== undefined ? isActive : true]
     );
     const r = result.rows[0];
     res.status(201).json({
@@ -1639,6 +1642,7 @@ app.post('/api/stream-events', requireAuth, requireAdmin, async (req, res) => {
       name: r.name,
       streamUrl: r.stream_url,
       embedLink: r.embed_link,
+      imageUrl: r.image_url,
       date: r.date,
       description: r.description,
       isActive: r.is_active,
@@ -1654,20 +1658,21 @@ app.post('/api/stream-events', requireAuth, requireAdmin, async (req, res) => {
 // Update stream event
 app.put('/api/stream-events/:id', requireAuth, requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const { name, streamUrl, embedLink, date, description, isActive } = req.body || {};
+  const { name, streamUrl, embedLink, imageUrl, date, description, isActive } = req.body || {};
   try {
     const result = await pool.query(
       `UPDATE stream_events SET
         name = COALESCE($2, name),
         stream_url = COALESCE($3, stream_url),
         embed_link = COALESCE($4, embed_link),
-        date = COALESCE($5, date),
-        description = COALESCE($6, description),
-        is_active = COALESCE($7, is_active),
+        image_url = COALESCE($5, image_url),
+        date = COALESCE($6, date),
+        description = COALESCE($7, description),
+        is_active = COALESCE($8, is_active),
         updated_at = NOW()
        WHERE id = $1
-       RETURNING id, name, stream_url, embed_link, date, description, is_active, created_at, updated_at`,
-      [id, name ?? null, streamUrl ?? null, embedLink ?? null, date ?? null, description ?? null, isActive ?? null]
+       RETURNING id, name, stream_url, embed_link, image_url, date, description, is_active, created_at, updated_at`,
+      [id, name ?? null, streamUrl ?? null, embedLink ?? null, imageUrl ?? null, date ?? null, description ?? null, isActive ?? null]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
     const r = result.rows[0];
@@ -1676,6 +1681,7 @@ app.put('/api/stream-events/:id', requireAuth, requireAdmin, async (req, res) =>
       name: r.name,
       streamUrl: r.stream_url,
       embedLink: r.embed_link,
+      imageUrl: r.image_url,
       date: r.date,
       description: r.description,
       isActive: r.is_active,

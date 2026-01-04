@@ -5,6 +5,7 @@ type StreamEvent = {
   name: string;
   streamUrl?: string;
   embedLink?: string;
+  imageUrl?: string;
   date?: string;
   description?: string;
   isActive: boolean;
@@ -45,6 +46,7 @@ export default function EventUpload() {
     name: "",
     streamUrl: "",
     embedLink: "",
+    imageUrl: "",
     date: "",
     description: "",
     isActive: true,
@@ -97,6 +99,7 @@ export default function EventUpload() {
       name: "",
       streamUrl: "",
       embedLink: "",
+      imageUrl: "",
       date: "",
       description: "",
       isActive: true,
@@ -109,6 +112,7 @@ export default function EventUpload() {
       name: event.name || "",
       streamUrl: event.streamUrl || "",
       embedLink: event.embedLink || "",
+      imageUrl: event.imageUrl || "",
       date: event.date || "",
       description: event.description || "",
       isActive: event.isActive,
@@ -130,6 +134,7 @@ export default function EventUpload() {
             name: formData.name,
             streamUrl: formData.streamUrl || null,
             embedLink: formData.embedLink || null,
+            imageUrl: formData.imageUrl || null,
             date: formData.date || null,
             description: formData.description || null,
             isActive: formData.isActive,
@@ -144,6 +149,7 @@ export default function EventUpload() {
             name: formData.name,
             streamUrl: formData.streamUrl || null,
             embedLink: formData.embedLink || null,
+            imageUrl: formData.imageUrl || null,
             date: formData.date || null,
             description: formData.description || null,
             isActive: formData.isActive,
@@ -227,6 +233,20 @@ export default function EventUpload() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
                 placeholder="e.g., PASTOR CHRIS LIVE UNENDING PRAISE ONLINE CRUSADE"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Background Image URL
+              </label>
+              <input
+                type="url"
+                value={formData.imageUrl}
+                onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
+                placeholder="https://example.com/image.jpg"
+              />
+              <p className="mt-1 text-sm text-gray-500">Background image for the banner</p>
             </div>
 
             <div>
