@@ -20,6 +20,7 @@ const Meetings = lazy(() => import("./pages/Meetings"));
 const MeetingVideoPlayer = lazy(() => import("./pages/MeetingVideoPlayer"));
 const Trainings = lazy(() => import("./pages/Trainings"));
 const DocumentViewer = lazy(() => import("./pages/DocumentViewer"));
+const TestForm = lazy(() => import("./pages/TestForm"));
 
 export default function App() {
   const location = useLocation();
@@ -241,6 +242,21 @@ export default function App() {
             <Route
               path="/meetings/:token/document/:id"
               element={<DocumentViewer />}
+            />
+
+            {/* Hidden Test Form Route - no links point here */}
+            <Route
+              path="/test-form"
+              element={
+                <motion.div
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -30 }}
+                  transition={{ duration: 0.5, ease: "easeInOut" }}
+                >
+                  <TestForm />
+                </motion.div>
+              }
             />
             </Routes>
           </Suspense>
