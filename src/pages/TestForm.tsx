@@ -8,6 +8,34 @@ type FormData = {
   [key: string]: any;
 };
 
+type ConditionalQuestion = {
+  id: string;
+  label: string;
+  type: "text" | "textarea" | "select" | "radio";
+  required: boolean;
+  options?: string[];
+};
+
+type ConditionalConfig = {
+  field: string;
+  value: string;
+  questions: ConditionalQuestion[];
+};
+
+type Question = {
+  id: string;
+  label: string;
+  type: "text" | "textarea" | "select" | "radio";
+  required: boolean;
+  options?: string[];
+  conditional?: ConditionalConfig;
+};
+
+type StepConfig = {
+  step: number;
+  questions: Question[];
+};
+
 // Question configurations for each member type
 const formConfigs = {
   "christ-embassy": [
@@ -232,15 +260,15 @@ export default function TestForm() {
       const newExpanded = new Set(expandedQuestions);
       const config = formConfigs[memberType];
       
-      config.forEach((stepConfig) => {
-        stepConfig.questions.forEach((question) => {
+      config.forEach((stepConfig: StepConfig) => {
+        stepConfig.questions.forEach((question: Question) => {
           if (question.conditional && question.conditional.field === id) {
             if (value === question.conditional.value) {
               newExpanded.add(question.id);
             } else {
               newExpanded.delete(question.id);
               // Clear conditional question data
-              question.conditional.questions.forEach((cq) => {
+              question.conditional.questions.forEach((cq: ConditionalQuestion) => {
                 delete newFormData[cq.id];
               });
             }
@@ -255,16 +283,16 @@ export default function TestForm() {
   };
 
   // Check if a question should show its conditional questions
-  const shouldShowConditional = (question: any) => {
+  const shouldShowConditional = (question: Question) => {
     if (!question.conditional) return false;
     const fieldValue = formData[question.conditional.field];
     return fieldValue === question.conditional.value;
   };
 
-  const getCurrentQuestions = () => {
+  const getCurrentQuestions = (): Question[] => {
     if (!memberType || currentStep === 1) return [];
     const config = formConfigs[memberType];
-    const stepConfig = config.find((s) => s.step === currentStep);
+    const stepConfig = config.find((s: StepConfig) => s.step === currentStep);
     return stepConfig ? stepConfig.questions : [];
   };
 
@@ -272,10 +300,10 @@ export default function TestForm() {
     if (currentStep === 1) return memberType !== null;
     
     const questions = getCurrentQuestions();
-    return questions.every((q) => {
+    return questions.every((q: Question) => {
       if (q.required && !formData[q.id]) return false;
       if (q.conditional && shouldShowConditional(q)) {
-        return q.conditional.questions.every((cq) => {
+        return q.conditional.questions.every((cq: ConditionalQuestion) => {
           if (cq.required) return !!formData[cq.id];
           return true;
         });
@@ -309,7 +337,7 @@ export default function TestForm() {
     alert("Form submitted! Check console for data.");
   };
 
-  const renderQuestion = (question: any) => {
+  const renderQuestion = (question: Question | ConditionalQuestion) => {
     const value = formData[question.id] || "";
 
     switch (question.type) {
@@ -345,7 +373,7 @@ export default function TestForm() {
             required={question.required}
           >
             <option value="">Select an option</option>
-            {question.options.map((opt: string) => (
+            {question.options?.map((opt: string) => (
               <option key={opt} value={opt}>
                 {opt}
               </option>
@@ -355,7 +383,7 @@ export default function TestForm() {
       case "radio":
         return (
           <div className="flex flex-col gap-2">
-            {question.options.map((opt: string) => (
+            {question.options?.map((opt: string) => (
               <label key={opt} className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="radio"
@@ -436,7 +464,7 @@ export default function TestForm() {
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-6"
               >
-                {getCurrentQuestions().map((question, idx) => (
+                {getCurrentQuestions().map((question) => (
                   <div key={question.id} className="space-y-2">
                     <label
                       htmlFor={question.id}
@@ -450,7 +478,7 @@ export default function TestForm() {
                     {/* Conditional Questions */}
                     {question.conditional &&
                       shouldShowConditional(question) &&
-                      question.conditional.questions.map((cq: any) => (
+                      question.conditional.questions.map((cq: ConditionalQuestion) => (
                         <motion.div
                           key={cq.id}
                           initial={{ opacity: 0, height: 0 }}
