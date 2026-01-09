@@ -20,6 +20,11 @@ type ConditionalConfig = {
   field: string;
   value: string;
   questions: ConditionalQuestion[];
+  // Support multiple conditional branches
+  branches?: Array<{
+    value: string;
+    questions: ConditionalQuestion[];
+  }>;
 };
 
 type Question = {
@@ -64,6 +69,57 @@ const formConfigs = {
                 label: "Which ministry are you involved in?",
                 type: "text",
                 required: true,
+              },
+            ],
+          },
+        },
+        {
+          id: "crusade_type",
+          label: "What kind of crusade?",
+          type: "radio",
+          options: ["Praise Night", "Prison", "Online", "Special"],
+          required: true,
+          conditional: {
+            field: "crusade_type",
+            value: "", // This will be handled by branches
+            questions: [],
+            branches: [
+              {
+                value: "Praise Night",
+                questions: [
+                  {
+                    id: "praise_night_type",
+                    label: "What type of Praise Night?",
+                    type: "select",
+                    options: [
+                      "Monthly Praise Night",
+                      "Special Praise Night",
+                      "Youth Praise Night",
+                      "Regional Praise Night",
+                      "Other"
+                    ],
+                    required: true,
+                  },
+                ],
+              },
+              {
+                value: "Special",
+                questions: [
+                  {
+                    id: "special_crusade_type",
+                    label: "What type of Special Crusade?",
+                    type: "select",
+                    options: [
+                      "Healing Service",
+                      "Deliverance Service",
+                      "Miracle Service",
+                      "Revival Service",
+                      "Outreach Crusade",
+                      "Other"
+                    ],
+                    required: true,
+                  },
+                ],
               },
             ],
           },
@@ -263,14 +319,35 @@ export default function TestForm() {
       config.forEach((stepConfig: StepConfig) => {
         stepConfig.questions.forEach((question: Question) => {
           if (question.conditional && question.conditional.field === id) {
-            if (value === question.conditional.value) {
-              newExpanded.add(question.id);
-            } else {
-              newExpanded.delete(question.id);
-              // Clear conditional question data
-              question.conditional.questions.forEach((cq: ConditionalQuestion) => {
-                delete newFormData[cq.id];
+            // Check if there are branches (multiple conditional paths)
+            if (question.conditional.branches) {
+              // Always clear all branch question data first when value changes
+              question.conditional.branches.forEach((branch) => {
+                branch.questions.forEach((cq: ConditionalQuestion) => {
+                  delete newFormData[cq.id];
+                });
               });
+              
+              // Then check if new value matches any branch
+              const hasMatchingBranch = question.conditional.branches.some(
+                (branch) => branch.value === value
+              );
+              if (hasMatchingBranch) {
+                newExpanded.add(question.id);
+              } else {
+                newExpanded.delete(question.id);
+              }
+            } else {
+              // Original single conditional logic
+              if (value === question.conditional.value) {
+                newExpanded.add(question.id);
+              } else {
+                newExpanded.delete(question.id);
+                // Clear conditional question data
+                question.conditional.questions.forEach((cq: ConditionalQuestion) => {
+                  delete newFormData[cq.id];
+                });
+              }
             }
           }
         });
@@ -286,7 +363,26 @@ export default function TestForm() {
   const shouldShowConditional = (question: Question) => {
     if (!question.conditional) return false;
     const fieldValue = formData[question.conditional.field];
+    
+    // Check if there are branches (multiple conditional paths)
+    if (question.conditional.branches) {
+      return question.conditional.branches.some(
+        (branch) => branch.value === fieldValue
+      );
+    }
+    
+    // Original single conditional logic
     return fieldValue === question.conditional.value;
+  };
+
+  // Get the active branch questions for a question with branches
+  const getActiveBranchQuestions = (question: Question): ConditionalQuestion[] => {
+    if (!question.conditional || !question.conditional.branches) return [];
+    const fieldValue = formData[question.conditional.field];
+    const activeBranch = question.conditional.branches.find(
+      (branch) => branch.value === fieldValue
+    );
+    return activeBranch ? activeBranch.questions : [];
   };
 
   const getCurrentQuestions = (): Question[] => {
@@ -303,6 +399,15 @@ export default function TestForm() {
     return questions.every((q: Question) => {
       if (q.required && !formData[q.id]) return false;
       if (q.conditional && shouldShowConditional(q)) {
+        // Check branch questions if branches exist
+        if (q.conditional.branches) {
+          const activeBranchQuestions = getActiveBranchQuestions(q);
+          return activeBranchQuestions.every((cq: ConditionalQuestion) => {
+            if (cq.required) return !!formData[cq.id];
+            return true;
+          });
+        }
+        // Original single conditional logic
         return q.conditional.questions.every((cq: ConditionalQuestion) => {
           if (cq.required) return !!formData[cq.id];
           return true;
@@ -478,7 +583,10 @@ export default function TestForm() {
                     {/* Conditional Questions */}
                     {question.conditional &&
                       shouldShowConditional(question) &&
-                      question.conditional.questions.map((cq: ConditionalQuestion) => (
+                      (question.conditional.branches
+                        ? getActiveBranchQuestions(question)
+                        : question.conditional.questions
+                      ).map((cq: ConditionalQuestion) => (
                         <motion.div
                           key={cq.id}
                           initial={{ opacity: 0, height: 0 }}
