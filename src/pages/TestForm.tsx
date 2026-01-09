@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 type MemberType = "christ-embassy" | "ism-reon" | "others" | null;
@@ -70,8 +70,70 @@ const commonStep2: StepConfig = {
   ],
 };
 
-// Common step 3 for all member types - Crusade details
-const commonStep3: StepConfig = {
+// Common step 4 for all member types - Attendance metrics
+const commonStep4: StepConfig = {
+  step: 4,
+  questions: [
+    {
+      id: "total_attendance",
+      label: "Total attendance",
+      type: "text",
+      required: true,
+    },
+    {
+      id: "new_converts",
+      label: "Total number of new converts",
+      type: "text",
+      required: true,
+    },
+    {
+      id: "first_timers",
+      label: "Total number of first timers",
+      type: "text",
+      required: true,
+    },
+    {
+      id: "cells",
+      label: "Total number of cells",
+      type: "text",
+      required: true,
+    },
+  ],
+};
+
+// Common step 5 for all member types - Media and writeup
+const commonStep5: StepConfig = {
+  step: 5,
+  questions: [
+    {
+      id: "media_link",
+      label: "Link containing media",
+      type: "text",
+      required: false,
+    },
+    {
+      id: "testimonies_link",
+      label: "Link containing testimonies",
+      type: "text",
+      required: false,
+    },
+    {
+      id: "writeup",
+      label: "Comprehensive writeup on the crusade",
+      type: "textarea",
+      required: false,
+    },
+    {
+      id: "other_comments",
+      label: "Other comments",
+      type: "textarea",
+      required: false,
+    },
+  ],
+};
+
+// Helper function to create step 3 with dynamic crusade options
+const createStep3 = (crusadeOptions: string[]): StepConfig => ({
   step: 3,
   questions: [
     {
@@ -89,237 +151,250 @@ const commonStep3: StepConfig = {
     {
       id: "crusade_type",
       label: "Type of crusade",
-      type: "radio",
-      options: ["Praise Night", "Prison", "Online", "Special"],
+      type: "select",
+      options: [...crusadeOptions, "Special Crusade"],
       required: true,
       conditional: {
         field: "crusade_type",
-        value: "",
-        questions: [],
-        branches: [
+        value: "Special Crusade",
+        questions: [
           {
-            value: "Praise Night",
-            questions: [
-              {
-                id: "praise_night_type",
-                label: "What type of Praise Night?",
-                type: "select",
-                options: [
-                  "Monthly Praise Night",
-                  "Special Praise Night",
-                  "Youth Praise Night",
-                  "Regional Praise Night",
-                  "Other"
-                ],
-                required: true,
-              },
+            id: "special_crusade_type",
+            label: "What type of Special Crusade?",
+            type: "select",
+            options: [
+              "Staff Praise Night",
+              "Regular Praise Night",
             ],
-          },
-          {
-            value: "Special",
-            questions: [
-              {
-                id: "special_crusade_type",
-                label: "What type of Special Crusade?",
-                type: "select",
-                options: [
-                  "Healing Service",
-                  "Deliverance Service",
-                  "Miracle Service",
-                  "Revival Service",
-                  "Outreach Crusade",
-                  "Other"
-                ],
-                required: true,
-              },
-            ],
+            required: true,
           },
         ],
       },
     },
   ],
-};
+});
 
-// Question configurations for each member type
-const formConfigs = {
-  "christ-embassy": [
-    commonStep2,
-    commonStep3,
-    {
-      step: 4,
-      questions: [
-        {
-          id: "church_location",
-          label: "Which church location do you attend?",
-          type: "select",
-          options: ["Main Campus", "Zone 1", "Zone 2", "Zone 3", "Other"],
-          required: true,
-        },
-        {
-          id: "ministry_involvement",
-          label: "Are you involved in any ministry?",
-          type: "radio",
-          options: ["Yes", "No"],
-          required: true,
-          conditional: {
-            field: "ministry_involvement",
-            value: "Yes",
-            questions: [
-              {
-                id: "ministry_name",
-                label: "Which ministry are you involved in?",
-                type: "text",
-                required: true,
-              },
-            ],
-          },
-        },
-        {
-          id: "years_attending",
-          label: "How long have you been attending?",
-          type: "select",
-          options: ["Less than 1 year", "1-3 years", "3-5 years", "5+ years"],
-          required: true,
-        },
-      ],
-    },
-  ],
-  "ism-reon": [
-    commonStep2,
-    commonStep3,
-    {
-      step: 4,
-      questions: [
-        {
-          id: "program_type",
-          label: "Which program are you enrolled in?",
-          type: "radio",
-          options: ["ISM", "REON"],
-          required: true,
-        },
-        {
-          id: "program_level",
-          label: "What level are you in?",
-          type: "select",
-          options: ["Level 1", "Level 2", "Level 3", "Level 4", "Graduate"],
-          required: true,
-        },
-        {
-          id: "campus_location",
-          label: "Which campus are you at?",
-          type: "text",
-          required: true,
-        },
-      ],
-    },
-    {
-      step: 5,
-      questions: [
-        {
-          id: "student_id",
-          label: "What is your student ID?",
-          type: "text",
-          required: true,
-        },
-        {
-          id: "mentor_assigned",
-          label: "Do you have an assigned mentor?",
-          type: "radio",
-          options: ["Yes", "No"],
-          required: true,
-          conditional: {
-            field: "mentor_assigned",
-            value: "Yes",
-            questions: [
-              {
-                id: "mentor_name",
-                label: "What is your mentor's name?",
-                type: "text",
-                required: true,
-              },
-            ],
-          },
-        },
-        {
-          id: "goals",
-          label: "What are your goals in the program?",
-          type: "textarea",
-          required: false,
-        },
-      ],
-    },
-  ],
-  "others": [
-    commonStep2,
-    commonStep3,
-    {
-      step: 4,
-      questions: [
-        {
-          id: "background",
-          label: "Tell us about your background",
-          type: "textarea",
-          required: true,
-        },
-        {
-          id: "interest_reason",
-          label: "What brings you here?",
-          type: "text",
-          required: true,
-        },
-        {
-          id: "previous_experience",
-          label: "Any previous experience with Christ Embassy?",
-          type: "radio",
-          options: ["Yes", "No"],
-          required: true,
-          conditional: {
-            field: "previous_experience",
-            value: "Yes",
-            questions: [
-              {
-                id: "experience_details",
-                label: "Please provide details",
-                type: "textarea",
-                required: true,
-              },
-            ],
-          },
-        },
-      ],
-    },
-    {
-      step: 5,
-      questions: [
-        {
-          id: "contact_preference",
-          label: "How would you prefer to be contacted?",
-          type: "select",
-          options: ["Email", "Phone", "WhatsApp", "KingsChat"],
-          required: true,
-        },
-        {
-          id: "expectations",
-          label: "What are your expectations?",
-          type: "textarea",
-          required: false,
-        },
-        {
-          id: "additional_comments",
-          label: "Any additional comments?",
-          type: "textarea",
-          required: false,
-        },
-      ],
-    },
-  ],
-} satisfies FormConfigs;
+
+type Crusade = {
+  id: string;
+  title?: string;
+  [key: string]: any;
+};
 
 export default function TestForm() {
   const [memberType, setMemberType] = useState<MemberType>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<FormData>({ memberType: null });
   const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set());
+  const [crusades, setCrusades] = useState<Crusade[]>([]);
+  const [crusadesLoading, setCrusadesLoading] = useState(true);
+
+  // Fetch crusades on component mount
+  useEffect(() => {
+    const fetchCrusades = async () => {
+      try {
+        const response = await fetch('/api/crusades');
+        if (response.ok) {
+          const data = await response.json();
+          setCrusades(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch crusades:', error);
+      } finally {
+        setCrusadesLoading(false);
+      }
+    };
+    fetchCrusades();
+  }, []);
+
+  // Build dynamic form config with crusades
+  const getFormConfigs = (): FormConfigs => {
+    const crusadeOptions = crusades
+      .filter(c => c.title)
+      .map(c => c.title as string);
+    
+    const step3 = createStep3(crusadeOptions);
+    
+    return {
+      "christ-embassy": [
+        commonStep2,
+        step3,
+        commonStep4,
+        commonStep5,
+        {
+          step: 6,
+          questions: [
+            {
+              id: "church_location",
+              label: "Which church location do you attend?",
+              type: "select",
+              options: ["Main Campus", "Zone 1", "Zone 2", "Zone 3", "Other"],
+              required: true,
+            },
+            {
+              id: "ministry_involvement",
+              label: "Are you involved in any ministry?",
+              type: "radio",
+              options: ["Yes", "No"],
+              required: true,
+              conditional: {
+                field: "ministry_involvement",
+                value: "Yes",
+                questions: [
+                  {
+                    id: "ministry_name",
+                    label: "Which ministry are you involved in?",
+                    type: "text",
+                    required: true,
+                  },
+                ],
+              },
+            },
+            {
+              id: "years_attending",
+              label: "How long have you been attending?",
+              type: "select",
+              options: ["Less than 1 year", "1-3 years", "3-5 years", "5+ years"],
+              required: true,
+            },
+          ],
+        },
+      ],
+      "ism-reon": [
+        commonStep2,
+        step3,
+        commonStep4,
+        commonStep5,
+        {
+          step: 6,
+          questions: [
+            {
+              id: "program_type",
+              label: "Which program are you enrolled in?",
+              type: "radio",
+              options: ["ISM", "REON"],
+              required: true,
+            },
+            {
+              id: "program_level",
+              label: "What level are you in?",
+              type: "select",
+              options: ["Level 1", "Level 2", "Level 3", "Level 4", "Graduate"],
+              required: true,
+            },
+            {
+              id: "campus_location",
+              label: "Which campus are you at?",
+              type: "text",
+              required: true,
+            },
+          ],
+        },
+        {
+          step: 7,
+          questions: [
+            {
+              id: "student_id",
+              label: "What is your student ID?",
+              type: "text",
+              required: true,
+            },
+            {
+              id: "mentor_assigned",
+              label: "Do you have an assigned mentor?",
+              type: "radio",
+              options: ["Yes", "No"],
+              required: true,
+              conditional: {
+                field: "mentor_assigned",
+                value: "Yes",
+                questions: [
+                  {
+                    id: "mentor_name",
+                    label: "What is your mentor's name?",
+                    type: "text",
+                    required: true,
+                  },
+                ],
+              },
+            },
+            {
+              id: "goals",
+              label: "What are your goals in the program?",
+              type: "textarea",
+              required: false,
+            },
+          ],
+        },
+      ],
+      "others": [
+        commonStep2,
+        step3,
+        commonStep4,
+        commonStep5,
+        {
+          step: 6,
+          questions: [
+            {
+              id: "background",
+              label: "Tell us about your background",
+              type: "textarea",
+              required: true,
+            },
+            {
+              id: "interest_reason",
+              label: "What brings you here?",
+              type: "text",
+              required: true,
+            },
+            {
+              id: "previous_experience",
+              label: "Any previous experience with Christ Embassy?",
+              type: "radio",
+              options: ["Yes", "No"],
+              required: true,
+              conditional: {
+                field: "previous_experience",
+                value: "Yes",
+                questions: [
+                  {
+                    id: "experience_details",
+                    label: "Please provide details",
+                    type: "textarea",
+                    required: true,
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        {
+          step: 7,
+          questions: [
+            {
+              id: "contact_preference",
+              label: "How would you prefer to be contacted?",
+              type: "select",
+              options: ["Email", "Phone", "WhatsApp", "KingsChat"],
+              required: true,
+            },
+            {
+              id: "expectations",
+              label: "What are your expectations?",
+              type: "textarea",
+              required: false,
+            },
+            {
+              id: "additional_comments",
+              label: "Any additional comments?",
+              type: "textarea",
+              required: false,
+            },
+          ],
+        },
+      ],
+    };
+  };
 
   const handleMemberTypeSelect = (type: MemberType) => {
     setMemberType(type);
@@ -332,7 +407,7 @@ export default function TestForm() {
     // Handle conditional questions - check if this change affects any conditional questions
     if (memberType) {
       const newExpanded = new Set(expandedQuestions);
-      const config: StepConfig[] = formConfigs[memberType];
+      const config: StepConfig[] = getFormConfigs()[memberType];
       
       config.forEach((stepConfig: StepConfig) => {
         stepConfig.questions.forEach((question: Question) => {
@@ -405,7 +480,7 @@ export default function TestForm() {
 
   const getCurrentQuestions = (): Question[] => {
     if (!memberType || currentStep === 1) return [];
-    const config: StepConfig[] = formConfigs[memberType];
+    const config: StepConfig[] = getFormConfigs()[memberType];
     const stepConfig = config.find((s: StepConfig) => s.step === currentStep);
     return stepConfig ? stepConfig.questions : [];
   };
@@ -439,7 +514,7 @@ export default function TestForm() {
     if (currentStep === 1 && memberType) {
       setCurrentStep(2);
     } else if (memberType) {
-      const config = formConfigs[memberType];
+      const config = getFormConfigs()[memberType];
       const maxStep = Math.max(...config.map((c) => c.step));
       if (currentStep < maxStep) {
         setCurrentStep(currentStep + 1);
@@ -462,17 +537,21 @@ export default function TestForm() {
 
   const renderQuestion = (question: Question | ConditionalQuestion) => {
     const value = formData[question.id] || "";
+    
+    // Use number input for attendance metrics
+    const isNumberField = ["total_attendance", "new_converts", "first_timers", "cells"].includes(question.id);
 
     switch (question.type) {
       case "text":
         return (
           <input
-            type="text"
+            type={isNumberField ? "number" : "text"}
             id={question.id}
             value={value}
             onChange={(e) => handleInputChange(question.id, e.target.value)}
             className="border border-gray-300 rounded px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[#54037C]"
             required={question.required}
+            min={isNumberField ? "0" : undefined}
           />
         );
       case "textarea":
@@ -559,8 +638,14 @@ export default function TestForm() {
             Test Form
           </h1>
           <p className="text-center text-gray-600 mb-8">
-            Step {currentStep} of {memberType ? (formConfigs[memberType].length + 1) : 1}
+            Step {currentStep} of {memberType ? (getFormConfigs()[memberType].length + 1) : 1}
           </p>
+
+          {crusadesLoading && currentStep >= 3 && (
+            <div className="text-center text-gray-500 mb-4">
+              Loading crusade types...
+            </div>
+          )}
 
           {/* Step 1: Member Type Selection */}
           {currentStep === 1 && (
@@ -707,7 +792,7 @@ export default function TestForm() {
                       exit={{ opacity: 0, scale: 0.8 }}
                       className="px-6 py-2 bg-[#54037C] text-white rounded-lg hover:bg-[#54037C]/90 transition font-semibold"
                     >
-                      {currentStep === Math.max(...formConfigs[memberType].map((c) => c.step))
+                      {currentStep === Math.max(...getFormConfigs()[memberType].map((c) => c.step))
                         ? "Submit"
                         : "Next →"}
                     </motion.button>
