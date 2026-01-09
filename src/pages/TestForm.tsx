@@ -41,6 +41,10 @@ type StepConfig = {
   questions: Question[];
 };
 
+type FormConfigs = {
+  [K in Exclude<MemberType, null>]: StepConfig[];
+};
+
 // Question configurations for each member type
 const formConfigs = {
   "christ-embassy": [
@@ -295,7 +299,7 @@ const formConfigs = {
       ],
     },
   ],
-};
+} satisfies FormConfigs;
 
 export default function TestForm() {
   const [memberType, setMemberType] = useState<MemberType>(null);
@@ -314,7 +318,7 @@ export default function TestForm() {
     // Handle conditional questions - check if this change affects any conditional questions
     if (memberType) {
       const newExpanded = new Set(expandedQuestions);
-      const config = formConfigs[memberType];
+      const config: StepConfig[] = formConfigs[memberType];
       
       config.forEach((stepConfig: StepConfig) => {
         stepConfig.questions.forEach((question: Question) => {
@@ -387,7 +391,7 @@ export default function TestForm() {
 
   const getCurrentQuestions = (): Question[] => {
     if (!memberType || currentStep === 1) return [];
-    const config = formConfigs[memberType];
+    const config: StepConfig[] = formConfigs[memberType];
     const stepConfig = config.find((s: StepConfig) => s.step === currentStep);
     return stepConfig ? stepConfig.questions : [];
   };
