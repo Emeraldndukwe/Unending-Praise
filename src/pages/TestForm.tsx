@@ -45,11 +45,108 @@ type FormConfigs = {
   [K in Exclude<MemberType, null>]: StepConfig[];
 };
 
+// Common step 2 for all member types
+const commonStep2: StepConfig = {
+  step: 2,
+  questions: [
+    {
+      id: "organizer_name",
+      label: "Name of individual/group that organized the crusade",
+      type: "text",
+      required: true,
+    },
+    {
+      id: "phone_number",
+      label: "Phone number",
+      type: "text",
+      required: true,
+    },
+    {
+      id: "kingschat_username",
+      label: "KingsChat username",
+      type: "text",
+      required: false,
+    },
+  ],
+};
+
+// Common step 3 for all member types - Crusade details
+const commonStep3: StepConfig = {
+  step: 3,
+  questions: [
+    {
+      id: "crusade_name",
+      label: "Name of crusade",
+      type: "text",
+      required: true,
+    },
+    {
+      id: "crusade_date",
+      label: "Date of crusade",
+      type: "text",
+      required: true,
+    },
+    {
+      id: "crusade_type",
+      label: "Type of crusade",
+      type: "radio",
+      options: ["Praise Night", "Prison", "Online", "Special"],
+      required: true,
+      conditional: {
+        field: "crusade_type",
+        value: "",
+        questions: [],
+        branches: [
+          {
+            value: "Praise Night",
+            questions: [
+              {
+                id: "praise_night_type",
+                label: "What type of Praise Night?",
+                type: "select",
+                options: [
+                  "Monthly Praise Night",
+                  "Special Praise Night",
+                  "Youth Praise Night",
+                  "Regional Praise Night",
+                  "Other"
+                ],
+                required: true,
+              },
+            ],
+          },
+          {
+            value: "Special",
+            questions: [
+              {
+                id: "special_crusade_type",
+                label: "What type of Special Crusade?",
+                type: "select",
+                options: [
+                  "Healing Service",
+                  "Deliverance Service",
+                  "Miracle Service",
+                  "Revival Service",
+                  "Outreach Crusade",
+                  "Other"
+                ],
+                required: true,
+              },
+            ],
+          },
+        ],
+      },
+    },
+  ],
+};
+
 // Question configurations for each member type
 const formConfigs = {
   "christ-embassy": [
+    commonStep2,
+    commonStep3,
     {
-      step: 2,
+      step: 4,
       questions: [
         {
           id: "church_location",
@@ -78,57 +175,6 @@ const formConfigs = {
           },
         },
         {
-          id: "crusade_type",
-          label: "What kind of crusade?",
-          type: "radio",
-          options: ["Praise Night", "Prison", "Online", "Special"],
-          required: true,
-          conditional: {
-            field: "crusade_type",
-            value: "", // This will be handled by branches
-            questions: [],
-            branches: [
-              {
-                value: "Praise Night",
-                questions: [
-                  {
-                    id: "praise_night_type",
-                    label: "What type of Praise Night?",
-                    type: "select",
-                    options: [
-                      "Monthly Praise Night",
-                      "Special Praise Night",
-                      "Youth Praise Night",
-                      "Regional Praise Night",
-                      "Other"
-                    ],
-                    required: true,
-                  },
-                ],
-              },
-              {
-                value: "Special",
-                questions: [
-                  {
-                    id: "special_crusade_type",
-                    label: "What type of Special Crusade?",
-                    type: "select",
-                    options: [
-                      "Healing Service",
-                      "Deliverance Service",
-                      "Miracle Service",
-                      "Revival Service",
-                      "Outreach Crusade",
-                      "Other"
-                    ],
-                    required: true,
-                  },
-                ],
-              },
-            ],
-          },
-        },
-        {
           id: "years_attending",
           label: "How long have you been attending?",
           type: "select",
@@ -137,46 +183,12 @@ const formConfigs = {
         },
       ],
     },
-    {
-      step: 3,
-      questions: [
-        {
-          id: "kingschat_username",
-          label: "What is your KingsChat username?",
-          type: "text",
-          required: true,
-        },
-        {
-          id: "cell_leader",
-          label: "Do you have a cell leader?",
-          type: "radio",
-          options: ["Yes", "No"],
-          required: true,
-          conditional: {
-            field: "cell_leader",
-            value: "Yes",
-            questions: [
-              {
-                id: "cell_leader_name",
-                label: "What is your cell leader's name?",
-                type: "text",
-                required: true,
-              },
-            ],
-          },
-        },
-        {
-          id: "additional_info",
-          label: "Any additional information?",
-          type: "textarea",
-          required: false,
-        },
-      ],
-    },
   ],
   "ism-reon": [
+    commonStep2,
+    commonStep3,
     {
-      step: 2,
+      step: 4,
       questions: [
         {
           id: "program_type",
@@ -201,7 +213,7 @@ const formConfigs = {
       ],
     },
     {
-      step: 3,
+      step: 5,
       questions: [
         {
           id: "student_id",
@@ -238,8 +250,10 @@ const formConfigs = {
     },
   ],
   "others": [
+    commonStep2,
+    commonStep3,
     {
-      step: 2,
+      step: 4,
       questions: [
         {
           id: "background",
@@ -275,7 +289,7 @@ const formConfigs = {
       ],
     },
     {
-      step: 3,
+      step: 5,
       questions: [
         {
           id: "contact_preference",
@@ -491,19 +505,39 @@ export default function TestForm() {
         );
       case "radio":
         return (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-3">
             {question.options?.map((opt: string) => (
-              <label key={opt} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name={question.id}
-                  value={opt}
-                  checked={value === opt}
-                  onChange={(e) => handleInputChange(question.id, e.target.value)}
-                  className="w-4 h-4 text-[#54037C] focus:ring-[#54037C]"
-                  required={question.required}
-                />
-                <span>{opt}</span>
+              <label
+                key={opt}
+                className={`flex items-center gap-3 cursor-pointer p-3 rounded-lg border-2 transition-all ${
+                  value === opt
+                    ? "border-[#54037C] bg-[#54037C]/10"
+                    : "border-gray-300 hover:border-[#54037C]/50 bg-white"
+                }`}
+              >
+                <div className="relative flex items-center justify-center">
+                  <input
+                    type="radio"
+                    name={question.id}
+                    value={opt}
+                    checked={value === opt}
+                    onChange={(e) => handleInputChange(question.id, e.target.value)}
+                    className="sr-only"
+                    required={question.required}
+                  />
+                  <div
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                      value === opt
+                        ? "border-[#54037C] bg-[#54037C]"
+                        : "border-gray-400 bg-white"
+                    }`}
+                  >
+                    {value === opt && (
+                      <div className="w-2.5 h-2.5 rounded-full bg-white"></div>
+                    )}
+                  </div>
+                </div>
+                <span className="text-gray-800 font-medium">{opt}</span>
               </label>
             ))}
           </div>
@@ -582,7 +616,38 @@ export default function TestForm() {
                       {question.label}
                       {question.required && <span className="text-red-500 ml-1">*</span>}
                     </label>
-                    {renderQuestion(question)}
+                    {question.id === "phone_number" && (
+                      <p className="text-xs text-gray-500 mb-1">
+                        If you submit on behalf of your group, input your phone number
+                      </p>
+                    )}
+                    {question.id === "kingschat_username" && (
+                      <p className="text-xs text-gray-500 mb-1">
+                        If you submit on behalf of group, input your KingsChat username
+                      </p>
+                    )}
+                    {question.id === "crusade_date" ? (
+                      <input
+                        type="date"
+                        id={question.id}
+                        value={formData[question.id] || ""}
+                        onChange={(e) => handleInputChange(question.id, e.target.value)}
+                        className="border border-gray-300 rounded px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[#54037C]"
+                        required={question.required}
+                      />
+                    ) : (
+                      renderQuestion(question)
+                    )}
+                    {question.id === "kingschat_username" && (
+                      <a
+                        href="https://kingsch.at"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-[#54037C] hover:underline inline-block mt-1"
+                      >
+                        Don't have a KingsChat account? Create one here →
+                      </a>
+                    )}
 
                     {/* Conditional Questions */}
                     {question.conditional &&
