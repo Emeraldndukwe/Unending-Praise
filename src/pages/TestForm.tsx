@@ -45,13 +45,13 @@ type FormConfigs = {
   [K in Exclude<MemberType, null>]: StepConfig[];
 };
 
-// Common step 2 for all member types
-const commonStep2: StepConfig = {
+// Step 2 for ISM/REON and Others
+const step2IsmReonOthers: StepConfig = {
   step: 2,
   questions: [
     {
       id: "organizer_name",
-      label: "Name of individual/group that organized the crusade",
+      label: "Name of individual/group",
       type: "text",
       required: true,
     },
@@ -64,6 +64,61 @@ const commonStep2: StepConfig = {
     {
       id: "kingschat_username",
       label: "KingsChat username",
+      type: "text",
+      required: false,
+    },
+    {
+      id: "ministry_church_name",
+      label: "Name of ministry/church",
+      type: "text",
+      required: true,
+    },
+    {
+      id: "pastor_name",
+      label: "Name of pastor",
+      type: "text",
+      required: true,
+    },
+  ],
+};
+
+// Step 2 for Christ Embassy members
+const step2ChristEmbassy: StepConfig = {
+  step: 2,
+  questions: [
+    {
+      id: "organizer_name",
+      label: "Name of individual/group",
+      type: "text",
+      required: true,
+    },
+    {
+      id: "phone_number",
+      label: "Phone number",
+      type: "text",
+      required: true,
+    },
+    {
+      id: "kingschat_username",
+      label: "KingsChat username",
+      type: "text",
+      required: false,
+    },
+    {
+      id: "zone_name",
+      label: "Name of zone",
+      type: "text",
+      required: true,
+    },
+    {
+      id: "zonal_pastor_name",
+      label: "Name of zonal pastor",
+      type: "text",
+      required: true,
+    },
+    {
+      id: "lmm_coordinator_name",
+      label: "Name of LMM co ordinator",
       type: "text",
       required: false,
     },
@@ -149,24 +204,53 @@ const createStep3 = (crusadeOptions: string[]): StepConfig => ({
       required: true,
     },
     {
-      id: "crusade_type",
-      label: "Type of crusade",
+      id: "crusade_category",
+      label: "Category of crusades",
       type: "select",
-      options: [...crusadeOptions, "Special Crusade"],
+      options: [
+        "Special Crusades",
+        "Online",
+        "Orphanage",
+        "School",
+        "Community",
+        "Prison",
+        "Street",
+        "Market",
+        "Transport",
+        "Medical",
+        "Birthday",
+        "Worship",
+      ],
       required: true,
       conditional: {
-        field: "crusade_type",
-        value: "Special Crusade",
+        field: "crusade_category",
+        value: "Special Crusades",
         questions: [
           {
             id: "special_crusade_type",
             label: "What type of Special Crusade?",
             type: "select",
             options: [
-              "Staff Praise Night",
-              "Regular Praise Night",
+              "Celebrating 1000 days with pastor chris live unending praise",
+              "Praise night with pastor chris",
             ],
             required: true,
+            conditional: {
+              field: "special_crusade_type",
+              value: "Praise night with pastor chris",
+              questions: [
+                {
+                  id: "praise_night_type",
+                  label: "What type of Praise Night?",
+                  type: "select",
+                  options: [
+                    "Staff Praise Night",
+                    "Regular Praise Night",
+                  ],
+                  required: true,
+                },
+              ],
+            },
           },
         ],
       },
@@ -217,181 +301,22 @@ export default function TestForm() {
     
     return {
       "christ-embassy": [
-        commonStep2,
+        step2ChristEmbassy,
         step3,
         commonStep4,
         commonStep5,
-        {
-          step: 6,
-          questions: [
-            {
-              id: "church_location",
-              label: "Which church location do you attend?",
-              type: "select",
-              options: ["Main Campus", "Zone 1", "Zone 2", "Zone 3", "Other"],
-              required: true,
-            },
-            {
-              id: "ministry_involvement",
-              label: "Are you involved in any ministry?",
-              type: "radio",
-              options: ["Yes", "No"],
-              required: true,
-              conditional: {
-                field: "ministry_involvement",
-                value: "Yes",
-                questions: [
-                  {
-                    id: "ministry_name",
-                    label: "Which ministry are you involved in?",
-                    type: "text",
-                    required: true,
-                  },
-                ],
-              },
-            },
-            {
-              id: "years_attending",
-              label: "How long have you been attending?",
-              type: "select",
-              options: ["Less than 1 year", "1-3 years", "3-5 years", "5+ years"],
-              required: true,
-            },
-          ],
-        },
       ],
       "ism-reon": [
-        commonStep2,
+        step2IsmReonOthers,
         step3,
         commonStep4,
         commonStep5,
-        {
-          step: 6,
-          questions: [
-            {
-              id: "program_type",
-              label: "Which program are you enrolled in?",
-              type: "radio",
-              options: ["ISM", "REON"],
-              required: true,
-            },
-            {
-              id: "program_level",
-              label: "What level are you in?",
-              type: "select",
-              options: ["Level 1", "Level 2", "Level 3", "Level 4", "Graduate"],
-              required: true,
-            },
-            {
-              id: "campus_location",
-              label: "Which campus are you at?",
-              type: "text",
-              required: true,
-            },
-          ],
-        },
-        {
-          step: 7,
-          questions: [
-            {
-              id: "student_id",
-              label: "What is your student ID?",
-              type: "text",
-              required: true,
-            },
-            {
-              id: "mentor_assigned",
-              label: "Do you have an assigned mentor?",
-              type: "radio",
-              options: ["Yes", "No"],
-              required: true,
-              conditional: {
-                field: "mentor_assigned",
-                value: "Yes",
-                questions: [
-                  {
-                    id: "mentor_name",
-                    label: "What is your mentor's name?",
-                    type: "text",
-                    required: true,
-                  },
-                ],
-              },
-            },
-            {
-              id: "goals",
-              label: "What are your goals in the program?",
-              type: "textarea",
-              required: false,
-            },
-          ],
-        },
       ],
       "others": [
-        commonStep2,
+        step2IsmReonOthers,
         step3,
         commonStep4,
         commonStep5,
-        {
-          step: 6,
-          questions: [
-            {
-              id: "background",
-              label: "Tell us about your background",
-              type: "textarea",
-              required: true,
-            },
-            {
-              id: "interest_reason",
-              label: "What brings you here?",
-              type: "text",
-              required: true,
-            },
-            {
-              id: "previous_experience",
-              label: "Any previous experience with Christ Embassy?",
-              type: "radio",
-              options: ["Yes", "No"],
-              required: true,
-              conditional: {
-                field: "previous_experience",
-                value: "Yes",
-                questions: [
-                  {
-                    id: "experience_details",
-                    label: "Please provide details",
-                    type: "textarea",
-                    required: true,
-                  },
-                ],
-              },
-            },
-          ],
-        },
-        {
-          step: 7,
-          questions: [
-            {
-              id: "contact_preference",
-              label: "How would you prefer to be contacted?",
-              type: "select",
-              options: ["Email", "Phone", "WhatsApp", "KingsChat"],
-              required: true,
-            },
-            {
-              id: "expectations",
-              label: "What are your expectations?",
-              type: "textarea",
-              required: false,
-            },
-            {
-              id: "additional_comments",
-              label: "Any additional comments?",
-              type: "textarea",
-              required: false,
-            },
-          ],
-        },
       ],
     };
   };
@@ -399,6 +324,24 @@ export default function TestForm() {
   const handleMemberTypeSelect = (type: MemberType) => {
     setMemberType(type);
     setFormData({ ...formData, memberType: type });
+  };
+
+  // Recursive function to clear nested conditional questions
+  const clearNestedConditionals = (questions: ConditionalQuestion[], newFormData: any, newExpanded: Set<string>) => {
+    questions.forEach((cq: ConditionalQuestion) => {
+      delete newFormData[cq.id];
+      newExpanded.delete(cq.id);
+      // If this conditional question has its own conditionals, clear those too
+      if (cq.conditional) {
+        if (cq.conditional.branches) {
+          cq.conditional.branches.forEach((branch) => {
+            clearNestedConditionals(branch.questions, newFormData, newExpanded);
+          });
+        } else {
+          clearNestedConditionals(cq.conditional.questions, newFormData, newExpanded);
+        }
+      }
+    });
   };
 
   const handleInputChange = (id: string, value: any) => {
@@ -414,11 +357,9 @@ export default function TestForm() {
           if (question.conditional && question.conditional.field === id) {
             // Check if there are branches (multiple conditional paths)
             if (question.conditional.branches) {
-              // Always clear all branch question data first when value changes
+              // Always clear all branch question data first when value changes (including nested)
               question.conditional.branches.forEach((branch) => {
-                branch.questions.forEach((cq: ConditionalQuestion) => {
-                  delete newFormData[cq.id];
-                });
+                clearNestedConditionals(branch.questions, newFormData, newExpanded);
               });
               
               // Then check if new value matches any branch
@@ -436,10 +377,8 @@ export default function TestForm() {
                 newExpanded.add(question.id);
               } else {
                 newExpanded.delete(question.id);
-                // Clear conditional question data
-                question.conditional.questions.forEach((cq: ConditionalQuestion) => {
-                  delete newFormData[cq.id];
-                });
+                // Clear conditional question data (including nested)
+                clearNestedConditionals(question.conditional.questions, newFormData, newExpanded);
               }
             }
           }
@@ -485,6 +424,28 @@ export default function TestForm() {
     return stepConfig ? stepConfig.questions : [];
   };
 
+  // Recursive function to check if all required conditional questions are filled
+  const checkConditionalQuestions = (questions: ConditionalQuestion[]): boolean => {
+    return questions.every((cq: ConditionalQuestion) => {
+      if (cq.required && !formData[cq.id]) return false;
+      // Check nested conditionals if they exist
+      if (cq.conditional) {
+        const fieldValue = formData[cq.conditional.field];
+        if (cq.conditional.branches) {
+          const activeBranch = cq.conditional.branches.find(
+            (branch) => branch.value === fieldValue
+          );
+          if (activeBranch) {
+            return checkConditionalQuestions(activeBranch.questions);
+          }
+        } else if (fieldValue === cq.conditional.value) {
+          return checkConditionalQuestions(cq.conditional.questions);
+        }
+      }
+      return true;
+    });
+  };
+
   const canProceedToNext = () => {
     if (currentStep === 1) return memberType !== null;
     
@@ -495,16 +456,10 @@ export default function TestForm() {
         // Check branch questions if branches exist
         if (q.conditional.branches) {
           const activeBranchQuestions = getActiveBranchQuestions(q);
-          return activeBranchQuestions.every((cq: ConditionalQuestion) => {
-            if (cq.required) return !!formData[cq.id];
-            return true;
-          });
+          return checkConditionalQuestions(activeBranchQuestions);
         }
         // Original single conditional logic
-        return q.conditional.questions.every((cq: ConditionalQuestion) => {
-          if (cq.required) return !!formData[cq.id];
-          return true;
-        });
+        return checkConditionalQuestions(q.conditional.questions);
       }
       return true;
     });
@@ -740,25 +695,69 @@ export default function TestForm() {
                       (question.conditional.branches
                         ? getActiveBranchQuestions(question)
                         : question.conditional.questions
-                      ).map((cq: ConditionalQuestion) => (
-                        <motion.div
-                          key={cq.id}
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          className="mt-4 ml-4 pl-4 border-l-2 border-[#54037C]"
-                        >
-                          <label
-                            htmlFor={cq.id}
-                            className="block text-sm font-semibold text-gray-700"
+                      ).map((cq: ConditionalQuestion) => {
+                        const shouldShowNested = cq.conditional && (() => {
+                          const fieldValue = formData[cq.conditional!.field];
+                          if (cq.conditional!.branches) {
+                            return cq.conditional!.branches.some(
+                              (branch) => branch.value === fieldValue
+                            );
+                          }
+                          return fieldValue === cq.conditional!.value;
+                        })();
+                        
+                        const getNestedQuestions = (): ConditionalQuestion[] => {
+                          if (!cq.conditional || !shouldShowNested) return [];
+                          if (cq.conditional.branches) {
+                            const fieldValue = formData[cq.conditional.field];
+                            const activeBranch = cq.conditional.branches.find(
+                              (branch) => branch.value === fieldValue
+                            );
+                            return activeBranch ? activeBranch.questions : [];
+                          }
+                          return cq.conditional.questions;
+                        };
+                        
+                        return (
+                          <motion.div
+                            key={cq.id}
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            className="mt-4 ml-4 pl-4 border-l-2 border-[#54037C]"
                           >
-                            {cq.label}
-                            {cq.required && (
-                              <span className="text-red-500 ml-1">*</span>
-                            )}
-                          </label>
-                          {renderQuestion(cq)}
-                        </motion.div>
-                      ))}
+                            <label
+                              htmlFor={cq.id}
+                              className="block text-sm font-semibold text-gray-700"
+                            >
+                              {cq.label}
+                              {cq.required && (
+                                <span className="text-red-500 ml-1">*</span>
+                              )}
+                            </label>
+                            {renderQuestion(cq)}
+                            {/* Nested Conditional Questions */}
+                            {shouldShowNested && getNestedQuestions().map((nestedCq: ConditionalQuestion) => (
+                              <motion.div
+                                key={nestedCq.id}
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: "auto" }}
+                                className="mt-4 ml-4 pl-4 border-l-2 border-[#54037C]/70"
+                              >
+                                <label
+                                  htmlFor={nestedCq.id}
+                                  className="block text-sm font-semibold text-gray-700"
+                                >
+                                  {nestedCq.label}
+                                  {nestedCq.required && (
+                                    <span className="text-red-500 ml-1">*</span>
+                                  )}
+                                </label>
+                                {renderQuestion(nestedCq)}
+                              </motion.div>
+                            ))}
+                          </motion.div>
+                        );
+                      })}
                   </div>
                 ))}
               </motion.div>
