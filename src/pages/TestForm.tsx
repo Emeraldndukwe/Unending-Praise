@@ -475,7 +475,7 @@ export default function TestForm() {
             id={question.id}
             value={value}
             onChange={(e) => handleInputChange(question.id, e.target.value)}
-            className="border border-gray-300 rounded px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[#54037C]"
+            className="border border-gray-300 rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[#54037C]"
             required={question.required}
             min={isNumberField ? "0" : undefined}
           />
@@ -487,7 +487,7 @@ export default function TestForm() {
             value={value}
             onChange={(e) => handleInputChange(question.id, e.target.value)}
             rows={4}
-            className="border border-gray-300 rounded px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[#54037C] resize-none"
+            className="border border-gray-300 rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[#54037C] resize-none"
             required={question.required}
           />
         );
@@ -497,7 +497,7 @@ export default function TestForm() {
             id={question.id}
             value={value}
             onChange={(e) => handleInputChange(question.id, e.target.value)}
-            className="border border-gray-300 rounded px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[#54037C]"
+            className="border border-gray-300 rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[#54037C]"
             required={question.required}
           >
             <option value="">Select an option</option>
@@ -591,8 +591,8 @@ export default function TestForm() {
                     whileTap={{ scale: 0.98 }}
                     className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
                       memberType === option.value
-                        ? "border-[#54037C] bg-[#54037C]/10"
-                        : "border-gray-300 hover:border-[#54037C]/50"
+                        ? "border-purple-500 bg-purple-100 text-purple-900"
+                        : "border-purple-300 bg-purple-50 hover:border-purple-400 hover:bg-purple-100 text-purple-800"
                     }`}
                   >
                     <span className="font-medium text-gray-800">{option.label}</span>
@@ -637,7 +637,7 @@ export default function TestForm() {
                         id={question.id}
                         value={formData[question.id] || ""}
                         onChange={(e) => handleInputChange(question.id, e.target.value)}
-                        className="border border-gray-300 rounded px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[#54037C]"
+                        className="border border-gray-300 rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[#54037C]"
                         required={question.required}
                       />
                     ) : (
