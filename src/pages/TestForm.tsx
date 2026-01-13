@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 type MemberType = "christ-embassy" | "ism-reon" | "others" | null;
@@ -14,6 +14,7 @@ type ConditionalQuestion = {
   type: "text" | "textarea" | "select" | "radio";
   required: boolean;
   options?: string[];
+  conditional?: ConditionalConfig;
 };
 
 type ConditionalConfig = {
@@ -187,8 +188,8 @@ const commonStep5: StepConfig = {
   ],
 };
 
-// Helper function to create step 3 with dynamic crusade options
-const createStep3 = (crusadeOptions: string[]): StepConfig => ({
+// Helper function to create step 3
+const createStep3 = (): StepConfig => ({
   step: 3,
   questions: [
     {
@@ -259,45 +260,15 @@ const createStep3 = (crusadeOptions: string[]): StepConfig => ({
 });
 
 
-type Crusade = {
-  id: string;
-  title?: string;
-  [key: string]: any;
-};
-
 export default function TestForm() {
   const [memberType, setMemberType] = useState<MemberType>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<FormData>({ memberType: null });
   const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set());
-  const [crusades, setCrusades] = useState<Crusade[]>([]);
-  const [crusadesLoading, setCrusadesLoading] = useState(true);
-
-  // Fetch crusades on component mount
-  useEffect(() => {
-    const fetchCrusades = async () => {
-      try {
-        const response = await fetch('/api/crusades');
-        if (response.ok) {
-          const data = await response.json();
-          setCrusades(data);
-        }
-      } catch (error) {
-        console.error('Failed to fetch crusades:', error);
-      } finally {
-        setCrusadesLoading(false);
-      }
-    };
-    fetchCrusades();
-  }, []);
 
   // Build dynamic form config with crusades
   const getFormConfigs = (): FormConfigs => {
-    const crusadeOptions = crusades
-      .filter(c => c.title)
-      .map(c => c.title as string);
-    
-    const step3 = createStep3(crusadeOptions);
+    const step3 = createStep3();
     
     return {
       "christ-embassy": [
@@ -334,7 +305,7 @@ export default function TestForm() {
       // If this conditional question has its own conditionals, clear those too
       if (cq.conditional) {
         if (cq.conditional.branches) {
-          cq.conditional.branches.forEach((branch) => {
+          cq.conditional.branches.forEach((branch: { value: string; questions: ConditionalQuestion[] }) => {
             clearNestedConditionals(branch.questions, newFormData, newExpanded);
           });
         } else {
@@ -433,7 +404,7 @@ export default function TestForm() {
         const fieldValue = formData[cq.conditional.field];
         if (cq.conditional.branches) {
           const activeBranch = cq.conditional.branches.find(
-            (branch) => branch.value === fieldValue
+            (branch: { value: string; questions: ConditionalQuestion[] }) => branch.value === fieldValue
           );
           if (activeBranch) {
             return checkConditionalQuestions(activeBranch.questions);
@@ -596,12 +567,6 @@ export default function TestForm() {
             Step {currentStep} of {memberType ? (getFormConfigs()[memberType].length + 1) : 1}
           </p>
 
-          {crusadesLoading && currentStep >= 3 && (
-            <div className="text-center text-gray-500 mb-4">
-              Loading crusade types...
-            </div>
-          )}
-
           {/* Step 1: Member Type Selection */}
           {currentStep === 1 && (
             <motion.div
@@ -700,7 +665,7 @@ export default function TestForm() {
                           const fieldValue = formData[cq.conditional!.field];
                           if (cq.conditional!.branches) {
                             return cq.conditional!.branches.some(
-                              (branch) => branch.value === fieldValue
+                              (branch: { value: string; questions: ConditionalQuestion[] }) => branch.value === fieldValue
                             );
                           }
                           return fieldValue === cq.conditional!.value;
@@ -711,7 +676,7 @@ export default function TestForm() {
                           if (cq.conditional.branches) {
                             const fieldValue = formData[cq.conditional.field];
                             const activeBranch = cq.conditional.branches.find(
-                              (branch) => branch.value === fieldValue
+                              (branch: { value: string; questions: ConditionalQuestion[] }) => branch.value === fieldValue
                             );
                             return activeBranch ? activeBranch.questions : [];
                           }
