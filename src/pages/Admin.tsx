@@ -1715,7 +1715,7 @@ export default function AdminPage() {
       {tab === "meetings" && role === 'superadmin' && (
         <section className="space-y-6">
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
-            <h2 className="text-xl font-bold text-[#54037C] mb-4">Meeting Recordings</h2>
+            <h2 className="text-xl font-bold text-[#54037C] mb-4">Trainings & Resources</h2>
             
             {/* Password Management */}
             <div className="mb-6 p-4 bg-purple-50 rounded-xl border border-purple-200">
@@ -1737,11 +1737,15 @@ export default function AdminPage() {
                     }
                     setMeetingPasswordLoading(true);
                     try {
-                      await fetch('/api/meetings/password', {
+                      const res = await fetch('/api/trainings/password', {
                         method: 'PUT',
                         headers: Object.assign({}, headers as Record<string, string>, { 'content-type': 'application/json' }),
                         body: JSON.stringify({ password: meetingPassword }),
                       });
+                      if (!res.ok) {
+                        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+                        throw new Error(errorData.error || `HTTP ${res.status}`);
+                      }
                       setMeetingPassword('');
                       alert('Password updated successfully');
                       await refreshMeetingSettings();
@@ -1763,9 +1767,9 @@ export default function AdminPage() {
               )}
             </div>
 
-            {/* Add New Meeting */}
+            {/* Add New Training Video */}
             <div className="mb-6 p-4 bg-gray-50 rounded-xl border">
-              <h3 className="font-semibold mb-3">Add New Meeting Recording</h3>
+              <h3 className="font-semibold mb-3">Add New Training Video</h3>
               <MeetingForm
                 onSubmit={async (data) => {
                   try {
@@ -1786,8 +1790,8 @@ export default function AdminPage() {
 
             {/* Meetings List */}
             <div className="space-y-3 mb-8">
-              <h3 className="font-semibold">Existing Video Recordings ({meetings.length})</h3>
-              {meetings.length === 0 && <div className="text-sm text-gray-500 text-center py-8">No meetings yet</div>}
+              <h3 className="font-semibold">Existing Training Videos ({meetings.length})</h3>
+              {meetings.length === 0 && <div className="text-sm text-gray-500 text-center py-8">No training videos yet</div>}
               {meetings.map((meeting) => (
                 <MeetingItem
                   key={meeting.id}
@@ -3477,7 +3481,7 @@ function MeetingForm({
         method: 'POST',
         headers: { ...authHeaders, 'content-type': 'application/json' },
         body: JSON.stringify({ 
-          folder: 'unendingpraise/meetings',
+          folder: 'unendingpraise/trainings',
           resourceType 
         }),
       });

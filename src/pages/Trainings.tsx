@@ -37,6 +37,7 @@ export default function Trainings() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [activeTabs, setActiveTabs] = useState<Record<string, "video" | "document">>({});
 
   useEffect(() => {
@@ -223,25 +224,62 @@ export default function Trainings() {
   // Main trainings page - same layout as Meetings
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50">
-      {/* Header Section - Below Navbar, no purple background */}
-      <div className="pt-24 pb-6">
+      {/* Header Section - Below Navbar, centered */}
+      <div className="pt-32 pb-8">
         <div className="max-w-7xl mx-auto px-4 md:px-8">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            {/* Title - Left/Center */}
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-800 uppercase tracking-wide">
-              MEETING RECORDINGS
+          <div className="flex flex-col items-center gap-6">
+            {/* Title - Centered */}
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-800 uppercase tracking-wide text-center">
+              TRAINING & RESOURCES
             </h1>
 
-            {/* Search Bar - Right */}
-            <div className="relative w-full md:w-auto md:min-w-[300px]">
-              <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-600 w-5 h-5 pointer-events-none" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search..."
-                className="w-full pl-4 pr-10 py-2 bg-purple-200 rounded-full border-0 focus:outline-none focus:ring-2 focus:ring-[#54037C]/50 text-gray-800 placeholder-gray-600"
-              />
+            {/* Search Icon/Bar */}
+            <div className="w-full flex justify-center">
+              {!isSearchOpen ? (
+                <button
+                  onClick={() => setIsSearchOpen(true)}
+                  className="p-3 bg-white rounded-full shadow-md hover:shadow-lg transition-all hover:scale-110"
+                  aria-label="Open search"
+                >
+                  <Search className="w-6 h-6 text-[#54037C]" />
+                </button>
+              ) : (
+                <div className="relative w-full max-w-2xl">
+                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-600 w-5 h-5 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onBlur={() => {
+                      // Keep search open if there's a query, close if empty
+                      if (!searchQuery) {
+                        setIsSearchOpen(false);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        setSearchQuery('');
+                        setIsSearchOpen(false);
+                      }
+                    }}
+                    placeholder="Search training videos and resources..."
+                    className="w-full pl-12 pr-4 py-3 bg-white rounded-full border-2 border-[#54037C]/20 focus:outline-none focus:ring-2 focus:ring-[#54037C]/50 focus:border-[#54037C] text-gray-800 placeholder-gray-500 shadow-lg"
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => {
+                      setSearchQuery('');
+                      setIsSearchOpen(false);
+                    }}
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    aria-label="Close search"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

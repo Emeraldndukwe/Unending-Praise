@@ -1632,8 +1632,8 @@ app.get('/api/meetings/settings', requireAuth, requireSuperAdmin, async (_req, r
   }
 });
 
-// Update meeting password
-app.put('/api/meetings/password', requireAuth, requireSuperAdmin, async (req, res) => {
+// Update meeting/training password handler
+const updateTrainingPassword = async (req, res) => {
   const { password } = req.body || {};
   if (!password || typeof password !== 'string') {
     return res.status(400).json({ error: 'Missing password' });
@@ -1657,10 +1657,16 @@ app.put('/api/meetings/password', requireAuth, requireSuperAdmin, async (req, re
     }
     res.json({ success: true });
   } catch (e) {
-    console.error('Update meeting password error:', e);
+    console.error('Update training password error:', e);
     res.status(500).json({ error: 'Server error' });
   }
-});
+};
+
+// Update meeting password (legacy endpoint)
+app.put('/api/meetings/password', requireAuth, requireSuperAdmin, updateTrainingPassword);
+
+// Update training password (new endpoint)
+app.put('/api/trainings/password', requireAuth, requireSuperAdmin, updateTrainingPassword);
 
 // Public API: Get meetings by access token (password-protected)
 app.get('/api/meetings/public/:token', async (req, res) => {
