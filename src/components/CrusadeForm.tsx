@@ -94,6 +94,9 @@ export default function CrusadeForm() {
           <label htmlFor="kingschat" className="block text-sm font-semibold text-gray-700 mb-1">
             KingsChat Username
           </label>
+          <p className="text-xs text-gray-500 mb-1">
+            If you are submitting on behalf of your group, kindly input your kingschat username
+          </p>
           <input
             id="kingschat"
             name="kingschat"

@@ -299,14 +299,19 @@ const Contacts: React.FC = () => {
                   className={inputClass}
                   required
                 />
-                <input
-                  type="text"
-                  name="kingschat"
-                  placeholder="KingsChat Username"
-                  value={messageForm.kingschat}
-                  onChange={handleMessageChange}
-                  className={inputClass}
-                />
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">
+                    If you are submitting on behalf of your group, kindly input your kingschat username
+                  </p>
+                  <input
+                    type="text"
+                    name="kingschat"
+                    placeholder="KingsChat Username"
+                    value={messageForm.kingschat}
+                    onChange={handleMessageChange}
+                    className={inputClass}
+                  />
+                </div>
                 <textarea
                   name="message"
                   placeholder="Message"

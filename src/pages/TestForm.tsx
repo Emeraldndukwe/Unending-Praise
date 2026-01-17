@@ -172,7 +172,7 @@ const commonStep5: StepConfig = {
   questions: [
     {
       id: "media_link",
-      label: "Link Containing Media",
+      label: "Link Containing Multimedia",
       type: "text",
       required: false,
     },
@@ -186,16 +186,16 @@ const commonStep5: StepConfig = {
     {
       id: "writeup",
       label: "Comprehensive Report on your Crusade",
-      description: "Please provide a detailed report outlining all activities carried out before, during, and after the crusade. This should include information on preparations made, the execution of the crusade itself, and post-crusade follow-up or impact, where applicable. You can type your report here or upload it as a Word Document or PDF.",
+      description: "Please provide a detailed report outlining all activities carried out before, during, and after the crusade. This should include information on preparations made, the execution of the crusade itself, and post-crusade follow-up or impact, where applicable. You can type your report here, upload it as a Word Document or PDF, upload an audio file, or record an audio report.",
       type: "textarea",
       required: false,
       hasFileUpload: true,
     },
     {
       id: "writeup_file",
-      label: "Upload Comprehensive Report (PDF or Word Document)",
+      label: "Upload Comprehensive Report (PDF, Word Document, or Audio File)",
       type: "file",
-      accept: ".pdf,.doc,.docx",
+      accept: ".pdf,.doc,.docx,.mp3,.wav,.m4a,.ogg,.aac",
       required: false,
       hidden: true,
     },
@@ -231,10 +231,10 @@ const createStep3 = (): StepConfig => ({
       options: [
         "Special Crusades",
         "Online",
-        "Orphanage",
+        "Orphanage Crusade",
         "School",
         "Community",
-        "Prison",
+        "Prison Crusade",
         "Street",
         "Market",
         "Transport",
@@ -285,6 +285,10 @@ export default function TestForm() {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<FormData>({ memberType: null });
   const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set());
+  const [isRecording, setIsRecording] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
 
   // Build dynamic form config with crusades
   const getFormConfigs = (): FormConfigs => {
@@ -503,37 +507,128 @@ export default function TestForm() {
       case "textarea":
         if (question.hasFileUpload) {
           const fileInputId = `${question.id}_file`;
+          
+          const startRecording = async () => {
+            try {
+              const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+              const recorder = new MediaRecorder(stream);
+              const chunks: Blob[] = [];
+              
+              recorder.ondataavailable = (e) => {
+                if (e.data.size > 0) {
+                  chunks.push(e.data);
+                }
+              };
+              
+              recorder.onstop = () => {
+                const blob = new Blob(chunks, { type: 'audio/webm' });
+                setAudioBlob(blob);
+                const url = URL.createObjectURL(blob);
+                setAudioUrl(url);
+                handleInputChange('writeup_file', 'audio_recording.webm');
+                stream.getTracks().forEach(track => track.stop());
+              };
+              
+              recorder.start();
+              setMediaRecorder(recorder);
+              setIsRecording(true);
+            } catch (err) {
+              console.error('Error starting recording:', err);
+              alert('Could not start audio recording. Please check your microphone permissions.');
+            }
+          };
+          
+          const stopRecording = () => {
+            if (mediaRecorder) {
+              mediaRecorder.stop();
+              setIsRecording(false);
+              setMediaRecorder(null);
+            }
+          };
+          
+          const handleAudioFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              if (file.type.startsWith('audio/')) {
+                handleInputChange('writeup_file', file.name);
+                setAudioBlob(file);
+                const url = URL.createObjectURL(file);
+                setAudioUrl(url);
+              } else {
+                handleInputChange('writeup_file', file.name);
+              }
+            }
+          };
+          
           return (
-            <div className="relative">
-              <textarea
-                id={question.id}
-                value={value}
-                onChange={(e) => handleInputChange(question.id, e.target.value)}
-                rows={4}
-                className="border border-gray-300 rounded-lg px-3 py-2 pr-12 w-full focus:outline-none focus:ring-2 focus:ring-[#54037C] resize-none"
-                required={question.required}
-              />
-              <label
-                htmlFor={fileInputId}
-                className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-[#54037C] hover:text-[#54037C]/80 transition-colors"
-                title="Upload PDF or Word Document"
-              >
-                <Upload size={20} />
-              </label>
-              <input
-                type="file"
-                id={fileInputId}
-                accept=".pdf,.doc,.docx"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    handleInputChange('writeup_file', file.name);
-                  }
-                }}
-                className="hidden"
-              />
-              {formData['writeup_file'] && (
-                <p className="mt-2 text-sm text-gray-600">File selected: {formData['writeup_file']}</p>
+            <div className="space-y-3">
+              <div className="relative">
+                <textarea
+                  id={question.id}
+                  value={value}
+                  onChange={(e) => handleInputChange(question.id, e.target.value)}
+                  rows={4}
+                  className="border border-gray-300 rounded-lg px-3 py-2 pr-12 w-full focus:outline-none focus:ring-2 focus:ring-[#54037C] resize-none"
+                  required={question.required}
+                />
+                <label
+                  htmlFor={fileInputId}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-[#54037C] hover:text-[#54037C]/80 transition-colors"
+                  title="Upload PDF, Word Document, or Audio File"
+                >
+                  <Upload size={20} />
+                </label>
+                <input
+                  type="file"
+                  id={fileInputId}
+                  accept=".pdf,.doc,.docx,.mp3,.wav,.m4a,.ogg,.aac"
+                  onChange={handleAudioFileUpload}
+                  className="hidden"
+                />
+              </div>
+              
+              {/* Audio Recording Controls */}
+              <div className="flex items-center gap-3">
+                {!isRecording ? (
+                  <button
+                    type="button"
+                    onClick={startRecording}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors text-sm font-medium"
+                  >
+                    <span className="w-3 h-3 bg-white rounded-full"></span>
+                    Start Recording
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={stopRecording}
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm font-medium"
+                  >
+                    <span className="w-3 h-3 bg-white rounded-full animate-pulse"></span>
+                    Stop Recording
+                  </button>
+                )}
+                
+                {audioUrl && (
+                  <div className="flex items-center gap-2">
+                    <audio src={audioUrl} controls className="h-8" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAudioUrl(null);
+                        setAudioBlob(null);
+                        handleInputChange('writeup_file', '');
+                      }}
+                      className="text-red-500 hover:text-red-700 text-sm"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
+              </div>
+              
+              {formData['writeup_file'] && !audioUrl && (
+                <p className="text-sm text-gray-600">File selected: {formData['writeup_file']}</p>
               )}
             </div>
           );
@@ -715,12 +810,12 @@ export default function TestForm() {
                     )}
                     {question.id === "phone_number" && (
                       <p className="text-xs text-gray-500 mb-1">
-                        If you submit on behalf of your group, input your phone number
+                        If you are submitting on behalf of your group, kindly input your phone number
                       </p>
                     )}
                     {question.id === "kingschat_username" && (
                       <p className="text-xs text-gray-500 mb-1">
-                        If you submit on behalf of group, input your KingsChat username
+                        If you are submitting on behalf of your group, kindly input your kingschat username
                       </p>
                     )}
                     {question.id === "crusade_date" ? (
