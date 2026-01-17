@@ -292,7 +292,9 @@ function writeDb(db) {
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+// Increase body size limits for large file uploads
+app.use(express.json({ limit: '10gb' }));
+app.use(express.urlencoded({ limit: '10gb', extended: true }));
 // Trust proxy to get correct IP addresses (needed for Render and other proxies)
 app.set('trust proxy', true);
 
@@ -616,7 +618,19 @@ app.post('/api/admin/upload-signature', requireAuth, requireRole('crusade', 'tes
 });
 
 // Server-side upload endpoint for large files (bypasses CORS and handles large files)
-app.post('/api/admin/upload-large', requireAuth, requireRole('crusade', 'testimony', 'songs'), upload.single('file'), async (req, res) => {
+app.post('/api/admin/upload-large', requireAuth, requireRole('crusade', 'testimony', 'songs'), (req, res, next) => {
+  // Handle 413 errors from reverse proxy before multer processes
+  req.on('error', (err) => {
+    if (err.message?.includes('413') || err.code === 'ECONNRESET') {
+      return res.status(413).json({ 
+        error: 'Upload failed', 
+        details: 'File is too large. The hosting provider may have size limits. Please try a smaller file or contact support.',
+        code: 413
+      });
+    }
+  });
+  next();
+}, upload.single('file'), async (req, res) => {
   if (!cloudinaryEnabled) {
     return res.status(503).json({ error: 'Cloudinary not configured' });
   }
@@ -633,6 +647,14 @@ app.post('/api/admin/upload-large', requireAuth, requireRole('crusade', 'testimo
   
   try {
     if (!req.file) {
+      // Check if the error is due to file size
+      if (req.headers['content-length'] && parseInt(req.headers['content-length']) > 10 * 1024 * 1024 * 1024) {
+        return res.status(413).json({ 
+          error: 'Upload failed', 
+          details: 'File is too large. Maximum file size is 10GB. Please try a smaller file.',
+          code: 413
+        });
+      }
       return res.status(400).json({ error: 'No file provided' });
     }
     
@@ -676,6 +698,14 @@ app.post('/api/admin/upload-large', requireAuth, requireRole('crusade', 'testimo
         if (error) {
           console.error('Cloudinary upload error:', error);
           if (!res.headersSent) {
+            // Check if it's a 413 error (Request Entity Too Large)
+            if (error.http_code === 413 || error.message?.includes('413') || error.message?.includes('too large')) {
+              return res.status(413).json({ 
+                error: 'Upload failed', 
+                details: 'File is too large. Please try a smaller file or contact support.',
+                code: 413
+              });
+            }
             return res.status(500).json({ error: 'Upload failed', details: error.message });
           }
           return;
@@ -710,7 +740,16 @@ app.post('/api/admin/upload-large', requireAuth, requireRole('crusade', 'testimo
       }
       if (!responseSent && !res.headersSent) {
         responseSent = true;
-        res.status(500).json({ error: 'Upload failed', details: err.message });
+        // Check for 413 errors
+        if (err.message?.includes('413') || err.message?.includes('too large') || err.code === 'ECONNRESET') {
+          res.status(413).json({ 
+            error: 'Upload failed', 
+            details: 'File is too large. The hosting provider may have size limits. Please try a smaller file or contact support.',
+            code: 413
+          });
+        } else {
+          res.status(500).json({ error: 'Upload failed', details: err.message });
+        }
       }
     });
     
@@ -721,7 +760,16 @@ app.post('/api/admin/upload-large', requireAuth, requireRole('crusade', 'testimo
       }
       if (!responseSent && !res.headersSent) {
         responseSent = true;
-        res.status(500).json({ error: 'Upload failed', details: err.message });
+        // Check for 413 errors from Cloudinary
+        if (err.http_code === 413 || err.message?.includes('413') || err.message?.includes('too large')) {
+          res.status(413).json({ 
+            error: 'Upload failed', 
+            details: 'File is too large for Cloudinary. Maximum file size is typically 100MB for free accounts. Please compress your file or use a smaller file.',
+            code: 413
+          });
+        } else {
+          res.status(500).json({ error: 'Upload failed', details: err.message });
+        }
       }
     });
   } catch (e) {
