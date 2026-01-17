@@ -286,7 +286,6 @@ export default function TestForm() {
   const [formData, setFormData] = useState<FormData>({ memberType: null });
   const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set());
   const [isRecording, setIsRecording] = useState(false);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
 
@@ -522,7 +521,6 @@ export default function TestForm() {
               
               recorder.onstop = () => {
                 const blob = new Blob(chunks, { type: 'audio/webm' });
-                setAudioBlob(blob);
                 const url = URL.createObjectURL(blob);
                 setAudioUrl(url);
                 handleInputChange('writeup_file', 'audio_recording.webm');
@@ -551,7 +549,6 @@ export default function TestForm() {
             if (file) {
               if (file.type.startsWith('audio/')) {
                 handleInputChange('writeup_file', file.name);
-                setAudioBlob(file);
                 const url = URL.createObjectURL(file);
                 setAudioUrl(url);
               } else {
@@ -615,8 +612,10 @@ export default function TestForm() {
                     <button
                       type="button"
                       onClick={() => {
+                        if (audioUrl) {
+                          URL.revokeObjectURL(audioUrl);
+                        }
                         setAudioUrl(null);
-                        setAudioBlob(null);
                         handleInputChange('writeup_file', '');
                       }}
                       className="text-red-500 hover:text-red-700 text-sm"
