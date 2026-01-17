@@ -61,7 +61,7 @@ const step2IsmReonOthers: StepConfig = {
   questions: [
     {
       id: "organizer_name",
-      label: "Name of Individual/Group",
+      label: "Name of Group/Individual that organized the Crusade",
       type: "text",
       required: true,
     },
@@ -98,7 +98,7 @@ const step2ChristEmbassy: StepConfig = {
   questions: [
     {
       id: "organizer_name",
-      label: "Name of Individual/Group",
+      label: "Name of Group/Individual that organized the Crusade",
       type: "text",
       required: true,
     },
@@ -201,7 +201,7 @@ const commonStep5: StepConfig = {
     },
     {
       id: "other_comments",
-      label: "Other Comments",
+      label: "Other Comments/Suggestions",
       type: "textarea",
       required: false,
     },
@@ -230,17 +230,17 @@ const createStep3 = (): StepConfig => ({
       type: "select",
       options: [
         "Special Crusades",
-        "Online",
+        "Online Crusade",
         "Orphanage Crusade",
-        "School",
-        "Community",
+        "School Crusade",
+        "Community Crusade",
         "Prison Crusade",
-        "Street",
-        "Market",
-        "Transport",
-        "Medical",
-        "Birthday",
-        "Worship",
+        "Street Crusade",
+        "Market Crusade",
+        "Transport Crusade",
+        "Medical Crusade",
+        "Birthday Crusade",
+        "Worship Crusade",
       ],
       required: true,
       conditional: {
@@ -638,7 +638,7 @@ export default function TestForm() {
             value={value}
             onChange={(e) => handleInputChange(question.id, e.target.value)}
             rows={4}
-            className="border border-gray-300 rounded-full px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[#54037C] resize-none"
+            className="border border-gray-300 rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[#54037C] resize-none"
             required={question.required}
           />
         );
