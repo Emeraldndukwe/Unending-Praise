@@ -3516,16 +3516,16 @@ function MeetingForm({
               reject(new Error('Invalid response from server'));
             }
           } else {
-            // Retry on server errors (5xx) if we haven't exceeded max retries
-            if (xhr.status >= 500 && retryCount < MAX_RETRIES) {
-              console.log(`Retrying upload (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+            // Retry on server errors (5xx) or HTTP/2 protocol errors (status 0) if we haven't exceeded max retries
+            if ((xhr.status >= 500 || xhr.status === 0) && retryCount < MAX_RETRIES) {
+              console.log(`Retrying upload (attempt ${retryCount + 1}/${MAX_RETRIES})... Status: ${xhr.status}`);
               setTimeout(() => {
                 uploadLargeFile(file, resourceType, retryCount + 1)
                   .then(resolve)
                   .catch(reject);
-              }, 2000 * (retryCount + 1)); // Exponential backoff
+              }, 5000 * (retryCount + 1)); // Longer delay for retries
             } else {
-              const errorText = xhr.responseText || xhr.statusText;
+              const errorText = xhr.responseText || xhr.statusText || 'Unknown error';
               reject(new Error(`Upload failed: ${errorText} (Status: ${xhr.status})`));
             }
           }
@@ -3535,16 +3535,16 @@ function MeetingForm({
           if (timeoutId) clearTimeout(timeoutId);
           if (isAborted) return;
           
-          // Retry on network errors if we haven't exceeded max retries
+          // HTTP/2 protocol errors and network errors - retry with longer delay
           if (retryCount < MAX_RETRIES) {
-            console.log(`Retrying upload after network error (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+            console.log(`Retrying upload after network/HTTP2 error (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
             setTimeout(() => {
               uploadLargeFile(file, resourceType, retryCount + 1)
                 .then(resolve)
                 .catch(reject);
-            }, 2000 * (retryCount + 1)); // Exponential backoff
+            }, 5000 * (retryCount + 1)); // Longer delay for network errors
           } else {
-            reject(new Error('Upload failed: Network error. Please check your internet connection and try again.'));
+            reject(new Error('Upload failed: Network or HTTP/2 protocol error. The file may be too large or the connection was interrupted. Please try again or use a smaller file.'));
           }
         });
 

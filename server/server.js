@@ -608,6 +608,16 @@ app.post('/api/admin/upload-large', requireAuth, requireRole('crusade', 'testimo
     return res.status(503).json({ error: 'Cloudinary not configured' });
   }
   
+  // Increase timeouts for large file uploads
+  req.setTimeout(60 * 60 * 1000); // 60 minutes
+  res.setTimeout(60 * 60 * 1000); // 60 minutes
+  
+  // Keep connection alive
+  if (req.socket) {
+    req.socket.setTimeout(60 * 60 * 1000);
+    req.socket.setKeepAlive(true);
+  }
+  
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file provided' });
@@ -627,16 +637,22 @@ app.post('/api/admin/upload-large', requireAuth, requireRole('crusade', 'testimo
       }
     }
     
-    // For large files, use upload_stream which handles streaming and chunking
-    // Stream directly from disk file instead of memory buffer for better performance
     const filePath = req.file.path;
+    let responseSent = false;
+    
+    // For large files, use upload_stream which handles streaming and chunking
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder: String(folder || 'unendingpraise/trainings'),
         resource_type: finalResourceType,
         chunk_size: 6000000, // 6MB chunks for large files
+        timeout: 60 * 60 * 1000, // 60 minutes timeout for Cloudinary
       },
       (error, result) => {
+        // Prevent double response
+        if (responseSent) return;
+        responseSent = true;
+        
         // Clean up temp file after upload
         if (filePath && fs.existsSync(filePath)) {
           fs.unlink(filePath, (err) => {
@@ -646,22 +662,31 @@ app.post('/api/admin/upload-large', requireAuth, requireRole('crusade', 'testimo
         
         if (error) {
           console.error('Cloudinary upload error:', error);
-          return res.status(500).json({ error: 'Upload failed', details: error.message });
+          if (!res.headersSent) {
+            return res.status(500).json({ error: 'Upload failed', details: error.message });
+          }
+          return;
         }
         if (!result) {
-          return res.status(500).json({ error: 'Upload failed: No result from Cloudinary' });
+          if (!res.headersSent) {
+            return res.status(500).json({ error: 'Upload failed: No result from Cloudinary' });
+          }
+          return;
         }
-        res.json({
-          url: result.secure_url,
-          publicId: result.public_id,
-          bytes: result.bytes,
-          resourceType: result.resource_type,
-        });
+        if (!res.headersSent) {
+          res.json({
+            url: result.secure_url,
+            publicId: result.public_id,
+            bytes: result.bytes,
+            resourceType: result.resource_type,
+          });
+        }
       }
     );
     
     // Stream file from disk to Cloudinary (much faster than buffering in memory)
-    const fileStream = fs.createReadStream(filePath);
+    const fileStream = fs.createReadStream(filePath, { highWaterMark: 1024 * 1024 * 5 }); // 5MB chunks
+    
     fileStream.pipe(uploadStream);
     
     // Handle stream errors
@@ -670,11 +695,27 @@ app.post('/api/admin/upload-large', requireAuth, requireRole('crusade', 'testimo
       if (filePath && fs.existsSync(filePath)) {
         fs.unlink(filePath, () => {});
       }
-      res.status(500).json({ error: 'Upload failed', details: err.message });
+      if (!responseSent && !res.headersSent) {
+        responseSent = true;
+        res.status(500).json({ error: 'Upload failed', details: err.message });
+      }
+    });
+    
+    uploadStream.on('error', (err) => {
+      console.error('Upload stream error:', err);
+      if (filePath && fs.existsSync(filePath)) {
+        fs.unlink(filePath, () => {});
+      }
+      if (!responseSent && !res.headersSent) {
+        responseSent = true;
+        res.status(500).json({ error: 'Upload failed', details: err.message });
+      }
     });
   } catch (e) {
     console.error('Large file upload error:', e);
-    res.status(500).json({ error: 'Upload failed', details: e?.message || 'Unknown error' });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Upload failed', details: e?.message || 'Unknown error' });
+    }
   }
 });
 
