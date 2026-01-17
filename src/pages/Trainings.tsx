@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, Video, FileText } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface Meeting {
   id: string;
@@ -227,59 +228,75 @@ export default function Trainings() {
       {/* Header Section - Below Navbar, centered */}
       <div className="pt-32 pb-8">
         <div className="max-w-7xl mx-auto px-4 md:px-8">
-          <div className="flex flex-col items-center gap-6">
+          <div className="flex items-center justify-center gap-6 relative">
             {/* Title - Centered */}
             <h1 className="text-2xl md:text-3xl font-bold text-gray-800 uppercase tracking-wide text-center">
               TRAINING & RESOURCES
             </h1>
 
-            {/* Search Icon/Bar */}
-            <div className="w-full flex justify-center">
-              {!isSearchOpen ? (
-                <button
-                  onClick={() => setIsSearchOpen(true)}
-                  className="p-3 bg-white rounded-full shadow-md hover:shadow-lg transition-all hover:scale-110"
-                  aria-label="Open search"
-                >
-                  <Search className="w-6 h-6 text-[#54037C]" />
-                </button>
-              ) : (
-                <div className="relative w-full max-w-2xl">
-                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-600 w-5 h-5 pointer-events-none" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onBlur={() => {
-                      // Keep search open if there's a query, close if empty
-                      if (!searchQuery) {
-                        setIsSearchOpen(false);
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape') {
-                        setSearchQuery('');
-                        setIsSearchOpen(false);
-                      }
-                    }}
-                    placeholder="Search training videos and resources..."
-                    className="w-full pl-12 pr-4 py-3 bg-white rounded-full border-2 border-[#54037C]/20 focus:outline-none focus:ring-2 focus:ring-[#54037C]/50 focus:border-[#54037C] text-gray-800 placeholder-gray-500 shadow-lg"
-                    autoFocus
-                  />
-                  <button
-                    onClick={() => {
-                      setSearchQuery('');
-                      setIsSearchOpen(false);
-                    }}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    aria-label="Close search"
+            {/* Search Icon/Bar - Same line, positioned to the right */}
+            <div className="absolute right-0">
+              <AnimatePresence mode="wait">
+                {!isSearchOpen ? (
+                  <motion.button
+                    key="search-icon"
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    transition={{ duration: 0.2 }}
+                    onClick={() => setIsSearchOpen(true)}
+                    className="p-3 bg-white rounded-full shadow-md hover:shadow-lg transition-all hover:scale-110"
+                    aria-label="Open search"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              )}
+                    <Search className="w-6 h-6 text-[#54037C]" />
+                  </motion.button>
+                ) : (
+                  <motion.div
+                    key="search-bar"
+                    initial={{ width: 0, opacity: 0 }}
+                    animate={{ width: 400, opacity: 1 }}
+                    exit={{ width: 0, opacity: 0 }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                    className="relative overflow-hidden"
+                  >
+                    <div className="relative w-[400px]">
+                      <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-600 w-5 h-5 pointer-events-none z-10" />
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onBlur={() => {
+                          // Keep search open if there's a query, close if empty
+                          if (!searchQuery) {
+                            setIsSearchOpen(false);
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') {
+                            setSearchQuery('');
+                            setIsSearchOpen(false);
+                          }
+                        }}
+                        placeholder="Search training videos and resources..."
+                        className="w-full pl-12 pr-4 py-3 bg-white rounded-full border-2 border-[#54037C]/20 focus:outline-none focus:ring-2 focus:ring-[#54037C]/50 focus:border-[#54037C] text-gray-800 placeholder-gray-500 shadow-lg"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => {
+                          setSearchQuery('');
+                          setIsSearchOpen(false);
+                        }}
+                        className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 z-10"
+                        aria-label="Close search"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </div>
