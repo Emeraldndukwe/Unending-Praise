@@ -283,8 +283,19 @@ export default function AdminPage() {
         if (res.ok) {
           const data = await res.json();
           setRole(data?.user?.role || "");
+        } else if (res.status === 401) {
+          // Token is invalid/expired, clear it
+          setToken("");
+          setRole("");
         }
-      } catch {}
+      } catch (err) {
+        // Silently handle network errors - don't log expected auth failures
+        if (token) {
+          // Only clear token if we have one (prevents infinite loops)
+          setToken("");
+          setRole("");
+        }
+      }
     };
     loadRole();
     refreshCrusadeTypes();
