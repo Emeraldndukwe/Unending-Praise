@@ -3579,37 +3579,48 @@ function MeetingForm({
     }
 
     try {
+      // Cloudinary has file size limits for direct uploads (typically 100MB-500MB depending on plan)
+      // For very large files (500MB+), use server proxy which handles chunked uploads
+      const fileSizeMB = file.size / (1024 * 1024);
+      const MAX_DIRECT_UPLOAD_SIZE_MB = 500; // Use server proxy for files larger than 500MB
+      
       // First, try to get upload signature/preset for direct Cloudinary upload
       let useDirectUpload = false;
       let uploadConfig: any = null;
       
-      try {
-        const sigRes = await fetch('/api/admin/upload-signature', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...authHeaders,
-          },
-          body: JSON.stringify({
-            folder: 'unendingpraise/trainings',
-            resourceType: resourceType === 'video' ? 'video' : 'image',
-          }),
-        });
-        
-        if (sigRes.ok) {
-          uploadConfig = await sigRes.json();
-          // If we have an uploadPreset, we can use direct upload
-          if (uploadConfig.uploadPreset) {
-            useDirectUpload = true;
+      // Only attempt direct upload for files under the size limit
+      if (fileSizeMB < MAX_DIRECT_UPLOAD_SIZE_MB) {
+        try {
+          const sigRes = await fetch('/api/admin/upload-signature', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...authHeaders,
+            },
+            body: JSON.stringify({
+              folder: 'unendingpraise/trainings',
+              resourceType: resourceType === 'video' ? 'video' : 'image',
+            }),
+          });
+          
+          if (sigRes.ok) {
+            uploadConfig = await sigRes.json();
+            // If we have an uploadPreset, we can use direct upload
+            if (uploadConfig.uploadPreset) {
+              useDirectUpload = true;
+            }
           }
+        } catch (e) {
+          console.log('Could not get upload signature, falling back to server proxy:', e);
         }
-      } catch (e) {
-        console.log('Could not get upload signature, falling back to server proxy:', e);
+      } else {
+        console.log(`File size (${fileSizeMB.toFixed(2)}MB) exceeds direct upload limit (${MAX_DIRECT_UPLOAD_SIZE_MB}MB), using server proxy for chunked upload`);
       }
 
-      // Use direct Cloudinary upload if preset is available
-      if (useDirectUpload && uploadConfig) {
-        return new Promise((resolve, reject) => {
+      // Use direct Cloudinary upload if preset is available and file is under size limit
+      if (useDirectUpload && uploadConfig && fileSizeMB < MAX_DIRECT_UPLOAD_SIZE_MB) {
+        try {
+          return await new Promise((resolve, reject) => {
           const formData = new FormData();
           formData.append('file', file);
           formData.append('upload_preset', uploadConfig.uploadPreset);
@@ -3645,6 +3656,12 @@ function MeetingForm({
               } catch (e) {
                 reject(new Error('Invalid response from Cloudinary'));
               }
+            } else if (xhr.status === 413) {
+              // File too large for direct upload - fall back to server proxy
+              if (timeoutId) clearTimeout(timeoutId);
+              console.log('File too large for direct Cloudinary upload (413), falling back to server proxy');
+              // Reject with a special error that we'll catch to use server proxy
+              reject(new Error('FILE_TOO_LARGE_FOR_DIRECT_UPLOAD'));
             } else {
               // Retry on server errors if we haven't exceeded max retries
               if ((xhr.status >= 500 || xhr.status === 0) && retryCount < MAX_RETRIES) {
@@ -3654,6 +3671,11 @@ function MeetingForm({
                     .then(resolve)
                     .catch(reject);
                 }, 5000 * (retryCount + 1));
+              } else if (xhr.status === 413) {
+                // File too large - fall back to server proxy
+                if (timeoutId) clearTimeout(timeoutId);
+                console.log('File too large for direct Cloudinary upload (413), falling back to server proxy');
+                reject(new Error('FILE_TOO_LARGE_FOR_DIRECT_UPLOAD'));
               } else {
                 const errorText = xhr.responseText || xhr.statusText || 'Unknown error';
                 reject(new Error(`Direct upload failed: ${errorText} (Status: ${xhr.status})`));
@@ -3664,6 +3686,13 @@ function MeetingForm({
           xhr.addEventListener('error', () => {
             if (timeoutId) clearTimeout(timeoutId);
             if (isAborted) return;
+            
+            // Check if it's a 413 error (Request Entity Too Large)
+            if (xhr.status === 413) {
+              console.log('File too large for direct Cloudinary upload, falling back to server proxy');
+              reject(new Error('FILE_TOO_LARGE_FOR_DIRECT_UPLOAD'));
+              return;
+            }
             
             if (retryCount < MAX_RETRIES) {
               console.log(`Retrying direct upload after network error (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
@@ -3691,9 +3720,20 @@ function MeetingForm({
           xhr.open('POST', uploadConfig.uploadUrl || `https://api.cloudinary.com/v1_1/${uploadConfig.cloudName}/${resourceType === 'video' ? 'video' : 'image'}/upload`);
           xhr.send(formData);
         });
+        } catch (error: any) {
+          // If direct upload fails with "file too large" error, fall back to server proxy
+          if (error.message === 'FILE_TOO_LARGE_FOR_DIRECT_UPLOAD') {
+            console.log('Falling back to server proxy for large file upload');
+            // Continue to server proxy code below
+          } else {
+            // For other errors, throw to be handled by outer catch
+            throw error;
+          }
+        }
       }
 
-      // Fallback to server proxy if direct upload is not available
+      // If direct upload failed or wasn't available, use server proxy
+      if (!useDirectUpload || fileSizeMB >= MAX_DIRECT_UPLOAD_SIZE_MB) {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('folder', 'unendingpraise/trainings');
