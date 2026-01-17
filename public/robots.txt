@@ -1,6 +1,5 @@
 User-agent: *
 Allow: /
 
-# Add your sitemap location below when it becomes available.
-# Sitemap: https://pastorchrisliveunendingpraise.org/sitemap.xml
+Sitemap: https://pastorchrisliveunendingpraise.org/sitemap.xml
 
