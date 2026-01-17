@@ -3972,7 +3972,7 @@ function MeetingForm({
             {uploading ? `Uploading... ${Math.round(uploadProgress)}%` : 'Upload Video(s)'}
             <input
               type="file"
-              accept="video/*"
+              accept="video/*,.mp4,.mov,.avi,.mkv,.flv,.wmv,.webm,.m4v,.3gp,.ogv,.ts,.mts,.m2ts"
               className="hidden"
               onChange={(e) => handleFileUpload(e, 'video')}
               disabled={uploading}
@@ -4212,7 +4212,7 @@ function MeetingItem({
                 {uploading ? '...' : 'Upload'}
                 <input
                   type="file"
-                  accept="video/*"
+                  accept="video/*,.mp4,.mov,.avi,.mkv,.flv,.wmv,.webm,.m4v,.3gp,.ogv,.ts,.mts,.m2ts"
                   className="hidden"
                   onChange={(e) => handleFileUpload(e, 'video')}
                   disabled={uploading}
