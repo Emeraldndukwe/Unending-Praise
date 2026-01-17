@@ -255,11 +255,24 @@ export default function MeetingVideoPlayer() {
     if (!video) return;
 
     const updateTime = () => setCurrentTime(video.currentTime);
-    const handlePlay = () => setIsPlaying(true);
+    const handlePlay = () => {
+      setIsPlaying(true);
+      // Ensure video is unmuted when playing
+      if (video.muted && !isMuted) {
+        video.muted = false;
+      }
+      // Ensure volume is set
+      if (video.volume === 0) {
+        video.volume = 1;
+      }
+    };
     const handlePause = () => setIsPlaying(false);
     const handleEnded = () => setIsPlaying(false);
     const handleLoadedMetadata = () => {
       setDuration(video.duration);
+      // Set volume and unmute when metadata loads
+      video.volume = 1;
+      video.muted = isMuted;
     };
 
     video.addEventListener("timeupdate", updateTime);
@@ -275,7 +288,7 @@ export default function MeetingVideoPlayer() {
       video.removeEventListener("pause", handlePause);
       video.removeEventListener("ended", handleEnded);
     };
-  }, [meeting]);
+  }, [meeting, isMuted]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -292,6 +305,14 @@ export default function MeetingVideoPlayer() {
     if (isPlaying) {
       video.pause();
     } else {
+      // Ensure video is unmuted before playing
+      if (video.muted && !isMuted) {
+        video.muted = false;
+      }
+      // Ensure volume is set
+      if (video.volume === 0) {
+        video.volume = 1;
+      }
       video.play().catch((err) => {
         console.error("Play failed:", err);
       });
