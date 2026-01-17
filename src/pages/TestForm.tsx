@@ -288,6 +288,7 @@ export default function TestForm() {
   const [isRecording, setIsRecording] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // Build dynamic form config with crusades
   const getFormConfigs = (): FormConfigs => {
@@ -480,8 +481,50 @@ export default function TestForm() {
   };
 
   const handleSubmit = () => {
-    console.log("Form submitted:", formData);
-    alert("Form submitted! Check console for data.");
+    // Show confirmation modal
+    setShowConfirmModal(true);
+  };
+
+  const confirmSubmit = async () => {
+    setShowConfirmModal(false);
+    try {
+      // Prepare form data for submission
+      const submissionData = {
+        ...formData,
+        memberType: memberType,
+      };
+      
+      const res = await fetch('/api/crusade-form-submissions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          memberType: memberType,
+          formData: submissionData,
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: 'Submission failed' }));
+        throw new Error(errorData.error || 'Submission failed');
+      }
+
+      const result = await res.json();
+      alert("Your crusade form has been submitted successfully! It will be reviewed by the admin team.");
+      
+      // Reset form
+      setMemberType(null);
+      setCurrentStep(1);
+      setFormData({ memberType: null });
+      setExpandedQuestions(new Set());
+      setAudioUrl(null);
+      setIsRecording(false);
+      setMediaRecorder(null);
+    } catch (error: any) {
+      console.error('Form submission error:', error);
+      alert(`Failed to submit form: ${error.message || 'Please try again.'}`);
+    }
   };
 
   const renderQuestion = (question: Question | ConditionalQuestion) => {
@@ -953,6 +996,60 @@ export default function TestForm() {
           </div>
         </motion.div>
       </div>
+
+      {/* Confirmation Modal */}
+      <AnimatePresence>
+        {showConfirmModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowConfirmModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full"
+            >
+              <div className="flex flex-col items-center text-center">
+                {/* Question Mark Icon */}
+                <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mb-4">
+                  <span className="text-4xl text-blue-500 font-bold">?</span>
+                </div>
+                
+                {/* Title */}
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                  Submit Response?
+                </h2>
+                
+                {/* Description */}
+                <p className="text-gray-600 mb-6">
+                  Please confirm to finalize your submission.
+                </p>
+                
+                {/* Buttons */}
+                <div className="flex gap-3 w-full">
+                  <button
+                    onClick={confirmSubmit}
+                    className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition border border-blue-700"
+                  >
+                    Submit
+                  </button>
+                  <button
+                    onClick={() => setShowConfirmModal(false)}
+                    className="flex-1 px-6 py-3 bg-gray-500 hover:bg-gray-600 text-white rounded-xl font-semibold transition"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

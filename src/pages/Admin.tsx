@@ -60,7 +60,7 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 
 export default function AdminPage() {
   const { token, setToken, headers } = useAuthToken();
-  const [tab, setTab] = useState<"testimonies" | "crusades" | "messages" | "songs" | "comments" | "users" | "crusade-types" | "analytics" | "trainings">("testimonies");
+  const [tab, setTab] = useState<"testimonies" | "crusades" | "messages" | "songs" | "comments" | "users" | "crusade-types" | "analytics" | "trainings" | "form-submissions">("testimonies");
   const [role, setRole] = useState<string>("");
   const [testimonies, setTestimonies] = useState<Testimony[]>([]);
   const [crusades, setCrusades] = useState<Crusade[]>([]);
@@ -81,6 +81,18 @@ export default function AdminPage() {
   const [meetingSettings, setMeetingSettings] = useState<{access_token?:string; updated_at?:string}>({});
   const [meetingPassword, setMeetingPassword] = useState("");
   const [meetingPasswordLoading, setMeetingPasswordLoading] = useState(false);
+  const [formSubmissions, setFormSubmissions] = useState<Array<{
+    id: string;
+    member_type: string;
+    form_data: any;
+    status: string;
+    reviewed_by?: string;
+    reviewed_by_name?: string;
+    reviewed_at?: string;
+    notes?: string;
+    created_at: string;
+    updated_at: string;
+  }>>([]);
 
   const uploadMedia = useCallback(
     async (dataUrl: string, scope: 'testimonies' | 'crusades' | 'documents') => {
@@ -221,6 +233,26 @@ export default function AdminPage() {
     }
   };
 
+  const refreshFormSubmissions = async () => {
+    try {
+      const submissions = await api<Array<{
+        id: string;
+        member_type: string;
+        form_data: any;
+        status: string;
+        reviewed_by?: string;
+        reviewed_by_name?: string;
+        reviewed_at?: string;
+        notes?: string;
+        created_at: string;
+        updated_at: string;
+      }>>("/api/crusade-form-submissions");
+      setFormSubmissions(submissions);
+    } catch (e: any) {
+      console.error("Failed to load form submissions:", e);
+    }
+  };
+
   const refresh = async () => {
     setLoading(true);
     setError(null);
@@ -236,6 +268,9 @@ export default function AdminPage() {
       setMessages(m);
       setSongs(s);
       await refreshCrusadeTypes();
+      if (role === 'crusade' || role === 'superadmin' || !role || role === 'admin') {
+        await refreshFormSubmissions();
+      }
     } catch (e: any) {
       setError(e?.message || "Failed to load");
     } finally {
@@ -1273,10 +1308,10 @@ export default function AdminPage() {
         <div className="flex flex-wrap gap-2 mb-6 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-2 border border-[#54037C]/10">
           {((() => {
             const base = ["testimonies", "crusades", "messages", "songs", "comments"] as const;
-            if (role === 'superadmin') return ([...base, 'crusade-types', 'users', 'analytics', 'trainings'] as const);
-            if (!role || role === 'admin') return ([...base, 'crusade-types', 'analytics'] as const);
+            if (role === 'superadmin') return ([...base, 'crusade-types', 'users', 'analytics', 'trainings', 'form-submissions'] as const);
+            if (!role || role === 'admin') return ([...base, 'crusade-types', 'analytics', 'form-submissions'] as const);
             if (role === 'testimony') return ["testimonies", "comments"] as const;
-            if (role === 'crusade') return (["crusades", "crusade-types", "comments"] as const);
+            if (role === 'crusade') return (["crusades", "crusade-types", "form-submissions", "comments"] as const);
             if (role === 'messages') return ["messages"] as const;
             if (role === 'songs') return ["songs"] as const;
             return base;
@@ -1412,6 +1447,71 @@ export default function AdminPage() {
                   </button>
                 </div>
               </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {tab === "form-submissions" && (
+        <section className="space-y-6">
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
+            <h2 className="text-xl font-bold text-[#54037C] mb-4">
+              Crusade Form Submissions ({formSubmissions.length})
+            </h2>
+            <div className="mb-4 flex gap-2">
+              <button
+                onClick={() => refreshFormSubmissions()}
+                className="px-4 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-xl text-sm font-medium"
+              >
+                Refresh
+              </button>
+              <select
+                onChange={(e) => {
+                  const status = e.target.value;
+                  if (status) {
+                    fetch(`/api/crusade-form-submissions?status=${status}`, {
+                      headers: headers as HeadersInit,
+                    })
+                      .then(res => res.json())
+                      .then(data => setFormSubmissions(data))
+                      .catch(err => console.error('Error filtering:', err));
+                  } else {
+                    refreshFormSubmissions();
+                  }
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-xl text-sm"
+              >
+                <option value="">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
+            <div className="space-y-4">
+              {formSubmissions.length === 0 && (
+                <div className="text-sm text-gray-500 text-center py-8">No form submissions yet</div>
+              )}
+              {formSubmissions.map((submission) => (
+                <FormSubmissionItem
+                  key={submission.id}
+                  submission={submission}
+                  onUpdate={async (status, notes) => {
+                    await api(`/api/crusade-form-submissions/${submission.id}`, {
+                      method: "PUT",
+                      headers: Object.assign({}, headers as Record<string, string>, { "content-type": "application/json" }),
+                      body: JSON.stringify({ status, notes }),
+                    });
+                    await refreshFormSubmissions();
+                  }}
+                  onDelete={async () => {
+                    await api(`/api/crusade-form-submissions/${submission.id}`, {
+                      method: "DELETE",
+                      headers: headers as HeadersInit,
+                    });
+                    await refreshFormSubmissions();
+                  }}
+                />
               ))}
             </div>
           </div>
@@ -4049,4 +4149,164 @@ function MeetingItem({
   );
 }
 
+function FormSubmissionItem({ 
+  submission, 
+  onUpdate, 
+  onDelete 
+}: { 
+  submission: {
+    id: string;
+    member_type: string;
+    form_data: any;
+    status: string;
+    reviewed_by_name?: string;
+    reviewed_at?: string;
+    notes?: string;
+    created_at: string;
+  };
+  onUpdate: (status: string, notes?: string) => Promise<void>;
+  onDelete: () => Promise<void>;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [status, setStatus] = useState(submission.status);
+  const [notes, setNotes] = useState(submission.notes || '');
+  const [updating, setUpdating] = useState(false);
+
+  const handleStatusUpdate = async (newStatus: string) => {
+    setUpdating(true);
+    try {
+      await onUpdate(newStatus, notes);
+      setStatus(newStatus);
+    } catch (err) {
+      alert('Failed to update status');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'approved': return 'bg-green-100 text-green-800';
+      case 'rejected': return 'bg-red-100 text-red-800';
+      default: return 'bg-yellow-100 text-yellow-800';
+    }
+  };
+
+  const formatFieldName = (key: string) => {
+    return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  return (
+    <div className="p-4 border border-gray-200 rounded-xl bg-white hover:shadow-md transition">
+      <div className="flex flex-col md:flex-row justify-between gap-4 mb-3">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="font-bold">
+              {submission.form_data?.organizer_name || submission.form_data?.crusade_name || 'Unnamed Submission'}
+            </h3>
+            <span className={`px-2 py-1 ${getStatusColor(status)} text-xs rounded-full font-medium`}>
+              {status.toUpperCase()}
+            </span>
+            <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+              {submission.member_type.replace('-', ' ').toUpperCase()}
+            </span>
+          </div>
+          <div className="text-sm text-gray-600">
+            {submission.form_data?.crusade_name && (
+              <div><strong>Crusade:</strong> {submission.form_data.crusade_name}</div>
+            )}
+            {submission.form_data?.crusade_date && (
+              <div><strong>Date:</strong> {submission.form_data.crusade_date}</div>
+            )}
+            {submission.form_data?.crusade_category && (
+              <div><strong>Category:</strong> {submission.form_data.crusade_category}</div>
+            )}
+          </div>
+          <div className="text-xs text-gray-500 mt-2">
+            Submitted: {new Date(submission.created_at).toLocaleString()}
+            {submission.reviewed_at && (
+              <> • Reviewed: {new Date(submission.reviewed_at).toLocaleString()} by {submission.reviewed_by_name || 'Admin'}</>
+            )}
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl text-sm h-fit"
+          >
+            {expanded ? 'Collapse' : 'View Details'}
+          </button>
+          <button
+            onClick={onDelete}
+            className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm h-fit"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="mt-4 pt-4 border-t border-gray-200 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {Object.entries(submission.form_data || {}).map(([key, value]) => {
+              if (key === 'memberType' || !value) return null;
+              return (
+                <div key={key} className="text-sm">
+                  <strong className="text-gray-700">{formatFieldName(key)}:</strong>
+                  <div className="text-gray-600 mt-1">
+                    {typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Admin Notes:</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              rows={3}
+              placeholder="Add notes about this submission..."
+            />
+          </div>
+
+          <div className="flex gap-2 mt-4">
+            <button
+              onClick={() => handleStatusUpdate('approved')}
+              disabled={updating || status === 'approved'}
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-xl text-sm"
+            >
+              {updating ? 'Updating...' : 'Approve'}
+            </button>
+            <button
+              onClick={() => handleStatusUpdate('rejected')}
+              disabled={updating || status === 'rejected'}
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white rounded-xl text-sm"
+            >
+              {updating ? 'Updating...' : 'Reject'}
+            </button>
+            <button
+              onClick={() => handleStatusUpdate('pending')}
+              disabled={updating || status === 'pending'}
+              className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-400 text-white rounded-xl text-sm"
+            >
+              {updating ? 'Updating...' : 'Set Pending'}
+            </button>
+            {notes !== (submission.notes || '') && (
+              <button
+                onClick={() => handleStatusUpdate(status)}
+                disabled={updating}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-xl text-sm"
+              >
+                Save Notes
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 

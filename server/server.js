@@ -218,6 +218,19 @@ async function ensureSchema() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+
+      -- Crusade form submissions
+      CREATE TABLE IF NOT EXISTS crusade_form_submissions (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        member_type TEXT NOT NULL,
+        form_data JSONB NOT NULL DEFAULT '{}'::jsonb,
+        status TEXT NOT NULL DEFAULT 'pending',
+        reviewed_by UUID REFERENCES users(id),
+        reviewed_at TIMESTAMPTZ,
+        notes TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
     `);
     
     // Migrate stream_events table - add missing columns if they don't exist
@@ -1124,6 +1137,108 @@ app.delete('/api/crusade-types/:id', requireAuth, requireAdmin, async (req, res)
     res.status(204).end();
   } catch (e) {
     console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Crusade Form Submissions API
+app.post('/api/crusade-form-submissions', async (req, res) => {
+  const { memberType, formData } = req.body || {};
+  if (!memberType || !formData) {
+    return res.status(400).json({ error: 'Missing memberType or formData' });
+  }
+  try {
+    const result = await pool.query(
+      `INSERT INTO crusade_form_submissions (member_type, form_data, status)
+       VALUES ($1, $2, 'pending')
+       RETURNING *`,
+      [memberType, JSON.stringify(formData)]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (e) {
+    console.error('Error creating form submission:', e);
+    res.status(500).json({ error: 'Server error', details: e.message || String(e) });
+  }
+});
+
+app.get('/api/crusade-form-submissions', requireAuth, requireRole('crusade'), async (req, res) => {
+  try {
+    const { status } = req.query || {};
+    let query = 'SELECT cfs.*, u.name as reviewed_by_name FROM crusade_form_submissions cfs LEFT JOIN users u ON cfs.reviewed_by = u.id';
+    const params = [];
+    if (status) {
+      query += ' WHERE cfs.status = $1';
+      params.push(status);
+    }
+    query += ' ORDER BY cfs.created_at DESC';
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (e) {
+    console.error('Error fetching form submissions:', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.get('/api/crusade-form-submissions/:id', requireAuth, requireRole('crusade'), async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      'SELECT cfs.*, u.name as reviewed_by_name FROM crusade_form_submissions cfs LEFT JOIN users u ON cfs.reviewed_by = u.id WHERE cfs.id = $1',
+      [id]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    res.json(result.rows[0]);
+  } catch (e) {
+    console.error('Error fetching form submission:', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.put('/api/crusade-form-submissions/:id', requireAuth, requireRole('crusade'), async (req, res) => {
+  const { id } = req.params;
+  const { status, notes } = req.body || {};
+  const userId = req.user?.id;
+  
+  try {
+    const updateFields = [];
+    const params = [];
+    let paramIndex = 1;
+    
+    if (status !== undefined) {
+      updateFields.push(`status = $${paramIndex++}`);
+      params.push(status);
+    }
+    if (notes !== undefined) {
+      updateFields.push(`notes = $${paramIndex++}`);
+      params.push(notes);
+    }
+    if (status && status !== 'pending') {
+      updateFields.push(`reviewed_by = $${paramIndex++}`);
+      params.push(userId);
+      updateFields.push(`reviewed_at = NOW()`);
+    }
+    updateFields.push(`updated_at = NOW()`);
+    
+    params.push(id);
+    const query = `UPDATE crusade_form_submissions SET ${updateFields.join(', ')} WHERE id = $${paramIndex} RETURNING *`;
+    const result = await pool.query(query, params);
+    
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    res.json(result.rows[0]);
+  } catch (e) {
+    console.error('Error updating form submission:', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.delete('/api/crusade-form-submissions/:id', requireAuth, requireRole('crusade'), async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query('DELETE FROM crusade_form_submissions WHERE id=$1', [id]);
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    res.status(204).end();
+  } catch (e) {
+    console.error('Error deleting form submission:', e);
     res.status(500).json({ error: 'Server error' });
   }
 });
