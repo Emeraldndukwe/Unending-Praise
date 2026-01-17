@@ -283,9 +283,24 @@ app.use(express.json({ limit: '10mb' }));
 // Trust proxy to get correct IP addresses (needed for Render and other proxies)
 app.set('trust proxy', true);
 
-// Configure multer for file uploads (memory storage for large files)
+// Configure multer for file uploads (disk storage for better performance with large files)
+// Using disk storage allows streaming instead of buffering entire file in memory
 const upload = multer({ 
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      // Use temp directory (will be cleaned up after upload)
+      const tempDir = path.join(__dirname, '../temp');
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+      cb(null, tempDir);
+    },
+    filename: (req, file, cb) => {
+      // Generate unique filename
+      const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1E9)}-${file.originalname}`;
+      cb(null, uniqueName);
+    }
+  }),
   limits: { 
     fileSize: 10 * 1024 * 1024 * 1024 // 10GB limit
   }
@@ -536,35 +551,51 @@ app.post('/api/admin/upload', requireAuth, requireRole('crusade', 'testimony', '
 });
 
 // Get Cloudinary upload signature for direct uploads (for large files)
+// Uses unsigned upload preset to bypass CORS and allow direct browser uploads
 app.post('/api/admin/upload-signature', requireAuth, requireRole('crusade', 'testimony', 'songs'), async (req, res) => {
   if (!cloudinaryEnabled) {
     return res.status(503).json({ error: 'Cloudinary not configured' });
   }
-  const { folder = 'unendingpraise/uploads', resourceType = 'auto' } = req.body || {};
+  const { folder = 'unendingpraise/trainings', resourceType = 'auto' } = req.body || {};
   
   try {
-    // Generate upload signature for unsigned uploads
-    // Note: You'll need to create an unsigned upload preset in Cloudinary dashboard
-    // For now, we'll use a timestamp-based signature
-    const timestamp = Math.round(new Date().getTime() / 1000);
-    const signature = cloudinary.utils.api_sign_request(
-      { timestamp, folder, resource_type: resourceType },
-      process.env.CLOUDINARY_API_SECRET || ''
-    );
-    
     const cloudName = cloudinary.config().cloud_name;
     const apiKey = cloudinary.config().api_key;
     
-    res.json({
-      signature,
-      timestamp,
-      folder,
-      resourceType,
-      cloudName,
-      apiKey,
-      // Upload URL for direct uploads
-      uploadUrl: `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType === 'video' ? 'video' : 'image'}/upload`,
-    });
+    // Use unsigned upload preset if available (set in CLOUDINARY_UPLOAD_PRESET env var)
+    // This allows direct browser uploads without CORS issues
+    const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET;
+    
+    if (uploadPreset) {
+      // Use unsigned preset - no signature needed, allows direct uploads
+      res.json({
+        uploadPreset,
+        folder,
+        resourceType,
+        cloudName,
+        apiKey,
+        // Upload URL for direct uploads with unsigned preset
+        uploadUrl: `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType === 'video' ? 'video' : 'image'}/upload`,
+      });
+    } else {
+      // Fallback to signed uploads (requires signature)
+      const timestamp = Math.round(new Date().getTime() / 1000);
+      const signature = cloudinary.utils.api_sign_request(
+        { timestamp, folder, resource_type: resourceType },
+        process.env.CLOUDINARY_API_SECRET || ''
+      );
+      
+      res.json({
+        signature,
+        timestamp,
+        folder,
+        resourceType,
+        cloudName,
+        apiKey,
+        // Upload URL for direct uploads
+        uploadUrl: `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType === 'video' ? 'video' : 'image'}/upload`,
+      });
+    }
   } catch (e) {
     console.error('Failed to generate upload signature:', e);
     res.status(500).json({ error: 'Failed to generate upload signature', details: e?.message || 'Unknown error' });
@@ -597,6 +628,8 @@ app.post('/api/admin/upload-large', requireAuth, requireRole('crusade', 'testimo
     }
     
     // For large files, use upload_stream which handles streaming and chunking
+    // Stream directly from disk file instead of memory buffer for better performance
+    const filePath = req.file.path;
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder: String(folder || 'unendingpraise/trainings'),
@@ -604,6 +637,13 @@ app.post('/api/admin/upload-large', requireAuth, requireRole('crusade', 'testimo
         chunk_size: 6000000, // 6MB chunks for large files
       },
       (error, result) => {
+        // Clean up temp file after upload
+        if (filePath && fs.existsSync(filePath)) {
+          fs.unlink(filePath, (err) => {
+            if (err) console.error('Error deleting temp file:', err);
+          });
+        }
+        
         if (error) {
           console.error('Cloudinary upload error:', error);
           return res.status(500).json({ error: 'Upload failed', details: error.message });
@@ -620,9 +660,18 @@ app.post('/api/admin/upload-large', requireAuth, requireRole('crusade', 'testimo
       }
     );
     
-    // Pipe the file buffer to Cloudinary
-    const fileStream = Readable.from(req.file.buffer);
+    // Stream file from disk to Cloudinary (much faster than buffering in memory)
+    const fileStream = fs.createReadStream(filePath);
     fileStream.pipe(uploadStream);
+    
+    // Handle stream errors
+    fileStream.on('error', (err) => {
+      console.error('File stream error:', err);
+      if (filePath && fs.existsSync(filePath)) {
+        fs.unlink(filePath, () => {});
+      }
+      res.status(500).json({ error: 'Upload failed', details: err.message });
+    });
   } catch (e) {
     console.error('Large file upload error:', e);
     res.status(500).json({ error: 'Upload failed', details: e?.message || 'Unknown error' });
