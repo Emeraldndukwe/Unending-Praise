@@ -49,7 +49,18 @@ export default function MeetingVideoPlayer() {
     // Otherwise (trainings route), fetch token from API
     if (token) {
       const authKey = `meetings_auth_${token}`;
-      const isAuth = sessionStorage.getItem(authKey) === "true";
+      const authData = sessionStorage.getItem(authKey);
+      // Check if auth data exists (could be "true" for old format or JSON for new format)
+      let isAuth = authData === "true";
+      if (!isAuth && authData) {
+        try {
+          const parsed = JSON.parse(authData);
+          isAuth = parsed.authenticated === true;
+        } catch (e) {
+          // If parsing fails, treat as not authenticated
+          isAuth = false;
+        }
+      }
       if (!isAuth) {
         navigate(`/meetings/${token}`);
         return;
@@ -62,7 +73,18 @@ export default function MeetingVideoPlayer() {
         .then(data => {
           if (data.token) {
             const authKey = `meetings_auth_${data.token}`;
-            const isAuth = sessionStorage.getItem(authKey) === "true";
+            const authData = sessionStorage.getItem(authKey);
+            // Check if auth data exists (could be "true" for old format or JSON for new format)
+            let isAuth = authData === "true";
+            if (!isAuth && authData) {
+              try {
+                const parsed = JSON.parse(authData);
+                isAuth = parsed.authenticated === true;
+              } catch (e) {
+                // If parsing fails, treat as not authenticated
+                isAuth = false;
+              }
+            }
             if (!isAuth) {
               navigate('/trainings');
               return;
