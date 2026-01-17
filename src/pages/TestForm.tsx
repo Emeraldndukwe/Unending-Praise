@@ -510,7 +510,7 @@ export default function TestForm() {
         throw new Error(errorData.error || 'Submission failed');
       }
 
-      const result = await res.json();
+      await res.json();
       alert("Your crusade form has been submitted successfully! It will be reviewed by the admin team.");
       
       // Reset form
