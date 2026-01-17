@@ -3711,10 +3711,11 @@ function MeetingForm({
           xhr.send(formData);
         });
         } catch (error: any) {
-          // If direct upload fails with "file too large" error, fall back to server proxy
-          if (error.message === 'FILE_TOO_LARGE_FOR_DIRECT_UPLOAD') {
-            console.log('Falling back to server proxy for large file upload');
+          // If direct upload fails with "file too large" or CORS/network error, fall back to server proxy
+          if (error.message === 'FILE_TOO_LARGE_FOR_DIRECT_UPLOAD' || error.message === 'DIRECT_UPLOAD_FAILED_FALLBACK') {
+            console.log('Falling back to server proxy for upload');
             // Continue to server proxy code below - don't return, let it fall through
+            useDirectUpload = false;
           } else {
             // For other errors, throw to be handled by outer catch
             throw error;
