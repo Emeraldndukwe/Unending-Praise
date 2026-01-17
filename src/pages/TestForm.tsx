@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Upload } from "lucide-react";
 
 type MemberType = "christ-embassy" | "ism-reon" | "others" | null;
 
@@ -16,6 +17,8 @@ type ConditionalQuestion = {
   options?: string[];
   description?: string;
   accept?: string;
+  hasFileUpload?: boolean;
+  hidden?: boolean;
   conditional?: ConditionalConfig;
 };
 
@@ -38,6 +41,8 @@ type Question = {
   options?: string[];
   description?: string;
   accept?: string;
+  hasFileUpload?: boolean;
+  hidden?: boolean;
   conditional?: ConditionalConfig;
 };
 
@@ -56,31 +61,31 @@ const step2IsmReonOthers: StepConfig = {
   questions: [
     {
       id: "organizer_name",
-      label: "Name of individual/group",
+      label: "Name of Individual/Group",
       type: "text",
       required: true,
     },
     {
       id: "phone_number",
-      label: "Phone number",
+      label: "Phone Number",
       type: "text",
       required: true,
     },
     {
       id: "kingschat_username",
-      label: "KingsChat username",
+      label: "KingsChat Username",
       type: "text",
       required: false,
     },
     {
       id: "ministry_church_name",
-      label: "Name of ministry/church",
+      label: "Name of Ministry/Church",
       type: "text",
       required: true,
     },
     {
       id: "pastor_name",
-      label: "Name of pastor",
+      label: "Name of Pastor",
       type: "text",
       required: true,
     },
@@ -93,37 +98,37 @@ const step2ChristEmbassy: StepConfig = {
   questions: [
     {
       id: "organizer_name",
-      label: "Name of individual/group",
+      label: "Name of Individual/Group",
       type: "text",
       required: true,
     },
     {
       id: "phone_number",
-      label: "Phone number",
+      label: "Phone Number",
       type: "text",
       required: true,
     },
     {
       id: "kingschat_username",
-      label: "KingsChat username",
+      label: "KingsChat Username",
       type: "text",
       required: false,
     },
     {
       id: "zone_name",
-      label: "Name of zone",
+      label: "Name of Zone",
       type: "text",
       required: true,
     },
     {
       id: "zonal_pastor_name",
-      label: "Name of zonal pastor",
+      label: "Name of Zonal Pastor",
       type: "text",
       required: true,
     },
     {
       id: "lmm_coordinator_name",
-      label: "Name of LMM coordinator",
+      label: "Name of LMM Coordinator",
       type: "text",
       required: false,
     },
@@ -136,25 +141,25 @@ const commonStep4: StepConfig = {
   questions: [
     {
       id: "total_attendance",
-      label: "Total attendance",
+      label: "Total Attendance",
       type: "text",
       required: true,
     },
     {
       id: "new_converts",
-      label: "Total number of new converts",
+      label: "Total Number of New Converts",
       type: "text",
       required: true,
     },
     {
       id: "first_timers",
-      label: "Total number of first timers",
+      label: "Total Number of First Timers",
       type: "text",
       required: true,
     },
     {
       id: "cells",
-      label: "Total number of cells",
+      label: "Total Number of Cells",
       type: "text",
       required: true,
     },
@@ -167,41 +172,36 @@ const commonStep5: StepConfig = {
   questions: [
     {
       id: "media_link",
-      label: "Link containing media",
+      label: "Link Containing Media",
       type: "text",
       required: false,
     },
     {
       id: "testimonies_link",
-      label: "Link containing testimonies",
+      label: "Link Containing Testimonies",
       description: "Link containing testimonies either in video or written format (if in written format, compile all testimonies from the program in a word document and upload it to the cloud and put the link here).",
       type: "text",
       required: false,
     },
     {
-      id: "testimonies_file",
-      label: "Upload testimonies file (PDF or Word Document)",
-      type: "file",
-      accept: ".pdf,.doc,.docx",
-      required: false,
-    },
-    {
       id: "writeup",
       label: "Comprehensive Report on your Crusade",
-      description: "Please provide a detailed report outlining all activities carried out before, during, and after the crusade. This should include information on preparations made, the execution of the crusade itself, and post-crusade follow-up or impact, where applicable. This should come in as a Word Document or PDF.",
+      description: "Please provide a detailed report outlining all activities carried out before, during, and after the crusade. This should include information on preparations made, the execution of the crusade itself, and post-crusade follow-up or impact, where applicable. You can type your report here or upload it as a Word Document or PDF.",
       type: "textarea",
       required: false,
+      hasFileUpload: true,
     },
     {
       id: "writeup_file",
-      label: "Upload comprehensive report (PDF or Word Document)",
+      label: "Upload Comprehensive Report (PDF or Word Document)",
       type: "file",
       accept: ".pdf,.doc,.docx",
       required: false,
+      hidden: true,
     },
     {
       id: "other_comments",
-      label: "Other comments",
+      label: "Other Comments",
       type: "textarea",
       required: false,
     },
@@ -214,19 +214,19 @@ const createStep3 = (): StepConfig => ({
   questions: [
     {
       id: "crusade_name",
-      label: "Name of crusade",
+      label: "Name of Crusade",
       type: "text",
       required: true,
     },
     {
       id: "crusade_date",
-      label: "Date of crusade",
+      label: "Date of Crusade",
       type: "text",
       required: true,
     },
     {
       id: "crusade_category",
-      label: "Category of crusades",
+      label: "Category of Crusades",
       type: "select",
       options: [
         "Special Crusades",
@@ -249,7 +249,7 @@ const createStep3 = (): StepConfig => ({
         questions: [
           {
             id: "special_crusade_type",
-            label: "What type of Special Crusade?",
+            label: "What Type of Special Crusade?",
             type: "select",
             options: [
               "Celebrating 1000 days with Pastor Chris live Unending Praise",
@@ -501,6 +501,43 @@ export default function TestForm() {
           />
         );
       case "textarea":
+        if (question.hasFileUpload) {
+          const fileInputId = `${question.id}_file`;
+          return (
+            <div className="relative">
+              <textarea
+                id={question.id}
+                value={value}
+                onChange={(e) => handleInputChange(question.id, e.target.value)}
+                rows={4}
+                className="border border-gray-300 rounded-lg px-3 py-2 pr-12 w-full focus:outline-none focus:ring-2 focus:ring-[#54037C] resize-none"
+                required={question.required}
+              />
+              <label
+                htmlFor={fileInputId}
+                className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-[#54037C] hover:text-[#54037C]/80 transition-colors"
+                title="Upload PDF or Word Document"
+              >
+                <Upload size={20} />
+              </label>
+              <input
+                type="file"
+                id={fileInputId}
+                accept=".pdf,.doc,.docx"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    handleInputChange('writeup_file', file.name);
+                  }
+                }}
+                className="hidden"
+              />
+              {formData['writeup_file'] && (
+                <p className="mt-2 text-sm text-gray-600">File selected: {formData['writeup_file']}</p>
+              )}
+            </div>
+          );
+        }
         return (
           <textarea
             id={question.id}
@@ -660,7 +697,9 @@ export default function TestForm() {
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-6"
               >
-                {getCurrentQuestions().map((question) => (
+                {getCurrentQuestions()
+                  .filter((question) => !question.hidden)
+                  .map((question) => (
                   <div key={question.id} className="space-y-2">
                     <label
                       htmlFor={question.id}
