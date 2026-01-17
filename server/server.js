@@ -303,12 +303,17 @@ app.set('trust proxy', true);
 const upload = multer({ 
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
-      // Use temp directory (will be cleaned up after upload)
-      const tempDir = path.join(__dirname, '../temp');
-      if (!fs.existsSync(tempDir)) {
-        fs.mkdirSync(tempDir, { recursive: true });
+      try {
+        // Use temp directory (will be cleaned up after upload)
+        const tempDir = path.join(__dirname, '../temp');
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
+        cb(null, tempDir);
+      } catch (err) {
+        console.error('Error creating temp directory:', err);
+        cb(err, null);
       }
-      cb(null, tempDir);
     },
     filename: (req, file, cb) => {
       // Generate unique filename
@@ -673,6 +678,17 @@ app.post('/api/admin/upload-large', requireAuth, requireRole('crusade', 'testimo
     }
     
     const filePath = req.file.path;
+    
+    // Verify file exists
+    if (!fs.existsSync(filePath)) {
+      console.error('File path does not exist:', filePath);
+      return res.status(500).json({ error: 'Upload failed', details: 'File was not saved correctly' });
+    }
+    
+    // Get file stats
+    const fileStats = fs.statSync(filePath);
+    console.log(`Uploading file: ${req.file.originalname}, Size: ${fileStats.size} bytes, Path: ${filePath}`);
+    
     let responseSent = false;
     
     // For large files, use upload_stream which handles streaming and chunking
@@ -774,8 +790,30 @@ app.post('/api/admin/upload-large', requireAuth, requireRole('crusade', 'testimo
     });
   } catch (e) {
     console.error('Large file upload error:', e);
+    console.error('Error stack:', e?.stack);
+    console.error('Request file:', req.file ? { 
+      fieldname: req.file.fieldname,
+      originalname: req.file.originalname,
+      encoding: req.file.encoding,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+      path: req.file.path
+    } : 'No file');
+    
+    // Clean up temp file if it exists
+    if (req.file?.path && fs.existsSync(req.file.path)) {
+      fs.unlink(req.file.path, (err) => {
+        if (err) console.error('Error deleting temp file in catch:', err);
+      });
+    }
+    
     if (!res.headersSent) {
-      res.status(500).json({ error: 'Upload failed', details: e?.message || 'Unknown error' });
+      res.status(500).json({ 
+        error: 'Upload failed', 
+        details: e?.message || 'Unknown error',
+        errorType: e?.name || 'Unknown',
+        code: e?.code
+      });
     }
   }
 });
