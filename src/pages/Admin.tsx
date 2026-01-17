@@ -3577,7 +3577,121 @@ function MeetingForm({
     }
 
     try {
-      // Upload through our server to avoid CORS issues
+      // First, try to get upload signature/preset for direct Cloudinary upload
+      let useDirectUpload = false;
+      let uploadConfig: any = null;
+      
+      try {
+        const sigRes = await fetch('/api/admin/upload-signature', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...authHeaders,
+          },
+          body: JSON.stringify({
+            folder: 'unendingpraise/trainings',
+            resourceType: resourceType === 'video' ? 'video' : 'image',
+          }),
+        });
+        
+        if (sigRes.ok) {
+          uploadConfig = await sigRes.json();
+          // If we have an uploadPreset, we can use direct upload
+          if (uploadConfig.uploadPreset) {
+            useDirectUpload = true;
+          }
+        }
+      } catch (e) {
+        console.log('Could not get upload signature, falling back to server proxy:', e);
+      }
+
+      // Use direct Cloudinary upload if preset is available
+      if (useDirectUpload && uploadConfig) {
+        return new Promise((resolve, reject) => {
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('upload_preset', uploadConfig.uploadPreset);
+          formData.append('folder', uploadConfig.folder || 'unendingpraise/trainings');
+          
+          const xhr = new XMLHttpRequest();
+          let timeoutId: ReturnType<typeof setTimeout> | null = null;
+          let isAborted = false;
+          
+          timeoutId = setTimeout(() => {
+            if (!isAborted) {
+              isAborted = true;
+              xhr.abort();
+              reject(new Error('Upload timeout: The upload took too long. Please try again or use a smaller file.'));
+            }
+          }, UPLOAD_TIMEOUT);
+          
+          xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable && !isAborted) {
+              const percentComplete = (e.loaded / e.total) * 100;
+              setUploadProgress(percentComplete);
+            }
+          });
+
+          xhr.addEventListener('load', () => {
+            if (timeoutId) clearTimeout(timeoutId);
+            if (isAborted) return;
+            
+            if (xhr.status === 200 || xhr.status === 201) {
+              try {
+                const response = JSON.parse(xhr.responseText);
+                resolve(response.secure_url || response.url);
+              } catch (e) {
+                reject(new Error('Invalid response from Cloudinary'));
+              }
+            } else {
+              // Retry on server errors if we haven't exceeded max retries
+              if ((xhr.status >= 500 || xhr.status === 0) && retryCount < MAX_RETRIES) {
+                console.log(`Retrying direct upload (attempt ${retryCount + 1}/${MAX_RETRIES})... Status: ${xhr.status}`);
+                setTimeout(() => {
+                  uploadLargeFile(file, resourceType, retryCount + 1)
+                    .then(resolve)
+                    .catch(reject);
+                }, 5000 * (retryCount + 1));
+              } else {
+                const errorText = xhr.responseText || xhr.statusText || 'Unknown error';
+                reject(new Error(`Direct upload failed: ${errorText} (Status: ${xhr.status})`));
+              }
+            }
+          });
+
+          xhr.addEventListener('error', () => {
+            if (timeoutId) clearTimeout(timeoutId);
+            if (isAborted) return;
+            
+            if (retryCount < MAX_RETRIES) {
+              console.log(`Retrying direct upload after network error (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+              setTimeout(() => {
+                uploadLargeFile(file, resourceType, retryCount + 1)
+                  .then(resolve)
+                  .catch(reject);
+              }, 5000 * (retryCount + 1));
+            } else {
+              reject(new Error('Direct upload failed: Network error. Please try again.'));
+            }
+          });
+
+          xhr.addEventListener('abort', () => {
+            if (timeoutId) clearTimeout(timeoutId);
+            if (!isAborted) {
+              isAborted = true;
+              reject(new Error('Upload was cancelled or aborted'));
+            }
+          });
+
+          xhr.timeout = UPLOAD_TIMEOUT;
+          
+          // Upload directly to Cloudinary
+          xhr.open('POST', uploadConfig.uploadUrl || `https://api.cloudinary.com/v1_1/${uploadConfig.cloudName}/${resourceType === 'video' ? 'video' : 'image'}/upload`);
+          xhr.send(formData);
+        });
+      }
+
+      // Fallback to server proxy if direct upload is not available
       const formData = new FormData();
       formData.append('file', file);
       formData.append('folder', 'unendingpraise/trainings');
