@@ -3724,7 +3724,7 @@ function MeetingForm({
           // If direct upload fails with "file too large" error, fall back to server proxy
           if (error.message === 'FILE_TOO_LARGE_FOR_DIRECT_UPLOAD') {
             console.log('Falling back to server proxy for large file upload');
-            // Continue to server proxy code below
+            // Continue to server proxy code below - don't return, let it fall through
           } else {
             // For other errors, throw to be handled by outer catch
             throw error;
@@ -3734,13 +3734,13 @@ function MeetingForm({
 
       // If direct upload failed or wasn't available, use server proxy
       if (!useDirectUpload || fileSizeMB >= MAX_DIRECT_UPLOAD_SIZE_MB) {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('folder', 'unendingpraise/trainings');
-      formData.append('resourceType', resourceType);
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('folder', 'unendingpraise/trainings');
+        formData.append('resourceType', resourceType);
 
-      return new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
+        return new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
         let timeoutId: ReturnType<typeof setTimeout> | null = null;
         let isAborted = false;
         
@@ -3837,13 +3837,17 @@ function MeetingForm({
         // Upload to our server endpoint
         xhr.open('POST', `/api/admin/upload-large?folder=unendingpraise/trainings&resourceType=${resourceType}`);
         
-        // Add auth headers
-        Object.keys(authHeaders).forEach(key => {
-          xhr.setRequestHeader(key, authHeaders[key]);
+          // Add auth headers
+          Object.keys(authHeaders).forEach(key => {
+            xhr.setRequestHeader(key, authHeaders[key]);
+          });
+          
+          xhr.send(formData);
         });
-        
-        xhr.send(formData);
-      });
+      }
+      
+      // If we reach here without returning, throw an error
+      throw new Error('Upload method not determined');
     } catch (error: any) {
       // Retry on errors if we haven't exceeded max retries
       if (retryCount < MAX_RETRIES) {
