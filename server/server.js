@@ -585,7 +585,7 @@ app.post('/api/admin/upload-large', requireAuth, requireRole('crusade', 'testimo
     const { folder = 'unendingpraise/trainings', resourceType = 'auto' } = req.query || {};
     
     // Determine resource type from file mimetype if not provided
-    let finalResourceType = resourceType as string;
+    let finalResourceType = String(resourceType || 'auto');
     if (finalResourceType === 'auto') {
       if (req.file.mimetype.startsWith('video/')) {
         finalResourceType = 'video';
@@ -599,7 +599,7 @@ app.post('/api/admin/upload-large', requireAuth, requireRole('crusade', 'testimo
     // For large files, use upload_stream which handles streaming and chunking
     const uploadStream = cloudinary.uploader.upload_stream(
       {
-        folder: folder as string,
+        folder: String(folder || 'unendingpraise/trainings'),
         resource_type: finalResourceType,
         chunk_size: 6000000, // 6MB chunks for large files
       },
