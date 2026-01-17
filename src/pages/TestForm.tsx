@@ -11,9 +11,11 @@ type FormData = {
 type ConditionalQuestion = {
   id: string;
   label: string;
-  type: "text" | "textarea" | "select" | "radio";
+  type: "text" | "textarea" | "select" | "radio" | "file";
   required: boolean;
   options?: string[];
+  description?: string;
+  accept?: string;
   conditional?: ConditionalConfig;
 };
 
@@ -31,9 +33,11 @@ type ConditionalConfig = {
 type Question = {
   id: string;
   label: string;
-  type: "text" | "textarea" | "select" | "radio";
+  type: "text" | "textarea" | "select" | "radio" | "file";
   required: boolean;
   options?: string[];
+  description?: string;
+  accept?: string;
   conditional?: ConditionalConfig;
 };
 
@@ -119,7 +123,7 @@ const step2ChristEmbassy: StepConfig = {
     },
     {
       id: "lmm_coordinator_name",
-      label: "Name of LMM co ordinator",
+      label: "Name of LMM coordinator",
       type: "text",
       required: false,
     },
@@ -170,13 +174,29 @@ const commonStep5: StepConfig = {
     {
       id: "testimonies_link",
       label: "Link containing testimonies",
+      description: "Link containing testimonies either in video or written format (if in written format, compile all testimonies from the program in a word document and upload it to the cloud and put the link here).",
       type: "text",
       required: false,
     },
     {
+      id: "testimonies_file",
+      label: "Upload testimonies file (PDF or Word Document)",
+      type: "file",
+      accept: ".pdf,.doc,.docx",
+      required: false,
+    },
+    {
       id: "writeup",
-      label: "Comprehensive writeup on the crusade",
+      label: "Comprehensive Report on your Crusade",
+      description: "Please provide a detailed report outlining all activities carried out before, during, and after the crusade. This should include information on preparations made, the execution of the crusade itself, and post-crusade follow-up or impact, where applicable. This should come in as a Word Document or PDF.",
       type: "textarea",
+      required: false,
+    },
+    {
+      id: "writeup_file",
+      label: "Upload comprehensive report (PDF or Word Document)",
+      type: "file",
+      accept: ".pdf,.doc,.docx",
       required: false,
     },
     {
@@ -232,21 +252,21 @@ const createStep3 = (): StepConfig => ({
             label: "What type of Special Crusade?",
             type: "select",
             options: [
-              "Celebrating 1000 days with pastor chris live unending praise",
-              "Praise night with pastor chris",
+              "Celebrating 1000 days with Pastor Chris live Unending Praise",
+              "Praise Night with Pastor Chris",
             ],
             required: true,
             conditional: {
               field: "special_crusade_type",
-              value: "Praise night with pastor chris",
+              value: "Praise Night with Pastor Chris",
               questions: [
                 {
                   id: "praise_night_type",
-                  label: "What type of Praise Night?",
+                  label: "Which Praise Night edition?",
                   type: "select",
                   options: [
-                    "Staff Praise Night",
-                    "Regular Praise Night",
+                    "Praise Night '24",
+                    "Praise Night '25",
                   ],
                   required: true,
                 },
@@ -475,7 +495,7 @@ export default function TestForm() {
             id={question.id}
             value={value}
             onChange={(e) => handleInputChange(question.id, e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[#54037C]"
+            className="border border-gray-300 rounded-full px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[#54037C]"
             required={question.required}
             min={isNumberField ? "0" : undefined}
           />
@@ -487,7 +507,7 @@ export default function TestForm() {
             value={value}
             onChange={(e) => handleInputChange(question.id, e.target.value)}
             rows={4}
-            className="border border-gray-300 rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[#54037C] resize-none"
+            className="border border-gray-300 rounded-full px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[#54037C] resize-none"
             required={question.required}
           />
         );
@@ -497,7 +517,7 @@ export default function TestForm() {
             id={question.id}
             value={value}
             onChange={(e) => handleInputChange(question.id, e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[#54037C]"
+            className="border border-gray-300 rounded-full px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[#54037C]"
             required={question.required}
           >
             <option value="">Select an option</option>
@@ -514,7 +534,7 @@ export default function TestForm() {
             {question.options?.map((opt: string) => (
               <label
                 key={opt}
-                className={`flex items-center gap-3 cursor-pointer p-3 rounded-lg border-2 transition-all ${
+                className={`flex items-center gap-3 cursor-pointer p-3 rounded-full border-2 transition-all ${
                   value === opt
                     ? "border-[#54037C] bg-[#54037C]/10"
                     : "border-gray-300 hover:border-[#54037C]/50 bg-white"
@@ -545,6 +565,29 @@ export default function TestForm() {
                 <span className="text-gray-800 font-medium">{opt}</span>
               </label>
             ))}
+          </div>
+        );
+      case "file":
+        return (
+          <div>
+            <input
+              type="file"
+              id={question.id}
+              accept={question.accept}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  handleInputChange(question.id, file.name);
+                } else {
+                  handleInputChange(question.id, "");
+                }
+              }}
+              className="border border-gray-300 rounded-full px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[#54037C] file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#54037C] file:text-white hover:file:bg-[#54037C]/90"
+              required={question.required}
+            />
+            {value && (
+              <p className="mt-2 text-sm text-gray-600">Selected: {value}</p>
+            )}
           </div>
         );
       default:
@@ -589,13 +632,18 @@ export default function TestForm() {
                     onClick={() => handleMemberTypeSelect(option.value as MemberType)}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
+                    className={`w-full p-4 rounded-full border-2 text-left transition-all flex items-center justify-between ${
                       memberType === option.value
-                        ? "border-purple-500 bg-purple-100 text-purple-900"
-                        : "border-purple-300 bg-purple-50 hover:border-purple-400 hover:bg-purple-100 text-purple-800"
+                        ? "border-purple-600 bg-purple-500 text-white shadow-lg shadow-purple-500/50"
+                        : "border-purple-200 bg-purple-50 hover:border-purple-300 hover:bg-purple-100 text-purple-700"
                     }`}
                   >
-                    <span className="font-medium text-gray-800">{option.label}</span>
+                    <span className="font-medium">{option.label}</span>
+                    {memberType === option.value && (
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
                   </motion.button>
                 ))}
               </div>
@@ -621,6 +669,11 @@ export default function TestForm() {
                       {question.label}
                       {question.required && <span className="text-red-500 ml-1">*</span>}
                     </label>
+                    {question.description && (
+                      <p className="text-xs text-gray-600 mb-2 italic">
+                        {question.description}
+                      </p>
+                    )}
                     {question.id === "phone_number" && (
                       <p className="text-xs text-gray-500 mb-1">
                         If you submit on behalf of your group, input your phone number
@@ -637,7 +690,7 @@ export default function TestForm() {
                         id={question.id}
                         value={formData[question.id] || ""}
                         onChange={(e) => handleInputChange(question.id, e.target.value)}
-                        className="border border-gray-300 rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[#54037C]"
+                        className="border border-gray-300 rounded-full px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[#54037C]"
                         required={question.required}
                       />
                     ) : (
@@ -737,7 +790,7 @@ export default function TestForm() {
                 onClick={handleBack}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                className="px-6 py-2 border-2 border-gray-300 rounded-lg text-gray-700 hover:border-gray-400 transition"
+                className="px-6 py-2 border-2 border-gray-300 rounded-full text-gray-700 hover:border-gray-400 transition"
               >
                 ← Back
               </motion.button>
@@ -754,7 +807,7 @@ export default function TestForm() {
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.8 }}
-                      className="px-6 py-2 bg-[#54037C] text-white rounded-lg hover:bg-[#54037C]/90 transition font-semibold"
+                      className="px-6 py-2 bg-[#54037C] text-white rounded-full hover:bg-[#54037C]/90 transition font-semibold"
                     >
                       {currentStep === Math.max(...getFormConfigs()[memberType].map((c) => c.step))
                         ? "Submit"
