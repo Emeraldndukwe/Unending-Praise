@@ -3579,10 +3579,10 @@ function MeetingForm({
     }
 
     try {
-      // Cloudinary has file size limits for direct uploads (typically 100MB-500MB depending on plan)
-      // For very large files (500MB+), use server proxy which handles chunked uploads
+      // Cloudinary has file size limits for direct uploads and CORS restrictions
+      // For safety, use server proxy for files larger than 100MB to avoid CORS and size issues
       const fileSizeMB = file.size / (1024 * 1024);
-      const MAX_DIRECT_UPLOAD_SIZE_MB = 500; // Use server proxy for files larger than 500MB
+      const MAX_DIRECT_UPLOAD_SIZE_MB = 100; // Use server proxy for files larger than 100MB to avoid CORS issues
       
       // First, try to get upload signature/preset for direct Cloudinary upload
       let useDirectUpload = false;
@@ -3660,8 +3660,12 @@ function MeetingForm({
               // File too large for direct upload - fall back to server proxy
               if (timeoutId) clearTimeout(timeoutId);
               console.log('File too large for direct Cloudinary upload (413), falling back to server proxy');
-              // Reject with a special error that we'll catch to use server proxy
               reject(new Error('FILE_TOO_LARGE_FOR_DIRECT_UPLOAD'));
+            } else if (xhr.status === 0) {
+              // CORS error or network failure (status 0) - fall back to server proxy
+              if (timeoutId) clearTimeout(timeoutId);
+              console.log('CORS or network error in direct upload, falling back to server proxy');
+              reject(new Error('DIRECT_UPLOAD_FAILED_FALLBACK'));
             } else {
               // Retry on server errors if we haven't exceeded max retries
               if ((xhr.status >= 500 || xhr.status === 0) && retryCount < MAX_RETRIES) {
@@ -3687,23 +3691,9 @@ function MeetingForm({
             if (timeoutId) clearTimeout(timeoutId);
             if (isAborted) return;
             
-            // Check if it's a 413 error (Request Entity Too Large)
-            if (xhr.status === 413) {
-              console.log('File too large for direct Cloudinary upload, falling back to server proxy');
-              reject(new Error('FILE_TOO_LARGE_FOR_DIRECT_UPLOAD'));
-              return;
-            }
-            
-            if (retryCount < MAX_RETRIES) {
-              console.log(`Retrying direct upload after network error (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
-              setTimeout(() => {
-                uploadLargeFile(file, resourceType, retryCount + 1)
-                  .then(resolve)
-                  .catch(reject);
-              }, 5000 * (retryCount + 1));
-            } else {
-              reject(new Error('Direct upload failed: Network error. Please try again.'));
-            }
+            // CORS errors or network errors - fall back to server proxy
+            console.log('Direct upload failed (likely CORS or network error), falling back to server proxy');
+            reject(new Error('DIRECT_UPLOAD_FAILED_FALLBACK'));
           });
 
           xhr.addEventListener('abort', () => {
