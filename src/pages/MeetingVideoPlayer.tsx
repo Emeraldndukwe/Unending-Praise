@@ -38,6 +38,9 @@ export default function MeetingVideoPlayer() {
   const [showControls, setShowControls] = useState(true);
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Store token in state to persist across video changes
+  const [storedToken, setStoredToken] = useState<string | null>(null);
+
   useEffect(() => {
     if (!id) {
       setError("Invalid link");
@@ -46,7 +49,7 @@ export default function MeetingVideoPlayer() {
     }
 
     // If token is in URL (meetings route), use it
-    // Otherwise (trainings route), fetch token from API
+    // Otherwise (trainings route), fetch token from API or use stored token
     if (token) {
       const authKey = `meetings_auth_${token}`;
       const authData = sessionStorage.getItem(authKey);
@@ -65,8 +68,28 @@ export default function MeetingVideoPlayer() {
         navigate(`/meetings/${token}`);
         return;
       }
+      setStoredToken(token);
       loadData(token);
     } else {
+      // For trainings route, check if we already have a stored token
+      if (storedToken) {
+        const authKey = `meetings_auth_${storedToken}`;
+        const authData = sessionStorage.getItem(authKey);
+        let isAuth = authData === "true";
+        if (!isAuth && authData) {
+          try {
+            const parsed = JSON.parse(authData);
+            isAuth = parsed.authenticated === true;
+          } catch (e) {
+            isAuth = false;
+          }
+        }
+        if (isAuth) {
+          loadData(storedToken);
+          return;
+        }
+      }
+      
       // Fetch token from API for trainings route
       fetch('/api/trainings/token')
         .then(res => res.json())
@@ -89,6 +112,7 @@ export default function MeetingVideoPlayer() {
               navigate('/trainings');
               return;
             }
+            setStoredToken(data.token);
             loadData(data.token);
           } else {
             navigate('/trainings');
@@ -96,7 +120,76 @@ export default function MeetingVideoPlayer() {
         })
         .catch(() => navigate('/trainings'));
     }
-  }, [token, id, navigate]);
+  }, [id, navigate]); // Removed token from dependencies to prevent re-checking on video change
+
+  // Reload data when id changes (user clicked another video)
+  useEffect(() => {
+    if (!id) return;
+    
+    // If we have a stored token, use it directly
+    if (storedToken) {
+      loadData(storedToken);
+      return;
+    }
+    
+    // For trainings route without token in URL, check sessionStorage for existing auth
+    if (!token) {
+      // Try to find any existing auth token in sessionStorage
+      let foundToken: string | null = null;
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key && key.startsWith('meetings_auth_')) {
+          const authData = sessionStorage.getItem(key);
+          let isAuth = authData === "true";
+          if (!isAuth && authData) {
+            try {
+              const parsed = JSON.parse(authData);
+              isAuth = parsed.authenticated === true;
+            } catch (e) {
+              isAuth = false;
+            }
+          }
+          if (isAuth) {
+            foundToken = key.replace('meetings_auth_', '');
+            break;
+          }
+        }
+      }
+      
+      if (foundToken) {
+        setStoredToken(foundToken);
+        loadData(foundToken);
+      } else {
+        // If no auth found, fetch token and check auth
+        fetch('/api/trainings/token')
+          .then(res => res.json())
+          .then(data => {
+            if (data.token) {
+              const authKey = `meetings_auth_${data.token}`;
+              const authData = sessionStorage.getItem(authKey);
+              let isAuth = authData === "true";
+              if (!isAuth && authData) {
+                try {
+                  const parsed = JSON.parse(authData);
+                  isAuth = parsed.authenticated === true;
+                } catch (e) {
+                  isAuth = false;
+                }
+              }
+              if (isAuth) {
+                setStoredToken(data.token);
+                loadData(data.token);
+              } else {
+                navigate('/trainings');
+              }
+            } else {
+              navigate('/trainings');
+            }
+          })
+          .catch(() => navigate('/trainings'));
+      }
+    }
+  }, [id]); // Only depend on id to reload when video changes
 
   const loadData = async (tokenValue: string) => {
     if (!tokenValue) return;
@@ -274,12 +367,18 @@ export default function MeetingVideoPlayer() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50">
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 pt-24">
       {/* Top Navigation with Back Button */}
-      <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-sm border-b border-purple-200 shadow-sm">
+      <div className="sticky top-24 z-50 bg-white/90 backdrop-blur-sm border-b border-purple-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 md:px-8 py-4">
           <button
-            onClick={() => navigate(`/meetings/${token}`)}
+            onClick={() => {
+              if (token) {
+                navigate(`/meetings/${token}`);
+              } else {
+                navigate('/trainings');
+              }
+            }}
             className="flex items-center gap-2 text-[#54037C] hover:text-[#8A4EBF] transition"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -339,15 +438,31 @@ export default function MeetingVideoPlayer() {
                         max={duration || 0}
                         value={currentTime}
                         onChange={handleSeek}
-                        className="w-full h-1.5 bg-white/30 rounded-lg appearance-none cursor-pointer accent-white"
+                        className="w-full h-1.5 bg-white/30 rounded-lg appearance-none cursor-pointer"
                         style={{
                           background: `linear-gradient(to right, white 0%, white ${(currentTime / duration) * 100}%, rgba(255,255,255,0.3) ${(currentTime / duration) * 100}%, rgba(255,255,255,0.3) 100%)`,
                         }}
                       />
-                      <div
-                        className="absolute top-1/2 transform -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-md"
-                        style={{ left: `${(currentTime / duration) * 100}%`, marginLeft: '-6px' }}
-                      />
+                      <style>{`
+                        input[type="range"]::-webkit-slider-thumb {
+                          appearance: none;
+                          width: 12px;
+                          height: 12px;
+                          background: white;
+                          border-radius: 50%;
+                          cursor: pointer;
+                          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                        }
+                        input[type="range"]::-moz-range-thumb {
+                          width: 12px;
+                          height: 12px;
+                          background: white;
+                          border-radius: 50%;
+                          cursor: pointer;
+                          border: none;
+                          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                        }
+                      `}</style>
                     </div>
                     <span className="text-white text-xs font-mono min-w-[80px] text-right">
                       {formatTime(currentTime)} / {formatTime(duration)}
@@ -462,7 +577,13 @@ export default function MeetingVideoPlayer() {
                   otherVideos.map((video) => (
                     <div
                       key={video.id}
-                      onClick={() => navigate(`/meetings/${token}/video/${video.id}`)}
+                      onClick={() => {
+                        if (token) {
+                          navigate(`/meetings/${token}/video/${video.id}`);
+                        } else if (storedToken) {
+                          navigate(`/trainings/video/${video.id}`);
+                        }
+                      }}
                       className="flex gap-3 cursor-pointer hover:bg-purple-50 p-2 rounded-lg transition"
                     >
                       <div className="relative w-32 h-20 bg-black rounded-lg overflow-hidden flex-shrink-0">
