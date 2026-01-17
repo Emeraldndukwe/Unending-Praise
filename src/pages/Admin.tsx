@@ -246,7 +246,9 @@ export default function AdminPage() {
         notes?: string;
         created_at: string;
         updated_at: string;
-      }>>("/api/crusade-form-submissions");
+      }>>("/api/crusade-form-submissions", {
+        headers: headers as HeadersInit,
+      });
       setFormSubmissions(submissions);
     } catch (e: any) {
       console.error("Failed to load form submissions:", e);
