@@ -11,6 +11,7 @@ import { fileURLToPath } from 'url';
 import { Readable } from 'stream';
 import { Pool } from 'pg';
 import { v2 as cloudinary } from 'cloudinary';
+import multer from 'multer';
 // Optional email notifications (nodemailer is optional)
 let nodemailer = null;
 try {
@@ -281,6 +282,14 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 // Trust proxy to get correct IP addresses (needed for Render and other proxies)
 app.set('trust proxy', true);
+
+// Configure multer for file uploads (memory storage for large files)
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { 
+    fileSize: 10 * 1024 * 1024 * 1024 // 10GB limit
+  }
+});
 
 // JWT auth
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
@@ -562,15 +571,62 @@ app.post('/api/admin/upload-signature', requireAuth, requireRole('crusade', 'tes
   }
 });
 
-// Direct upload endpoint for large files (multipart/form-data)
-app.post('/api/admin/upload-direct', requireAuth, requireRole('crusade', 'testimony', 'songs'), async (req, res) => {
+// Server-side upload endpoint for large files (bypasses CORS and handles large files)
+app.post('/api/admin/upload-large', requireAuth, requireRole('crusade', 'testimony', 'songs'), upload.single('file'), async (req, res) => {
   if (!cloudinaryEnabled) {
     return res.status(503).json({ error: 'Cloudinary not configured' });
   }
   
-  // Note: For multipart uploads, we need to use multer or similar
-  // For now, this is a placeholder - we'll use direct browser upload instead
-  res.status(501).json({ error: 'Use direct Cloudinary upload from browser' });
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file provided' });
+    }
+    
+    const { folder = 'unendingpraise/trainings', resourceType = 'auto' } = req.query || {};
+    
+    // Determine resource type from file mimetype if not provided
+    let finalResourceType = resourceType as string;
+    if (finalResourceType === 'auto') {
+      if (req.file.mimetype.startsWith('video/')) {
+        finalResourceType = 'video';
+      } else if (req.file.mimetype.startsWith('image/')) {
+        finalResourceType = 'image';
+      } else {
+        finalResourceType = 'raw';
+      }
+    }
+    
+    // For large files, use upload_stream which handles streaming and chunking
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: folder as string,
+        resource_type: finalResourceType,
+        chunk_size: 6000000, // 6MB chunks for large files
+      },
+      (error, result) => {
+        if (error) {
+          console.error('Cloudinary upload error:', error);
+          return res.status(500).json({ error: 'Upload failed', details: error.message });
+        }
+        if (!result) {
+          return res.status(500).json({ error: 'Upload failed: No result from Cloudinary' });
+        }
+        res.json({
+          url: result.secure_url,
+          publicId: result.public_id,
+          bytes: result.bytes,
+          resourceType: result.resource_type,
+        });
+      }
+    );
+    
+    // Pipe the file buffer to Cloudinary
+    const fileStream = Readable.from(req.file.buffer);
+    fileStream.pipe(uploadStream);
+  } catch (e) {
+    console.error('Large file upload error:', e);
+    res.status(500).json({ error: 'Upload failed', details: e?.message || 'Unknown error' });
+  }
 });
 
 // Proxy endpoint for PDFs to bypass Cloudinary access restrictions

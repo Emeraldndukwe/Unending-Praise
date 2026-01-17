@@ -3459,7 +3459,7 @@ function MeetingForm({
     const MAX_RETRIES = 2;
     const UPLOAD_TIMEOUT = 60 * 60 * 1000; // 60 minutes for very large files (1GB+)
     
-    // Get upload signature from server
+    // Get auth headers
     const authHeaders: Record<string, string> = {};
     if (headers) {
       const headerSource = headers as HeadersInit;
@@ -3477,30 +3477,11 @@ function MeetingForm({
     }
 
     try {
-      const sigRes = await fetch('/api/admin/upload-signature', {
-        method: 'POST',
-        headers: { ...authHeaders, 'content-type': 'application/json' },
-        body: JSON.stringify({ 
-          folder: 'unendingpraise/trainings',
-          resourceType 
-        }),
-      });
-
-      if (!sigRes.ok) {
-        const errorText = await sigRes.text();
-        throw new Error(`Failed to get upload signature: ${errorText || 'Unknown error'}`);
-      }
-
-      const sigData = await sigRes.json();
-
-      // Upload directly to Cloudinary with progress tracking
+      // Upload through our server to avoid CORS issues
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('folder', sigData.folder);
-      formData.append('resource_type', resourceType);
-      formData.append('timestamp', sigData.timestamp.toString());
-      formData.append('signature', sigData.signature);
-      formData.append('api_key', sigData.apiKey);
+      formData.append('folder', 'unendingpraise/trainings');
+      formData.append('resourceType', resourceType);
 
       return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -3527,12 +3508,12 @@ function MeetingForm({
           if (timeoutId) clearTimeout(timeoutId);
           if (isAborted) return;
           
-          if (xhr.status === 200) {
+          if (xhr.status === 200 || xhr.status === 201) {
             try {
               const response = JSON.parse(xhr.responseText);
-              resolve(response.secure_url || response.url);
+              resolve(response.url || response.secure_url);
             } catch (e) {
-              reject(new Error('Invalid response from Cloudinary'));
+              reject(new Error('Invalid response from server'));
             }
           } else {
             // Retry on server errors (5xx) if we haven't exceeded max retries
@@ -3544,7 +3525,8 @@ function MeetingForm({
                   .catch(reject);
               }, 2000 * (retryCount + 1)); // Exponential backoff
             } else {
-              reject(new Error(`Upload failed: ${xhr.statusText} (Status: ${xhr.status})`));
+              const errorText = xhr.responseText || xhr.statusText;
+              reject(new Error(`Upload failed: ${errorText} (Status: ${xhr.status})`));
             }
           }
         });
@@ -3593,16 +3575,23 @@ function MeetingForm({
           }
         });
 
-        // Set a timeout on the XHR object itself (though we're using our own timeout above)
+        // Set a timeout on the XHR object itself
         xhr.timeout = UPLOAD_TIMEOUT;
         
-        xhr.open('POST', sigData.uploadUrl);
+        // Upload to our server endpoint
+        xhr.open('POST', `/api/admin/upload-large?folder=unendingpraise/trainings&resourceType=${resourceType}`);
+        
+        // Add auth headers
+        Object.keys(authHeaders).forEach(key => {
+          xhr.setRequestHeader(key, authHeaders[key]);
+        });
+        
         xhr.send(formData);
       });
     } catch (error: any) {
-      // Retry on signature fetch errors if we haven't exceeded max retries
-      if (retryCount < MAX_RETRIES && error.message?.includes('signature')) {
-        console.log(`Retrying signature fetch (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+      // Retry on errors if we haven't exceeded max retries
+      if (retryCount < MAX_RETRIES) {
+        console.log(`Retrying upload (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
         await new Promise(resolve => setTimeout(resolve, 2000 * (retryCount + 1)));
         return uploadLargeFile(file, resourceType, retryCount + 1);
       }
