@@ -272,7 +272,12 @@ export default function MeetingVideoPlayer() {
       setDuration(video.duration);
       // Set volume and unmute when metadata loads
       video.volume = 1;
-      video.muted = isMuted;
+      // Force unmute if not explicitly muted by user
+      if (!isMuted) {
+        video.muted = false;
+      } else {
+        video.muted = true;
+      }
     };
 
     video.addEventListener("timeupdate", updateTime);
