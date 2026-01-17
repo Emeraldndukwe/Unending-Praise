@@ -54,8 +54,30 @@ export default function Trainings() {
           setToken(data.token);
           // Check if already authenticated (stored in sessionStorage)
           const authKey = `meetings_auth_${data.token}`;
-          const isAuth = sessionStorage.getItem(authKey) === "true";
-          if (isAuth) {
+          const storedAuth = sessionStorage.getItem(authKey);
+          
+          if (storedAuth) {
+            // Verify password hasn't changed since authentication
+            try {
+              const timestampRes = await fetch("/api/trainings/password-timestamp");
+              if (timestampRes.ok) {
+                const timestampData = await timestampRes.json();
+                const storedTimestamp = JSON.parse(storedAuth).passwordUpdatedAt;
+                
+                // If password was updated after authentication, clear session
+                if (timestampData.passwordUpdatedAt !== storedTimestamp) {
+                  sessionStorage.removeItem(authKey);
+                  setIsAuthenticated(false);
+                  return;
+                }
+              }
+            } catch (e) {
+              // If we can't verify, clear session to be safe
+              sessionStorage.removeItem(authKey);
+              setIsAuthenticated(false);
+              return;
+            }
+            
             setIsAuthenticated(true);
             loadData(data.token);
           }
@@ -149,9 +171,13 @@ export default function Trainings() {
         throw new Error(data.error || "Invalid password");
       }
 
-      // Store authentication in sessionStorage
+      // Store authentication in sessionStorage with password timestamp
+      const authData = await res.json();
       const authKey = `meetings_auth_${token}`;
-      sessionStorage.setItem(authKey, "true");
+      sessionStorage.setItem(authKey, JSON.stringify({ 
+        authenticated: true, 
+        passwordUpdatedAt: authData.passwordUpdatedAt 
+      }));
       setIsAuthenticated(true);
       await loadData(token);
     } catch (e: any) {

@@ -1710,7 +1710,7 @@ app.post('/api/trainings/verify-password', async (req, res) => {
   }
   try {
     const settingsResult = await pool.query(
-      'SELECT password_hash, access_token FROM meeting_settings ORDER BY updated_at DESC LIMIT 1'
+      'SELECT password_hash, access_token, updated_at FROM meeting_settings ORDER BY updated_at DESC LIMIT 1'
     );
     if (settingsResult.rowCount === 0) {
       return res.status(404).json({ error: 'Settings not found' });
@@ -1723,9 +1723,26 @@ app.post('/api/trainings/verify-password', async (req, res) => {
     if (!valid) {
       return res.status(401).json({ error: 'Invalid password' });
     }
-    res.json({ success: true });
+    // Return password updated_at timestamp so client can verify it hasn't changed
+    res.json({ success: true, passwordUpdatedAt: settings.updated_at });
   } catch (e) {
     console.error('Verify training password error:', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get password updated timestamp (for checking if password changed)
+app.get('/api/trainings/password-timestamp', async (_req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT updated_at FROM meeting_settings ORDER BY updated_at DESC LIMIT 1'
+    );
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Settings not found' });
+    }
+    res.json({ passwordUpdatedAt: result.rows[0].updated_at });
+  } catch (e) {
+    console.error('Get password timestamp error:', e);
     res.status(500).json({ error: 'Server error' });
   }
 });
