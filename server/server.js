@@ -1541,98 +1541,7 @@ app.get('/api/analytics/stats', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // Meeting Recordings API - Superadmin only
-// Get all meetings
-app.get('/api/meetings', requireAuth, requireSuperAdmin, async (_req, res) => {
-  try {
-    const result = await pool.query(
-      'SELECT id, title, video_url, thumbnail_url, section, created_at, updated_at FROM meeting_recordings ORDER BY section, created_at DESC'
-    );
-    res.json(result.rows);
-  } catch (e) {
-    console.error('Get meetings error:', e);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// Create meeting
-app.post('/api/meetings', requireAuth, requireSuperAdmin, async (req, res) => {
-  const { title, video_url, thumbnail_url, section } = req.body || {};
-  if (!title || !video_url) {
-    return res.status(400).json({ error: 'Missing title or video_url' });
-  }
-  try {
-    const result = await pool.query(
-      'INSERT INTO meeting_recordings (title, video_url, thumbnail_url, section) VALUES ($1, $2, $3, $4) RETURNING id, title, video_url, thumbnail_url, section, created_at, updated_at',
-      [title, video_url, thumbnail_url || null, section || null]
-    );
-    res.status(201).json(result.rows[0]);
-  } catch (e) {
-    console.error('Create meeting error:', e);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// Update meeting
-app.put('/api/meetings/:id', requireAuth, requireSuperAdmin, async (req, res) => {
-  const { id } = req.params;
-  const { title, video_url, thumbnail_url, section } = req.body || {};
-  if (!title || !video_url) {
-    return res.status(400).json({ error: 'Missing title or video_url' });
-  }
-  try {
-    const result = await pool.query(
-      'UPDATE meeting_recordings SET title=$1, video_url=$2, thumbnail_url=$3, section=$4, updated_at=NOW() WHERE id=$5 RETURNING id, title, video_url, thumbnail_url, section, created_at, updated_at',
-      [title, video_url, thumbnail_url || null, section || null, id]
-    );
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: 'Meeting not found' });
-    }
-    res.json(result.rows[0]);
-  } catch (e) {
-    console.error('Update meeting error:', e);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// Delete meeting
-app.delete('/api/meetings/:id', requireAuth, requireSuperAdmin, async (req, res) => {
-  const { id } = req.params;
-  try {
-    const result = await pool.query('DELETE FROM meeting_recordings WHERE id=$1', [id]);
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: 'Meeting not found' });
-    }
-    res.json({ success: true });
-  } catch (e) {
-    console.error('Delete meeting error:', e);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// Get meeting settings (password hash and access token)
-app.get('/api/meetings/settings', requireAuth, requireSuperAdmin, async (_req, res) => {
-  try {
-    let result = await pool.query('SELECT id, access_token, updated_at FROM meeting_settings ORDER BY updated_at DESC LIMIT 1');
-    if (result.rowCount === 0) {
-      // Initialize default settings if none exist
-      const crypto = await import('crypto');
-      const defaultToken = crypto.randomBytes(32).toString('hex');
-      const defaultPassword = 'password123';
-      const defaultHash = await bcrypt.hash(defaultPassword, 10);
-      await pool.query(
-        'INSERT INTO meeting_settings (password_hash, access_token) VALUES ($1, $2)',
-        [defaultHash, defaultToken]
-      );
-      result = await pool.query('SELECT id, access_token, updated_at FROM meeting_settings ORDER BY updated_at DESC LIMIT 1');
-    }
-    res.json({ access_token: result.rows[0].access_token, updated_at: result.rows[0].updated_at });
-  } catch (e) {
-    console.error('Get meeting settings error:', e);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// Update meeting/training password handler
+// Update training password handler
 const updateTrainingPassword = async (req, res) => {
   const { password } = req.body || {};
   if (!password || typeof password !== 'string') {
@@ -1662,14 +1571,97 @@ const updateTrainingPassword = async (req, res) => {
   }
 };
 
-// Update meeting password (legacy endpoint)
-app.put('/api/meetings/password', requireAuth, requireSuperAdmin, updateTrainingPassword);
-
-// Update training password (new endpoint)
+// Update training password
 app.put('/api/trainings/password', requireAuth, requireSuperAdmin, updateTrainingPassword);
 
-// Public API: Get meetings by access token (password-protected)
-app.get('/api/meetings/public/:token', async (req, res) => {
+// Training endpoints (aliases for meetings endpoints)
+app.get('/api/trainings', requireAuth, requireSuperAdmin, async (_req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, title, video_url, thumbnail_url, section, created_at, updated_at FROM meeting_recordings ORDER BY section, created_at DESC'
+    );
+    res.json(result.rows);
+  } catch (e) {
+    console.error('Get trainings error:', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.post('/api/trainings', requireAuth, requireSuperAdmin, async (req, res) => {
+  const { title, video_url, thumbnail_url, section } = req.body || {};
+  if (!title || !video_url) {
+    return res.status(400).json({ error: 'Missing title or video_url' });
+  }
+  try {
+    const result = await pool.query(
+      'INSERT INTO meeting_recordings (title, video_url, thumbnail_url, section) VALUES ($1, $2, $3, $4) RETURNING id, title, video_url, thumbnail_url, section, created_at, updated_at',
+      [title, video_url, thumbnail_url || null, section || null]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (e) {
+    console.error('Create training error:', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.put('/api/trainings/:id', requireAuth, requireSuperAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { title, video_url, thumbnail_url, section } = req.body || {};
+  if (!title || !video_url) {
+    return res.status(400).json({ error: 'Missing title or video_url' });
+  }
+  try {
+    const result = await pool.query(
+      'UPDATE meeting_recordings SET title=$1, video_url=$2, thumbnail_url=$3, section=$4, updated_at=NOW() WHERE id=$5 RETURNING id, title, video_url, thumbnail_url, section, created_at, updated_at',
+      [title, video_url, thumbnail_url || null, section || null, id]
+    );
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Training not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (e) {
+    console.error('Update training error:', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.delete('/api/trainings/:id', requireAuth, requireSuperAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query('DELETE FROM meeting_recordings WHERE id=$1', [id]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Training not found' });
+    }
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Delete training error:', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.get('/api/trainings/settings', requireAuth, requireSuperAdmin, async (_req, res) => {
+  try {
+    let result = await pool.query('SELECT id, access_token, updated_at FROM meeting_settings ORDER BY updated_at DESC LIMIT 1');
+    if (result.rowCount === 0) {
+      // Initialize default settings if none exist
+      const crypto = await import('crypto');
+      const defaultToken = crypto.randomBytes(32).toString('hex');
+      const defaultPassword = 'password123';
+      const defaultHash = await bcrypt.hash(defaultPassword, 10);
+      await pool.query(
+        'INSERT INTO meeting_settings (password_hash, access_token) VALUES ($1, $2)',
+        [defaultHash, defaultToken]
+      );
+      result = await pool.query('SELECT id, access_token, updated_at FROM meeting_settings ORDER BY updated_at DESC LIMIT 1');
+    }
+    res.json({ access_token: result.rows[0].access_token, updated_at: result.rows[0].updated_at });
+  } catch (e) {
+    console.error('Get training settings error:', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.get('/api/trainings/public/:token', async (req, res) => {
   const { token } = req.params;
   try {
     const settingsResult = await pool.query(
@@ -1684,10 +1676,60 @@ app.get('/api/meetings/public/:token', async (req, res) => {
     ]);
     res.json({ videos: videos.rows, documents: documents.rows });
   } catch (e) {
-    console.error('Get public meetings error:', e);
+    console.error('Get public trainings error:', e);
     res.status(500).json({ error: 'Server error' });
   }
 });
+
+app.get('/api/trainings/token', async (_req, res) => {
+  try {
+    let result = await pool.query('SELECT access_token FROM meeting_settings ORDER BY updated_at DESC LIMIT 1');
+    if (result.rowCount === 0) {
+      // Initialize default settings if none exist
+      const crypto = await import('crypto');
+      const defaultToken = crypto.randomBytes(32).toString('hex');
+      const defaultPassword = 'password123';
+      const defaultHash = await bcrypt.hash(defaultPassword, 10);
+      await pool.query(
+        'INSERT INTO meeting_settings (password_hash, access_token) VALUES ($1, $2)',
+        [defaultHash, defaultToken]
+      );
+      result = await pool.query('SELECT access_token FROM meeting_settings ORDER BY updated_at DESC LIMIT 1');
+    }
+    res.json({ token: result.rows[0].access_token });
+  } catch (e) {
+    console.error('Get training token error:', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.post('/api/trainings/verify-password', async (req, res) => {
+  const { password, token } = req.body || {};
+  if (!password || !token) {
+    return res.status(400).json({ error: 'Missing password or token' });
+  }
+  try {
+    const settingsResult = await pool.query(
+      'SELECT password_hash, access_token FROM meeting_settings ORDER BY updated_at DESC LIMIT 1'
+    );
+    if (settingsResult.rowCount === 0) {
+      return res.status(404).json({ error: 'Settings not found' });
+    }
+    const settings = settingsResult.rows[0];
+    if (settings.access_token !== token) {
+      return res.status(403).json({ error: 'Invalid access token' });
+    }
+    const valid = await bcrypt.compare(password, settings.password_hash);
+    if (!valid) {
+      return res.status(401).json({ error: 'Invalid password' });
+    }
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Verify training password error:', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 
 // Stream Events API - Admin only
 // Get all stream events
@@ -1901,56 +1943,6 @@ app.delete('/api/documents/:id', requireAuth, requireSuperAdmin, async (req, res
   }
 });
 
-// Public API: Get access token (for navbar link)
-app.get('/api/meetings/token', async (_req, res) => {
-  try {
-    let result = await pool.query('SELECT access_token FROM meeting_settings ORDER BY updated_at DESC LIMIT 1');
-    if (result.rowCount === 0) {
-      // Initialize default settings if none exist
-      const crypto = await import('crypto');
-      const defaultToken = crypto.randomBytes(32).toString('hex');
-      const defaultPassword = 'password123';
-      const defaultHash = await bcrypt.hash(defaultPassword, 10);
-      await pool.query(
-        'INSERT INTO meeting_settings (password_hash, access_token) VALUES ($1, $2)',
-        [defaultHash, defaultToken]
-      );
-      result = await pool.query('SELECT access_token FROM meeting_settings ORDER BY updated_at DESC LIMIT 1');
-    }
-    res.json({ token: result.rows[0].access_token });
-  } catch (e) {
-    console.error('Get token error:', e);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// Public API: Verify password for meetings page
-app.post('/api/meetings/verify-password', async (req, res) => {
-  const { password, token } = req.body || {};
-  if (!password || !token) {
-    return res.status(400).json({ error: 'Missing password or token' });
-  }
-  try {
-    const settingsResult = await pool.query(
-      'SELECT password_hash, access_token FROM meeting_settings ORDER BY updated_at DESC LIMIT 1'
-    );
-    if (settingsResult.rowCount === 0) {
-      return res.status(404).json({ error: 'Settings not found' });
-    }
-    const settings = settingsResult.rows[0];
-    if (settings.access_token !== token) {
-      return res.status(403).json({ error: 'Invalid access token' });
-    }
-    const valid = await bcrypt.compare(password, settings.password_hash);
-    if (!valid) {
-      return res.status(401).json({ error: 'Invalid password' });
-    }
-    res.json({ success: true });
-  } catch (e) {
-    console.error('Verify password error:', e);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
 
 // Serve built frontend (dist) from the same server for Render
 const distDir = path.resolve(__dirname, '../dist');

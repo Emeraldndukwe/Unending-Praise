@@ -39,29 +39,49 @@ export default function MeetingVideoPlayer() {
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!token || !id) {
+    if (!id) {
       setError("Invalid link");
       setLoading(false);
       return;
     }
 
-    // Check authentication
-    const authKey = `meetings_auth_${token}`;
-    const isAuth = sessionStorage.getItem(authKey) === "true";
-    if (!isAuth) {
-      navigate(`/meetings/${token}`);
-      return;
+    // If token is in URL (meetings route), use it
+    // Otherwise (trainings route), fetch token from API
+    if (token) {
+      const authKey = `meetings_auth_${token}`;
+      const isAuth = sessionStorage.getItem(authKey) === "true";
+      if (!isAuth) {
+        navigate(`/meetings/${token}`);
+        return;
+      }
+      loadData(token);
+    } else {
+      // Fetch token from API for trainings route
+      fetch('/api/trainings/token')
+        .then(res => res.json())
+        .then(data => {
+          if (data.token) {
+            const authKey = `meetings_auth_${data.token}`;
+            const isAuth = sessionStorage.getItem(authKey) === "true";
+            if (!isAuth) {
+              navigate('/trainings');
+              return;
+            }
+            loadData(data.token);
+          } else {
+            navigate('/trainings');
+          }
+        })
+        .catch(() => navigate('/trainings'));
     }
-
-    loadData();
   }, [token, id, navigate]);
 
-  const loadData = async () => {
-    if (!token) return;
+  const loadData = async (tokenValue: string) => {
+    if (!tokenValue) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/meetings/public/${token}`);
+      const res = await fetch(`/api/trainings/public/${tokenValue}`);
       if (!res.ok) {
         throw new Error("Failed to load meetings");
       }

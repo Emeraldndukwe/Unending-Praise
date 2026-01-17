@@ -60,7 +60,7 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 
 export default function AdminPage() {
   const { token, setToken, headers } = useAuthToken();
-  const [tab, setTab] = useState<"testimonies" | "crusades" | "messages" | "songs" | "comments" | "users" | "crusade-types" | "analytics" | "meetings">("testimonies");
+  const [tab, setTab] = useState<"testimonies" | "crusades" | "messages" | "songs" | "comments" | "users" | "crusade-types" | "analytics" | "trainings">("testimonies");
   const [role, setRole] = useState<string>("");
   const [testimonies, setTestimonies] = useState<Testimony[]>([]);
   const [crusades, setCrusades] = useState<Crusade[]>([]);
@@ -246,7 +246,7 @@ export default function AdminPage() {
   const refreshMeetings = async () => {
     if (role !== 'superadmin') return;
     try {
-      const list = await api<typeof meetings>("/api/meetings", { headers: headers as HeadersInit });
+      const list = await api<typeof meetings>("/api/trainings", { headers: headers as HeadersInit });
       setMeetings(list);
     } catch (e: any) {
       console.error("Failed to load meetings:", e);
@@ -266,7 +266,7 @@ export default function AdminPage() {
   const refreshMeetingSettings = async () => {
     if (role !== 'superadmin') return;
     try {
-      const settings = await api<typeof meetingSettings>("/api/meetings/settings", { headers: headers as HeadersInit });
+      const settings = await api<typeof meetingSettings>("/api/trainings/settings", { headers: headers as HeadersInit });
       setMeetingSettings(settings);
     } catch (e: any) {
       console.error("Failed to load meeting settings:", e);
@@ -302,7 +302,7 @@ export default function AdminPage() {
   }, [token]); // Re-run when token changes
 
   useEffect(() => {
-    if (role === 'superadmin' && tab === 'meetings') {
+    if (role === 'superadmin' && tab === 'trainings') {
       refreshMeetings();
       refreshDocuments();
       refreshMeetingSettings();
@@ -1273,7 +1273,7 @@ export default function AdminPage() {
         <div className="flex flex-wrap gap-2 mb-6 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-2 border border-[#54037C]/10">
           {((() => {
             const base = ["testimonies", "crusades", "messages", "songs", "comments"] as const;
-            if (role === 'superadmin') return ([...base, 'crusade-types', 'users', 'analytics', 'meetings'] as const);
+            if (role === 'superadmin') return ([...base, 'crusade-types', 'users', 'analytics', 'trainings'] as const);
             if (!role || role === 'admin') return ([...base, 'crusade-types', 'analytics'] as const);
             if (role === 'testimony') return ["testimonies", "comments"] as const;
             if (role === 'crusade') return (["crusades", "crusade-types", "comments"] as const);
@@ -1712,7 +1712,7 @@ export default function AdminPage() {
         </section>
       )}
 
-      {tab === "meetings" && role === 'superadmin' && (
+      {tab === "trainings" && role === 'superadmin' && (
         <section className="space-y-6">
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
             <h2 className="text-xl font-bold text-[#54037C] mb-4">Trainings & Resources</h2>
@@ -1762,7 +1762,7 @@ export default function AdminPage() {
               </div>
               {meetingSettings.access_token && (
                 <div className="mt-3 text-sm text-gray-600">
-                  <p>Share link: <code className="bg-white px-2 py-1 rounded">{window.location.origin}/meetings/{meetingSettings.access_token}</code></p>
+                  <p>Share link: <code className="bg-white px-2 py-1 rounded">{window.location.origin}/trainings</code></p>
                 </div>
               )}
             </div>
@@ -1773,14 +1773,14 @@ export default function AdminPage() {
               <MeetingForm
                 onSubmit={async (data) => {
                   try {
-                    await fetch('/api/meetings', {
+                    await fetch('/api/trainings', {
                       method: 'POST',
                       headers: Object.assign({}, headers as Record<string, string>, { 'content-type': 'application/json' }),
                       body: JSON.stringify(data),
                     });
                     await refreshMeetings();
                   } catch (e: any) {
-                    alert('Failed to create meeting: ' + (e?.message || 'Unknown error'));
+                    alert('Failed to create training video: ' + (e?.message || 'Unknown error'));
                   }
                 }}
                 onUploadMedia={uploadCrusadeMedia}
@@ -1788,7 +1788,7 @@ export default function AdminPage() {
               />
             </div>
 
-            {/* Meetings List */}
+            {/* Training Videos List */}
             <div className="space-y-3 mb-8">
               <h3 className="font-semibold">Existing Training Videos ({meetings.length})</h3>
               {meetings.length === 0 && <div className="text-sm text-gray-500 text-center py-8">No training videos yet</div>}
@@ -1798,20 +1798,20 @@ export default function AdminPage() {
                   meeting={meeting}
                   onUpdate={async (data) => {
                     try {
-                      await fetch(`/api/meetings/${meeting.id}`, {
+                      await fetch(`/api/trainings/${meeting.id}`, {
                         method: 'PUT',
                         headers: Object.assign({}, headers as Record<string, string>, { 'content-type': 'application/json' }),
                         body: JSON.stringify(data),
                       });
                       await refreshMeetings();
                     } catch (e: any) {
-                      alert('Failed to update meeting: ' + (e?.message || 'Unknown error'));
+                      alert('Failed to update training video: ' + (e?.message || 'Unknown error'));
                     }
                   }}
                   onDelete={async () => {
-                    if (!confirm('Are you sure you want to delete this meeting?')) return;
+                    if (!confirm('Are you sure you want to delete this training video?')) return;
                     try {
-                      await fetch(`/api/meetings/${meeting.id}`, {
+                      await fetch(`/api/trainings/${meeting.id}`, {
                         method: 'DELETE',
                         headers: headers as HeadersInit,
                       });

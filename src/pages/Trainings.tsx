@@ -45,7 +45,7 @@ export default function Trainings() {
     // Get the access token
     const loadToken = async () => {
       try {
-        const res = await fetch("/api/meetings/token");
+        const res = await fetch("/api/trainings/token");
         if (!res.ok) {
           throw new Error("Failed to load access token");
         }
@@ -117,7 +117,7 @@ export default function Trainings() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/meetings/public/${tokenValue}`);
+      const res = await fetch(`/api/trainings/public/${tokenValue}`);
       if (!res.ok) {
         throw new Error("Failed to load content");
       }
@@ -138,7 +138,7 @@ export default function Trainings() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/meetings/verify-password", {
+      const res = await fetch("/api/trainings/verify-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password, token }),
@@ -366,7 +366,7 @@ export default function Trainings() {
                         {filteredVideos.map((meeting) => (
                           <div
                             key={meeting.id}
-                            onClick={() => navigate(`/meetings/${token}/video/${meeting.id}`)}
+                            onClick={() => navigate(`/trainings/video/${meeting.id}`)}
                             className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all cursor-pointer transform hover:scale-105"
                           >
                             {/* Thumbnail */}
@@ -417,7 +417,7 @@ export default function Trainings() {
                         {filteredDocs.map((doc) => (
                           <div
                             key={doc.id}
-                            onClick={() => navigate(`/meetings/${token}/document/${doc.id}`)}
+                            onClick={() => navigate(`/trainings/document/${doc.id}`)}
                             className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all cursor-pointer transform hover:scale-105"
                           >
                             {/* Document Icon */}

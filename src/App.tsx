@@ -224,10 +224,18 @@ export default function App() {
               }
             />
 
-            {/* Trainings Route */}
+            {/* Trainings Routes */}
             <Route
               path="/trainings"
               element={<Trainings />}
+            />
+            <Route
+              path="/trainings/video/:id"
+              element={<MeetingVideoPlayer />}
+            />
+            <Route
+              path="/trainings/document/:id"
+              element={<DocumentViewer />}
             />
 
             {/* Private Meetings Routes */}
