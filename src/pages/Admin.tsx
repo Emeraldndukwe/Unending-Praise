@@ -2056,6 +2056,10 @@ export default function AdminPage() {
                     }
                   }}
                   onUploadMedia={uploadDocumentMedia}
+                  existingSections={Array.from(new Set([
+                    ...meetings.map(m => m.section).filter((s): s is string => Boolean(s)),
+                    ...documents.map(d => d.section).filter((s): s is string => Boolean(s))
+                  ]))}
                 />
               </div>
 
@@ -4181,15 +4185,18 @@ function MeetingForm({
 
 function DocumentForm({ 
   onSubmit, 
-  onUploadMedia 
+  onUploadMedia,
+  existingSections = []
 }: { 
   onSubmit: (payload: { title: string; document_url: string; document_type?: string; section?: string }) => Promise<void>;
   onUploadMedia: (dataUrl: string) => Promise<string>;
+  existingSections?: string[];
 }) {
   const [title, setTitle] = useState("");
   const [documentUrl, setDocumentUrl] = useState("");
   const [documentType, setDocumentType] = useState("");
   const [section, setSection] = useState("");
+  const [useExistingSection, setUseExistingSection] = useState(false);
   const [uploading, setUploading] = useState(false);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
