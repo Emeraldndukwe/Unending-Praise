@@ -1887,6 +1887,10 @@ export default function AdminPage() {
                 }}
                 onUploadMedia={uploadCrusadeMedia}
                 headers={headers}
+                existingSections={Array.from(new Set([
+                  ...meetings.map(m => m.section).filter(Boolean),
+                  ...documents.map(d => d.section).filter(Boolean)
+                ]))}
               />
             </div>
 
@@ -3544,16 +3548,19 @@ function SongForm({ onSubmit }: { onSubmit: (payload: Partial<Song>) => Promise<
 function MeetingForm({ 
   onSubmit, 
   onUploadMedia,
-  headers
+  headers,
+  existingSections = []
 }: { 
   onSubmit: (payload: { title: string; video_url: string; thumbnail_url?: string; section?: string }) => Promise<void>;
   onUploadMedia: (dataUrl: string) => Promise<string>;
   headers?: HeadersInit;
+  existingSections?: string[];
 }) {
   const [title, setTitle] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [thumbnailUrl, setThumbnailUrl] = useState("");
   const [section, setSection] = useState("");
+  const [useExistingSection, setUseExistingSection] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
