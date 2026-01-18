@@ -49,7 +49,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {!isAdmin && !isEventUpload && !isMeetings && <Navbar />}
+      {!isAdmin && !isEventUpload && !isMeetings && !isVideoPlayer && !isDocumentViewer && <Navbar />}
       <main className="flex-grow">
         <AnimatePresence mode="wait">
           <Suspense

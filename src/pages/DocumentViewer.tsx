@@ -266,13 +266,8 @@ export default function DocumentViewer() {
             <div className="flex items-center gap-4">
               <button
                 onClick={() => {
-                  // Go back to previous page (could be /trainings or /meetings/:token)
-                  if (window.history.length > 1) {
-                    navigate(-1);
-                  } else {
-                    // Fallback: try to go to trainings first, then meetings
-                    navigate('/trainings');
-                  }
+                  // Always go back to trainings page
+                  navigate('/trainings');
                 }}
                 className="flex items-center gap-2 text-white hover:text-purple-200 transition"
               >

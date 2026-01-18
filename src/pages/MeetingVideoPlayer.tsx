@@ -452,19 +452,16 @@ export default function MeetingVideoPlayer() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 pt-24">
-      {/* Top Navigation with Back Button */}
-      <div className="sticky top-24 z-50 bg-white/90 backdrop-blur-sm border-b border-purple-200 shadow-sm">
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50">
+      {/* Top Navigation with Back Button - Fixed at top */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-[#54037C]/70 backdrop-blur-sm border-b border-[#54037C]/20 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 md:px-8 py-4">
           <button
             onClick={() => {
-              if (token) {
-                navigate(`/meetings/${token}`);
-              } else {
-                navigate('/trainings');
-              }
+              // Always go back to trainings page
+              navigate('/trainings');
             }}
-            className="flex items-center gap-2 text-[#54037C] hover:text-[#8A4EBF] transition"
+            className="flex items-center gap-2 text-white hover:text-purple-200 transition"
           >
             <ArrowLeft className="w-5 h-5" />
             <span>Back</span>

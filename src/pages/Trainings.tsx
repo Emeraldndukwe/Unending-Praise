@@ -393,10 +393,10 @@ export default function Trainings() {
                           <div
                             key={meeting.id}
                             onClick={() => navigate(`/trainings/video/${meeting.id}`)}
-                            className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all cursor-pointer transform hover:scale-105"
+                            className="rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all cursor-pointer transform hover:scale-105"
                           >
                             {/* Thumbnail */}
-                            <div className="relative w-full aspect-video bg-gray-200">
+                            <div className="relative w-full aspect-video bg-gray-200 overflow-hidden rounded-t-xl">
                               {meeting.thumbnail_url ? (
                                 <img
                                   src={meeting.thumbnail_url}
