@@ -1894,6 +1894,105 @@ export default function AdminPage() {
               />
             </div>
 
+            {/* Section Management */}
+            {(() => {
+              const allSections = Array.from(new Set([
+                ...meetings.map(m => m.section).filter((s): s is string => Boolean(s)),
+                ...documents.map(d => d.section).filter((s): s is string => Boolean(s))
+              ]));
+              
+              return allSections.length > 0 ? (
+                <div className="mb-6 p-4 bg-gray-50 rounded-xl border">
+                  <h3 className="font-semibold mb-3">Manage Sections</h3>
+                  <div className="space-y-2">
+                    {allSections.map((sectionName) => {
+                      const sectionVideos = meetings.filter(m => m.section === sectionName);
+                      const sectionDocs = documents.filter(d => d.section === sectionName);
+                      const totalItems = sectionVideos.length + sectionDocs.length;
+                      
+                      return (
+                        <div key={sectionName} className="flex items-center justify-between p-3 bg-white rounded-lg border">
+                          <div>
+                            <span className="font-medium">{sectionName}</span>
+                            <span className="text-sm text-gray-500 ml-2">
+                              ({totalItems} {totalItems === 1 ? 'item' : 'items'})
+                            </span>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={async () => {
+                                const newName = prompt(`Rename section "${sectionName}" to:`, sectionName);
+                                if (!newName || newName.trim() === sectionName) return;
+                                
+                                try {
+                                  // Update all videos in this section
+                                  await Promise.all(sectionVideos.map(video => 
+                                    fetch(`/api/trainings/${video.id}`, {
+                                      method: 'PUT',
+                                      headers: Object.assign({}, headers as Record<string, string>, { 'content-type': 'application/json' }),
+                                      body: JSON.stringify({ ...video, section: newName.trim() }),
+                                    })
+                                  ));
+                                  
+                                  // Update all documents in this section
+                                  await Promise.all(sectionDocs.map(doc => 
+                                    fetch(`/api/documents/${doc.id}`, {
+                                      method: 'PUT',
+                                      headers: Object.assign({}, headers as Record<string, string>, { 'content-type': 'application/json' }),
+                                      body: JSON.stringify({ ...doc, section: newName.trim() }),
+                                    })
+                                  ));
+                                  
+                                  await Promise.all([refreshMeetings(), refreshDocuments()]);
+                                } catch (e: any) {
+                                  alert('Failed to rename section: ' + (e?.message || 'Unknown error'));
+                                }
+                              }}
+                              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm"
+                            >
+                              Rename
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (!confirm(`Delete section "${sectionName}"? This will remove the section from all ${totalItems} items.`)) return;
+                                
+                                try {
+                                  // Remove section from all videos
+                                  await Promise.all(sectionVideos.map(video => 
+                                    fetch(`/api/trainings/${video.id}`, {
+                                      method: 'PUT',
+                                      headers: Object.assign({}, headers as Record<string, string>, { 'content-type': 'application/json' }),
+                                      body: JSON.stringify({ ...video, section: undefined }),
+                                    })
+                                  ));
+                                  
+                                  // Remove section from all documents
+                                  await Promise.all(sectionDocs.map(doc => 
+                                    fetch(`/api/documents/${doc.id}`, {
+                                      method: 'PUT',
+                                      headers: Object.assign({}, headers as Record<string, string>, { 'content-type': 'application/json' }),
+                                      body: JSON.stringify({ ...doc, section: undefined }),
+                                    })
+                                  ));
+                                  
+                                  await Promise.all([refreshMeetings(), refreshDocuments()]);
+                                } catch (e: any) {
+                                  alert('Failed to delete section: ' + (e?.message || 'Unknown error'));
+                                }
+                              }}
+                              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null;
+            })()}
+
             {/* Training Videos List */}
             <div className="space-y-3 mb-8">
               <h3 className="font-semibold">Existing Training Videos ({meetings.length})</h3>
