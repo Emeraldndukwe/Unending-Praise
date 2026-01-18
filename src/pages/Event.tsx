@@ -395,7 +395,7 @@ export default function Event() {
       )}
 
       {/* TV Section with Video Player */}
-      <section ref={tvSectionRef} className="relative w-full px-4 md:px-10 pt-10 pb-10 bg-white">
+      <section ref={tvSectionRef} className="relative w-full px-4 md:px-10 pt-24 pb-10 bg-white">
         {/* TV Header - Centered */}
         <div className="max-w-7xl mx-auto mb-6">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-800 text-center">TV</h2>
@@ -413,7 +413,7 @@ export default function Event() {
                     className="absolute inset-0 w-full h-full object-contain bg-black"
                   />
                 ) : (
-                  <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-[#54037C] via-[#6f3aa6] to-[#8A4EBF]" />
+                  <div className="absolute inset-0 w-full h-full bg-black" />
                 )}
                 <div className="absolute inset-0 bg-black/45"></div>
                 

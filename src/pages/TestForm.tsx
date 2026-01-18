@@ -1034,7 +1034,7 @@ export default function TestForm() {
                 <div className="flex gap-3 w-full">
                   <button
                     onClick={confirmSubmit}
-                    className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition border border-blue-700"
+                    className="flex-1 px-6 py-3 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-xl font-semibold transition"
                   >
                     Submit
                   </button>
