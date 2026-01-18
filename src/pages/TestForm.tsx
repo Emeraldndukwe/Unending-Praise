@@ -306,8 +306,10 @@ export default function TestForm() {
   const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set());
   const [isRecording, setIsRecording] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [uploadingAudio, setUploadingAudio] = useState(false);
 
   // Build dynamic form config with crusades
   const getFormConfigs = (): FormConfigs => {
@@ -506,11 +508,67 @@ export default function TestForm() {
 
   const confirmSubmit = async () => {
     setShowConfirmModal(false);
+    setUploadingAudio(true);
     try {
+      // Upload audio blob to Cloudinary if it exists
+      let audioFileUrl = formData.writeup_file || '';
+      
+      if (audioBlob) {
+        try {
+          // Convert blob to File
+          const audioFile = new File([audioBlob], 'audio_recording.webm', { type: 'audio/webm' });
+          
+          // Upload to Cloudinary using public form submission endpoint
+          const uploadFormData = new FormData();
+          uploadFormData.append('file', audioFile);
+          
+          const uploadRes = await fetch('/api/form-submissions/upload?resourceType=raw', {
+            method: 'POST',
+            body: uploadFormData,
+          });
+          
+          if (!uploadRes.ok) {
+            const errorText = await uploadRes.text();
+            throw new Error(errorText || 'Failed to upload audio file');
+          }
+          
+          const uploadResult = await uploadRes.json();
+          audioFileUrl = uploadResult.url || '';
+        } catch (uploadError: any) {
+          console.error('Audio upload error:', uploadError);
+          alert(`Warning: Could not upload audio recording. The form will be submitted without the audio file. Error: ${uploadError.message}`);
+          audioFileUrl = '';
+        }
+      } else if (formData.writeup_file && typeof formData.writeup_file === 'string' && !formData.writeup_file.startsWith('http')) {
+        // If it's a file name but not a URL, try to upload the file if it exists
+        // This handles the case where a file was selected but not yet uploaded
+        const fileInput = document.querySelector(`input[type="file"][id*="writeup_file"]`) as HTMLInputElement;
+        if (fileInput?.files?.[0]) {
+          try {
+            const uploadFormData = new FormData();
+            uploadFormData.append('file', fileInput.files[0]);
+            
+            const resourceType = fileInput.files[0].type.startsWith('audio/') ? 'raw' : 'auto';
+            const uploadRes = await fetch(`/api/form-submissions/upload?resourceType=${resourceType}`, {
+              method: 'POST',
+              body: uploadFormData,
+            });
+            
+            if (uploadRes.ok) {
+              const uploadResult = await uploadRes.json();
+              audioFileUrl = uploadResult.url || '';
+            }
+          } catch (e) {
+            console.error('File upload error:', e);
+          }
+        }
+      }
+      
       // Prepare form data for submission
       const submissionData = {
         ...formData,
         memberType: memberType,
+        writeup_file: audioFileUrl || formData.writeup_file || '',
       };
       
       const res = await fetch('/api/crusade-form-submissions', {
@@ -537,12 +595,18 @@ export default function TestForm() {
       setCurrentStep(1);
       setFormData({ memberType: null });
       setExpandedQuestions(new Set());
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
       setAudioUrl(null);
+      setAudioBlob(null);
       setIsRecording(false);
       setMediaRecorder(null);
     } catch (error: any) {
       console.error('Form submission error:', error);
       alert(`Failed to submit form: ${error.message || 'Please try again.'}`);
+    } finally {
+      setUploadingAudio(false);
     }
   };
 
@@ -585,6 +649,7 @@ export default function TestForm() {
                 const blob = new Blob(chunks, { type: 'audio/webm' });
                 const url = URL.createObjectURL(blob);
                 setAudioUrl(url);
+                setAudioBlob(blob);
                 handleInputChange('writeup_file', 'audio_recording.webm');
                 stream.getTracks().forEach(track => track.stop());
               };
@@ -606,15 +671,17 @@ export default function TestForm() {
             }
           };
           
-          const handleAudioFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+          const handleAudioFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
             const file = e.target.files?.[0];
             if (file) {
               if (file.type.startsWith('audio/')) {
                 handleInputChange('writeup_file', file.name);
                 const url = URL.createObjectURL(file);
                 setAudioUrl(url);
+                setAudioBlob(file);
               } else {
                 handleInputChange('writeup_file', file.name);
+                // For non-audio files, we'll upload them during submission
               }
             }
           };
@@ -678,6 +745,7 @@ export default function TestForm() {
                           URL.revokeObjectURL(audioUrl);
                         }
                         setAudioUrl(null);
+                        setAudioBlob(null);
                         handleInputChange('writeup_file', '');
                       }}
                       className="text-red-500 hover:text-red-700 text-sm"
@@ -1053,9 +1121,10 @@ export default function TestForm() {
                 <div className="flex gap-3 w-full">
                   <button
                     onClick={confirmSubmit}
-                    className="flex-1 px-6 py-3 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-xl font-semibold transition"
+                    disabled={uploadingAudio}
+                    className="flex-1 px-6 py-3 bg-[#54037C] hover:bg-[#54037C]/90 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-xl font-semibold transition"
                   >
-                    Submit
+                    {uploadingAudio ? 'Uploading Audio...' : 'Submit'}
                   </button>
                   <button
                     onClick={() => setShowConfirmModal(false)}

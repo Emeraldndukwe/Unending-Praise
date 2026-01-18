@@ -1228,6 +1228,59 @@ app.delete('/api/crusade-types/:id', requireAuth, requireAdmin, async (req, res)
 });
 
 // Crusade Form Submissions API
+// Public upload endpoint for form submissions (audio, documents, etc.)
+app.post('/api/form-submissions/upload', upload.single('file'), async (req, res) => {
+  if (!cloudinaryEnabled) {
+    return res.status(503).json({ error: 'Cloudinary not configured' });
+  }
+  
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file provided' });
+    }
+    
+    const filePath = req.file.path;
+    const resourceType = req.query.resourceType || 'auto';
+    
+    // Stream file to Cloudinary
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: 'unendingpraise/form-submissions',
+        resource_type: resourceType,
+        use_filename: true,
+        unique_filename: true,
+      },
+      async (error, result) => {
+        // Clean up temp file
+        try {
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        } catch (unlinkError) {
+          console.error('Error deleting temp file:', unlinkError);
+        }
+        
+        if (error) {
+          console.error('Cloudinary upload error:', error);
+          return res.status(500).json({ error: 'Upload failed', details: error.message || 'Unknown error' });
+        }
+        
+        if (!result) {
+          return res.status(500).json({ error: 'Upload failed', details: 'No result from Cloudinary' });
+        }
+        
+        res.json({ url: result.secure_url || result.url });
+      }
+    );
+    
+    // Stream file to Cloudinary
+    fs.createReadStream(filePath, { highWaterMark: 1024 * 1024 * 5 }).pipe(uploadStream);
+  } catch (e) {
+    console.error('Form submission upload error:', e);
+    res.status(500).json({ error: 'Upload failed', details: e.message || String(e) });
+  }
+});
+
 app.post('/api/crusade-form-submissions', async (req, res) => {
   const { memberType, formData } = req.body || {};
   if (!memberType || !formData) {
