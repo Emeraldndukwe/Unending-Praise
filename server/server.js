@@ -192,9 +192,18 @@ async function ensureSchema() {
         document_url TEXT NOT NULL,
         document_type TEXT,
         section TEXT,
+        downloadable BOOLEAN NOT NULL DEFAULT FALSE,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+      
+      -- Add downloadable column if it doesn't exist (migration)
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='meeting_documents' AND column_name='downloadable') THEN
+          ALTER TABLE meeting_documents ADD COLUMN downloadable BOOLEAN NOT NULL DEFAULT FALSE;
+        END IF;
+      END $$;
 
       -- Meeting page settings (password and access token)
       CREATE TABLE IF NOT EXISTS meeting_settings (
@@ -2296,7 +2305,7 @@ app.delete('/api/stream-events/:id', requireAuth, requireAdmin, async (req, res)
 app.get('/api/documents', requireAuth, requireSuperAdmin, async (_req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, title, document_url, document_type, section, created_at, updated_at FROM meeting_documents ORDER BY section, created_at DESC'
+      'SELECT id, title, document_url, document_type, section, downloadable, created_at, updated_at FROM meeting_documents ORDER BY section, created_at DESC'
     );
     res.json(result.rows);
   } catch (e) {
@@ -2313,7 +2322,7 @@ app.post('/api/documents', requireAuth, requireSuperAdmin, async (req, res) => {
   }
   try {
     const result = await pool.query(
-      'INSERT INTO meeting_documents (title, document_url, document_type, section) VALUES ($1, $2, $3, $4) RETURNING id, title, document_url, document_type, section, created_at, updated_at',
+      'INSERT INTO meeting_documents (title, document_url, document_type, section, downloadable) VALUES ($1, $2, $3, $4, $5) RETURNING id, title, document_url, document_type, section, downloadable, created_at, updated_at',
       [title, document_url, document_type || null, section || null]
     );
     res.status(201).json(result.rows[0]);
@@ -2332,7 +2341,7 @@ app.put('/api/documents/:id', requireAuth, requireSuperAdmin, async (req, res) =
   }
   try {
     const result = await pool.query(
-      'UPDATE meeting_documents SET title=$1, document_url=$2, document_type=$3, section=$4, updated_at=NOW() WHERE id=$5 RETURNING id, title, document_url, document_type, section, created_at, updated_at',
+      'UPDATE meeting_documents SET title=$1, document_url=$2, document_type=$3, section=$4, downloadable=$5, updated_at=NOW() WHERE id=$6 RETURNING id, title, document_url, document_type, section, downloadable, created_at, updated_at',
       [title, document_url, document_type || null, section || null, id]
     );
     if (result.rowCount === 0) {

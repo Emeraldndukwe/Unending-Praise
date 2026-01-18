@@ -4122,7 +4122,7 @@ function MeetingForm({
             type="text"
             value={videoUrl}
             onChange={(e) => setVideoUrl(e.target.value)}
-            placeholder="https://example.com/video.mp4 or upload file"
+            placeholder="https://example.com/video.mp4, YouTube, KingsCloud, or upload file"
             className="flex-1 border border-gray-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
             required
           />
@@ -4245,12 +4245,14 @@ function DocumentForm({
           title, 
           document_url: documentUrl, 
           document_type: documentType || undefined, 
-          section: section || undefined 
+          section: section || undefined,
+          downloadable: downloadable
         });
         setTitle("");
         setDocumentUrl("");
         setDocumentType("");
         setSection("");
+        setDownloadable(false);
       }}
     >
       <input 
