@@ -267,8 +267,29 @@ export default function DocumentViewer() {
             <div className="flex items-center gap-4">
               <button
                 onClick={() => {
-                  // Always go back to trainings page
-                  navigate('/trainings');
+                  // Check if we have authentication before navigating
+                  const authKey = token ? `meetings_auth_${token}` : null;
+                  if (!authKey) {
+                    // Try to get token from API
+                    fetch('/api/trainings/token')
+                      .then(res => res.json())
+                      .then(data => {
+                        if (data.token) {
+                          const key = `meetings_auth_${data.token}`;
+                          const authData = sessionStorage.getItem(key);
+                          if (authData) {
+                            navigate('/trainings', { replace: true });
+                          } else {
+                            navigate('/trainings');
+                          }
+                        } else {
+                          navigate('/trainings');
+                        }
+                      })
+                      .catch(() => navigate('/trainings'));
+                  } else {
+                    navigate('/trainings', { replace: true });
+                  }
                 }}
                 className="flex items-center gap-2 text-white hover:text-purple-200 transition"
               >

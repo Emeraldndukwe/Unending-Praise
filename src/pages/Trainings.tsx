@@ -396,20 +396,20 @@ export default function Trainings() {
                             className="rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all cursor-pointer transform hover:scale-105"
                           >
                             {/* Thumbnail */}
-                            <div className="relative w-full aspect-video bg-gray-200 overflow-hidden rounded-t-xl">
+                            <div className="relative w-full aspect-video bg-gray-200 overflow-hidden rounded-xl">
                               {meeting.thumbnail_url ? (
                                 <img
                                   src={meeting.thumbnail_url}
                                   alt={meeting.title}
-                                  className="w-full h-full object-cover rounded-t-xl"
+                                  className="w-full h-full object-cover rounded-xl"
                                 />
                               ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-100 to-pink-100">
+                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-100 to-pink-100 rounded-xl">
                                   <Video className="w-16 h-16 text-purple-400" />
                                 </div>
                               )}
                               {/* Play overlay */}
-                              <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                              <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity rounded-xl">
                                 <div className="bg-white/90 rounded-full p-4">
                                   <svg
                                     className="w-12 h-12 text-[#54037C]"
@@ -423,7 +423,7 @@ export default function Trainings() {
                             </div>
 
                             {/* Title */}
-                            <div className="p-4 bg-white rounded-b-xl">
+                            <div className="p-4">
                               <h3 className="font-semibold text-gray-800 line-clamp-2">{meeting.title}</h3>
                               {meeting.created_at && (
                                 <p className="text-xs text-gray-500 mt-2">
@@ -447,7 +447,7 @@ export default function Trainings() {
                             className="rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all cursor-pointer transform hover:scale-105"
                           >
                             {/* Document Icon */}
-                            <div className="relative w-full aspect-video bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center rounded-t-xl">
+                            <div className="relative w-full aspect-video bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center rounded-xl">
                               <FileText className="w-20 h-20 text-purple-400" />
                               <div className="absolute bottom-2 right-2 bg-[#54037C] text-white px-2 py-1 rounded text-xs">
                                 {doc.document_type?.toUpperCase() || "DOC"}
@@ -455,7 +455,7 @@ export default function Trainings() {
                             </div>
 
                             {/* Title */}
-                            <div className="p-4 bg-white rounded-b-xl">
+                            <div className="p-4">
                               <h3 className="font-semibold text-gray-800 line-clamp-2">{doc.title}</h3>
                               {doc.created_at && (
                                 <p className="text-xs text-gray-500 mt-2">
