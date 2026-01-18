@@ -423,7 +423,7 @@ export default function Trainings() {
                             </div>
 
                             {/* Title */}
-                            <div className="p-4">
+                            <div className="p-4 bg-white rounded-b-xl">
                               <h3 className="font-semibold text-gray-800 line-clamp-2">{meeting.title}</h3>
                               {meeting.created_at && (
                                 <p className="text-xs text-gray-500 mt-2">
