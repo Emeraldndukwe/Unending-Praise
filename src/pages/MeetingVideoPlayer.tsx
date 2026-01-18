@@ -469,7 +469,7 @@ export default function MeetingVideoPlayer() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 md:px-8 py-6">
+      <div className="max-w-7xl mx-auto px-4 md:px-8 py-6 pt-24">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Video Player */}
           <div className="lg:col-span-2 space-y-4">
