@@ -254,21 +254,39 @@ const createStep3 = (): StepConfig => ({
             options: [
               "Celebrating 1000 days with Pastor Chris live Unending Praise",
               "Praise Night with Pastor Chris",
+              "Others",
             ],
             required: true,
             conditional: {
               field: "special_crusade_type",
               value: "Praise Night with Pastor Chris",
-              questions: [
+              questions: [],
+              branches: [
                 {
-                  id: "praise_night_type",
-                  label: "Which Praise Night edition?",
-                  type: "select",
-                  options: [
-                    "Praise Night '24",
-                    "Praise Night '25",
+                  value: "Praise Night with Pastor Chris",
+                  questions: [
+                    {
+                      id: "praise_night_type",
+                      label: "Which Praise Night edition?",
+                      type: "select",
+                      options: [
+                        "Praise Night '24",
+                        "Praise Night '25",
+                      ],
+                      required: true,
+                    },
                   ],
-                  required: true,
+                },
+                {
+                  value: "Others",
+                  questions: [
+                    {
+                      id: "other_crusade_type",
+                      label: "Please specify the type of crusade",
+                      type: "text",
+                      required: true,
+                    },
+                  ],
                 },
               ],
             },
