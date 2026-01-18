@@ -31,7 +31,29 @@ export default function Trainings() {
   const navigate = useNavigate();
   const [password, setPassword] = useState("");
   const [token, setToken] = useState<string | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // Check sessionStorage immediately for existing auth
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    // Try to find any auth key in sessionStorage
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (key && key.startsWith('meetings_auth_')) {
+        const authData = sessionStorage.getItem(key);
+        if (authData) {
+          try {
+            const parsed = JSON.parse(authData);
+            if (parsed.authenticated === true) {
+              return true;
+            }
+          } catch (e) {
+            if (authData === "true") {
+              return true;
+            }
+          }
+        }
+      }
+    }
+    return false;
+  });
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [sections, setSections] = useState<SectionData[]>([]);
