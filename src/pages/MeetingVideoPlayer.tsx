@@ -2,6 +2,39 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Play, Pause, Volume2, VolumeX, Maximize, Minimize, Send, MessageCircle } from "lucide-react";
 
+// Helper function to check if URL is a direct video file or needs embedding
+function isDirectVideoUrl(url: string): boolean {
+  if (!url) return false;
+  const directVideoExtensions = ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv', '.flv', '.wmv', '.m4v', '.3gp'];
+  const lowerUrl = url.toLowerCase();
+  return directVideoExtensions.some(ext => lowerUrl.includes(ext)) || 
+         lowerUrl.startsWith('blob:') || 
+         lowerUrl.startsWith('data:video/');
+}
+
+// Helper function to convert YouTube/Vimeo URLs to embed URLs
+function getEmbedUrl(url: string): string | null {
+  if (!url) return null;
+  
+  // YouTube
+  const youtubeRegex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+  const youtubeMatch = url.match(youtubeRegex);
+  if (youtubeMatch) {
+    return `https://www.youtube.com/embed/${youtubeMatch[1]}`;
+  }
+  
+  // Vimeo
+  const vimeoRegex = /(?:vimeo\.com\/)(\d+)/;
+  const vimeoMatch = url.match(vimeoRegex);
+  if (vimeoMatch) {
+    return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+  }
+  
+  // For other URLs (like KingsCloud), try to use as iframe src if it's not a direct video
+  // Return null to indicate it should be handled differently
+  return null;
+}
+
 interface Meeting {
   id: string;
   title: string;

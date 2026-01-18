@@ -4262,27 +4262,30 @@ function DocumentForm({
         className="w-full px-4 py-2 border rounded-lg" 
       />
       <div>
-        <label className="text-sm font-medium text-gray-700 mb-1 block">Document URL *</label>
+        <label className="text-sm font-medium text-gray-700 mb-1 block">Document/Video URL *</label>
         <div className="flex gap-2">
           <input
             type="text"
             value={documentUrl}
             onChange={(e) => setDocumentUrl(e.target.value)}
-            placeholder="https://example.com/document.pdf or upload file"
+            placeholder="https://example.com/document.pdf or https://cloud.com/video.mp4 or upload file"
             className="flex-1 border border-gray-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
             required
           />
           <label className="px-4 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-xl cursor-pointer text-sm whitespace-nowrap">
-            {uploading ? 'Uploading...' : 'Upload Document'}
+            {uploading ? 'Uploading...' : 'Upload File'}
             <input
               type="file"
-              accept=".pdf,.doc,.docx,.txt,.xls,.xlsx"
+              accept=".pdf,.doc,.docx,.txt,.xls,.xlsx,.mp4,.mov,.avi,.mkv,.flv,.wmv,.webm,.m4v,.3gp,.ogv"
               className="hidden"
               onChange={handleFileUpload}
               disabled={uploading}
             />
           </label>
         </div>
+        <p className="text-xs text-gray-500 mt-1">
+          You can paste a link to a document or video hosted on cloud storage (Google Drive, Dropbox, etc.) or upload a file directly.
+        </p>
       </div>
       <input 
         type="text" 
