@@ -344,6 +344,10 @@ export default function AdminPage() {
       refreshDocuments();
       refreshMeetingSettings();
     }
+    // Load form submissions when tab changes to form-submissions
+    if (tab === "form-submissions" && (role === 'crusade' || role === 'superadmin' || !role || role === 'admin')) {
+      refreshFormSubmissions();
+    }
   }, [role, tab]);
 
   const approveTestimony = async (id: string) => {
