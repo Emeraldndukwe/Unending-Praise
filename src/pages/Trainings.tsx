@@ -444,10 +444,10 @@ export default function Trainings() {
                           <div
                             key={doc.id}
                             onClick={() => navigate(`/trainings/document/${doc.id}`)}
-                            className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all cursor-pointer transform hover:scale-105"
+                            className="rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all cursor-pointer transform hover:scale-105"
                           >
                             {/* Document Icon */}
-                            <div className="relative w-full aspect-video bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center">
+                            <div className="relative w-full aspect-video bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center rounded-t-xl">
                               <FileText className="w-20 h-20 text-purple-400" />
                               <div className="absolute bottom-2 right-2 bg-[#54037C] text-white px-2 py-1 rounded text-xs">
                                 {doc.document_type?.toUpperCase() || "DOC"}
@@ -455,7 +455,7 @@ export default function Trainings() {
                             </div>
 
                             {/* Title */}
-                            <div className="p-4">
+                            <div className="p-4 bg-white rounded-b-xl">
                               <h3 className="font-semibold text-gray-800 line-clamp-2">{doc.title}</h3>
                               {doc.created_at && (
                                 <p className="text-xs text-gray-500 mt-2">
