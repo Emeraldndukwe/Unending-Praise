@@ -4262,30 +4262,27 @@ function DocumentForm({
         className="w-full px-4 py-2 border rounded-lg" 
       />
       <div>
-        <label className="text-sm font-medium text-gray-700 mb-1 block">Document/Video URL *</label>
+        <label className="text-sm font-medium text-gray-700 mb-1 block">Document URL *</label>
         <div className="flex gap-2">
           <input
             type="text"
             value={documentUrl}
             onChange={(e) => setDocumentUrl(e.target.value)}
-            placeholder="https://example.com/document.pdf or https://cloud.com/video.mp4 or upload file"
+            placeholder="https://example.com/document.pdf or upload file"
             className="flex-1 border border-gray-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
             required
           />
           <label className="px-4 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-xl cursor-pointer text-sm whitespace-nowrap">
-            {uploading ? 'Uploading...' : 'Upload File'}
+            {uploading ? 'Uploading...' : 'Upload Document'}
             <input
               type="file"
-              accept=".pdf,.doc,.docx,.txt,.xls,.xlsx,.mp4,.mov,.avi,.mkv,.flv,.wmv,.webm,.m4v,.3gp,.ogv"
+              accept=".pdf,.doc,.docx,.txt,.xls,.xlsx"
               className="hidden"
               onChange={handleFileUpload}
               disabled={uploading}
             />
           </label>
         </div>
-        <p className="text-xs text-gray-500 mt-1">
-          You can paste a link to a document or video hosted on cloud storage (Google Drive, Dropbox, etc.) or upload a file directly.
-        </p>
       </div>
       <input 
         type="text" 
@@ -4484,6 +4481,38 @@ function FormSubmissionItem({
   const [status, setStatus] = useState(submission.status);
   const [notes, setNotes] = useState(submission.notes || '');
   const [updating, setUpdating] = useState(false);
+  
+  // Check if a URL is an audio file
+  const isAudioFile = (url: string): boolean => {
+    if (!url || typeof url !== 'string') return false;
+    const audioExtensions = ['.mp3', '.wav', '.m4a', '.ogg', '.aac', '.webm'];
+    const lowerUrl = url.toLowerCase();
+    return audioExtensions.some(ext => lowerUrl.includes(ext)) || lowerUrl.includes('audio');
+  };
+  
+  // Check if a URL is a document file
+  const isDocumentFile = (url: string): boolean => {
+    if (!url || typeof url !== 'string') return false;
+    const docExtensions = ['.pdf', '.doc', '.docx'];
+    const lowerUrl = url.toLowerCase();
+    return docExtensions.some(ext => lowerUrl.includes(ext));
+  };
+  
+  // Check if a URL is a video file
+  const isVideoFile = (url: string): boolean => {
+    if (!url || typeof url !== 'string') return false;
+    const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.flv', '.wmv'];
+    const lowerUrl = url.toLowerCase();
+    return videoExtensions.some(ext => lowerUrl.includes(ext)) || lowerUrl.includes('video');
+  };
+  
+  // Check if a URL is an image file
+  const isImageFile = (url: string): boolean => {
+    if (!url || typeof url !== 'string') return false;
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
+    const lowerUrl = url.toLowerCase();
+    return imageExtensions.some(ext => lowerUrl.includes(ext)) || lowerUrl.includes('image');
+  };
 
   const handleStatusUpdate = async (newStatus: string) => {
     setUpdating(true);
@@ -4559,19 +4588,296 @@ function FormSubmissionItem({
       </div>
 
       {expanded && (
-        <div className="mt-4 pt-4 border-t border-gray-200 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {Object.entries(submission.form_data || {}).map(([key, value]) => {
-              if (key === 'memberType' || !value) return null;
-              return (
-                <div key={key} className="text-sm">
-                  <strong className="text-gray-700">{formatFieldName(key)}:</strong>
-                  <div className="text-gray-600 mt-1">
-                    {typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)}
-                  </div>
+        <div className="mt-4 pt-4 border-t border-gray-200 space-y-6">
+          {/* Basic Information Section */}
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h4 className="font-semibold text-[#54037C] mb-3 text-lg">Basic Information</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {submission.form_data?.organizer_name && (
+                <div className="text-sm">
+                  <strong className="text-gray-700 block mb-1">Organizer Name:</strong>
+                  <div className="text-gray-600">{String(submission.form_data.organizer_name)}</div>
                 </div>
-              );
-            })}
+              )}
+              {submission.form_data?.kingschat_username && (
+                <div className="text-sm">
+                  <strong className="text-gray-700 block mb-1">KingsChat Username:</strong>
+                  <div className="text-gray-600">{String(submission.form_data.kingschat_username)}</div>
+                </div>
+              )}
+              {submission.form_data?.phone_number && (
+                <div className="text-sm">
+                  <strong className="text-gray-700 block mb-1">Phone Number:</strong>
+                  <div className="text-gray-600">{String(submission.form_data.phone_number)}</div>
+                </div>
+              )}
+              {submission.form_data?.email && (
+                <div className="text-sm">
+                  <strong className="text-gray-700 block mb-1">Email:</strong>
+                  <div className="text-gray-600">{String(submission.form_data.email)}</div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Crusade Details Section */}
+          {(submission.form_data?.crusade_name || submission.form_data?.crusade_date || submission.form_data?.crusade_category) && (
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h4 className="font-semibold text-[#54037C] mb-3 text-lg">Crusade Details</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {submission.form_data?.crusade_name && (
+                  <div className="text-sm">
+                    <strong className="text-gray-700 block mb-1">Crusade Name:</strong>
+                    <div className="text-gray-600">{String(submission.form_data.crusade_name)}</div>
+                  </div>
+                )}
+                {submission.form_data?.crusade_date && (
+                  <div className="text-sm">
+                    <strong className="text-gray-700 block mb-1">Crusade Date:</strong>
+                    <div className="text-gray-600">{String(submission.form_data.crusade_date)}</div>
+                  </div>
+                )}
+                {submission.form_data?.crusade_category && (
+                  <div className="text-sm">
+                    <strong className="text-gray-700 block mb-1">Category:</strong>
+                    <div className="text-gray-600">{String(submission.form_data.crusade_category)}</div>
+                  </div>
+                )}
+                {submission.form_data?.special_crusade_type && (
+                  <div className="text-sm">
+                    <strong className="text-gray-700 block mb-1">Special Crusade Type:</strong>
+                    <div className="text-gray-600">{String(submission.form_data.special_crusade_type)}</div>
+                  </div>
+                )}
+                {submission.form_data?.other_crusade_type && (
+                  <div className="text-sm">
+                    <strong className="text-gray-700 block mb-1">Other Crusade Type:</strong>
+                    <div className="text-gray-600">{String(submission.form_data.other_crusade_type)}</div>
+                  </div>
+                )}
+                {submission.form_data?.location && (
+                  <div className="text-sm">
+                    <strong className="text-gray-700 block mb-1">Location:</strong>
+                    <div className="text-gray-600">{String(submission.form_data.location)}</div>
+                  </div>
+                )}
+                {submission.form_data?.total_cells && (
+                  <div className="text-sm">
+                    <strong className="text-gray-700 block mb-1">Total Number of Cells:</strong>
+                    <div className="text-gray-600">{String(submission.form_data.total_cells)}</div>
+                  </div>
+                )}
+                {submission.form_data?.total_souls_won && (
+                  <div className="text-sm">
+                    <strong className="text-gray-700 block mb-1">Total Souls Won:</strong>
+                    <div className="text-gray-600">{String(submission.form_data.total_souls_won)}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Media & Links Section */}
+          {(submission.form_data?.media_link || submission.form_data?.testimonies_link || submission.form_data?.writeup_file) && (
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h4 className="font-semibold text-[#54037C] mb-3 text-lg">Media & Links</h4>
+              <div className="space-y-4">
+                {submission.form_data?.media_link && (
+                  <div className="text-sm">
+                    <strong className="text-gray-700 block mb-1">Multimedia Link:</strong>
+                    <a 
+                      href={String(submission.form_data.media_link)} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800 underline break-all"
+                    >
+                      {String(submission.form_data.media_link)}
+                    </a>
+                  </div>
+                )}
+                {submission.form_data?.testimonies_link && (
+                  <div className="text-sm">
+                    <strong className="text-gray-700 block mb-1">Testimonies Link:</strong>
+                    <a 
+                      href={String(submission.form_data.testimonies_link)} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800 underline break-all"
+                    >
+                      {String(submission.form_data.testimonies_link)}
+                    </a>
+                  </div>
+                )}
+                {submission.form_data?.writeup_file && (
+                  <div className="text-sm">
+                    <strong className="text-gray-700 block mb-2">Comprehensive Report File:</strong>
+                    {(() => {
+                      const fileValue = String(submission.form_data.writeup_file);
+                      const isUrl = fileValue.startsWith('http://') || fileValue.startsWith('https://') || fileValue.startsWith('blob:');
+                      
+                      // Check if it's an audio file (by extension or URL pattern)
+                      if (isAudioFile(fileValue) || (isUrl && (fileValue.includes('audio') || fileValue.includes('.webm') || fileValue.includes('.mp3') || fileValue.includes('.wav') || fileValue.includes('.m4a') || fileValue.includes('.ogg') || fileValue.includes('.aac')))) {
+                        return (
+                          <div className="bg-white rounded-lg p-3 border border-gray-200">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-gray-600 font-medium">🎵 Audio Recording:</span>
+                              {isUrl ? (
+                                <a 
+                                  href={fileValue} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:text-blue-800 underline text-xs"
+                                >
+                                  Open in new tab
+                                </a>
+                              ) : (
+                                <span className="text-xs text-gray-500">(Filename: {fileValue})</span>
+                              )}
+                            </div>
+                            {isUrl ? (
+                              <audio 
+                                controls 
+                                className="w-full"
+                                src={fileValue}
+                                preload="metadata"
+                              >
+                                Your browser does not support the audio element.
+                              </audio>
+                            ) : (
+                              <div className="text-xs text-gray-500 italic p-2 bg-gray-50 rounded">
+                                Audio file not available as URL. The file may need to be uploaded separately.
+                              </div>
+                            )}
+                          </div>
+                        );
+                      } else if (isDocumentFile(fileValue) || (isUrl && (fileValue.includes('.pdf') || fileValue.includes('.doc') || fileValue.includes('.docx')))) {
+                        return (
+                          <div className="bg-white rounded-lg p-3 border border-gray-200">
+                            <a 
+                              href={isUrl ? fileValue : '#'} 
+                              target={isUrl ? "_blank" : undefined}
+                              rel={isUrl ? "noopener noreferrer" : undefined}
+                              className={`text-blue-600 hover:text-blue-800 ${isUrl ? 'underline' : 'cursor-not-allowed'} break-all inline-flex items-center gap-2`}
+                            >
+                              <span>📄</span>
+                              <span>{isUrl ? 'View Document' : `Document: ${fileValue}`}</span>
+                            </a>
+                          </div>
+                        );
+                      } else if (isUrl) {
+                        return (
+                          <a 
+                            href={fileValue} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 underline break-all"
+                          >
+                            {fileValue}
+                          </a>
+                        );
+                      } else {
+                        return (
+                          <div className="text-gray-600">
+                            <span className="font-medium">File:</span> {fileValue}
+                          </div>
+                        );
+                      }
+                    })()}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Comprehensive Report Section */}
+          {submission.form_data?.writeup && (
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h4 className="font-semibold text-[#54037C] mb-3 text-lg">Comprehensive Report</h4>
+              <div className="text-sm text-gray-700 whitespace-pre-wrap bg-white rounded-lg p-4 border border-gray-200 max-h-96 overflow-y-auto">
+                {String(submission.form_data.writeup)}
+              </div>
+            </div>
+          )}
+
+          {/* Other Comments Section */}
+          {submission.form_data?.other_comments && (
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h4 className="font-semibold text-[#54037C] mb-3 text-lg">Other Comments/Suggestions</h4>
+              <div className="text-sm text-gray-700 whitespace-pre-wrap bg-white rounded-lg p-4 border border-gray-200">
+                {String(submission.form_data.other_comments)}
+              </div>
+            </div>
+          )}
+
+          {/* Additional Fields Section */}
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h4 className="font-semibold text-[#54037C] mb-3 text-lg">Additional Information</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {Object.entries(submission.form_data || {}).map(([key, value]) => {
+                // Skip already displayed fields
+                const displayedFields = [
+                  'memberType', 'organizer_name', 'kingschat_username', 'phone_number', 'email',
+                  'crusade_name', 'crusade_date', 'crusade_category', 'special_crusade_type', 
+                  'other_crusade_type', 'location', 'total_cells', 'total_souls_won',
+                  'media_link', 'testimonies_link', 'writeup_file', 'writeup', 'other_comments'
+                ];
+                if (displayedFields.includes(key) || !value) return null;
+                
+                // Handle array values
+                if (Array.isArray(value)) {
+                  return (
+                    <div key={key} className="text-sm">
+                      <strong className="text-gray-700 block mb-1">{formatFieldName(key)}:</strong>
+                      <div className="text-gray-600">
+                        <ul className="list-disc list-inside space-y-1">
+                          {value.map((item, idx) => (
+                            <li key={idx}>{String(item)}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  );
+                }
+                
+                // Handle object values
+                if (typeof value === 'object' && value !== null) {
+                  return (
+                    <div key={key} className="text-sm">
+                      <strong className="text-gray-700 block mb-1">{formatFieldName(key)}:</strong>
+                      <div className="text-gray-600 bg-white rounded p-2 border border-gray-200">
+                        <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(value, null, 2)}</pre>
+                      </div>
+                    </div>
+                  );
+                }
+                
+                // Handle string URLs
+                const stringValue = String(value);
+                if (stringValue.startsWith('http://') || stringValue.startsWith('https://')) {
+                  return (
+                    <div key={key} className="text-sm">
+                      <strong className="text-gray-700 block mb-1">{formatFieldName(key)}:</strong>
+                      <a 
+                        href={stringValue} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800 underline break-all"
+                      >
+                        {stringValue}
+                      </a>
+                    </div>
+                  );
+                }
+                
+                // Regular text value
+                return (
+                  <div key={key} className="text-sm">
+                    <strong className="text-gray-700 block mb-1">{formatFieldName(key)}:</strong>
+                    <div className="text-gray-600">{stringValue}</div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           <div className="mt-4 pt-4 border-t border-gray-200">
