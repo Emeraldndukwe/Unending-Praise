@@ -4261,13 +4261,58 @@ function DocumentForm({
         required 
         className="w-full px-4 py-2 border rounded-lg" 
       />
-      <input 
-        type="text" 
-        value={section}
-        onChange={(e) => setSection(e.target.value)}
-        placeholder="Section (e.g., 1000 Days Crusade, Days of crusade)" 
-        className="w-full px-4 py-2 border rounded-lg" 
-      />
+      
+      {/* Section Selection */}
+      <div>
+        <label className="text-sm font-medium text-gray-700 mb-1 block">Section</label>
+        {existingSections.length > 0 && (
+          <div className="mb-2">
+            <label className="flex items-center gap-2 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={useExistingSection}
+                onChange={(e) => {
+                  setUseExistingSection(e.target.checked);
+                  if (e.target.checked && existingSections.length > 0) {
+                    setSection(existingSections[0]);
+                  } else {
+                    setSection("");
+                  }
+                }}
+                className="rounded"
+              />
+              <span>Use existing section</span>
+            </label>
+          </div>
+        )}
+        {useExistingSection && existingSections.length > 0 ? (
+          <select
+            value={section}
+            onChange={(e) => setSection(e.target.value)}
+            className="w-full border border-gray-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
+          >
+            <option value="">Select a section...</option>
+            {existingSections.map((sec) => (
+              <option key={sec} value={sec}>
+                {sec}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            type="text"
+            value={section}
+            onChange={(e) => setSection(e.target.value)}
+            placeholder="e.g., 1000 Days Crusade, Days of crusade"
+            className="w-full border border-gray-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
+          />
+        )}
+        {existingSections.length > 0 && !useExistingSection && (
+          <p className="text-xs text-gray-500 mt-1">
+            Or check "Use existing section" to select from: {existingSections.join(", ")}
+          </p>
+        )}
+      </div>
       <div>
         <label className="text-sm font-medium text-gray-700 mb-1 block">Document URL *</label>
         <div className="flex gap-2">
