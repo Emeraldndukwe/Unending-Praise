@@ -401,7 +401,7 @@ export default function Trainings() {
                                 <img
                                   src={meeting.thumbnail_url}
                                   alt={meeting.title}
-                                  className="w-full h-full object-cover"
+                                  className="w-full h-full object-cover rounded-t-xl"
                                 />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-100 to-pink-100">
