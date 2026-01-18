@@ -4497,22 +4497,6 @@ function FormSubmissionItem({
     const lowerUrl = url.toLowerCase();
     return docExtensions.some(ext => lowerUrl.includes(ext));
   };
-  
-  // Check if a URL is a video file
-  const isVideoFile = (url: string): boolean => {
-    if (!url || typeof url !== 'string') return false;
-    const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.flv', '.wmv'];
-    const lowerUrl = url.toLowerCase();
-    return videoExtensions.some(ext => lowerUrl.includes(ext)) || lowerUrl.includes('video');
-  };
-  
-  // Check if a URL is an image file
-  const isImageFile = (url: string): boolean => {
-    if (!url || typeof url !== 'string') return false;
-    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
-    const lowerUrl = url.toLowerCase();
-    return imageExtensions.some(ext => lowerUrl.includes(ext)) || lowerUrl.includes('image');
-  };
 
   const handleStatusUpdate = async (newStatus: string) => {
     setUpdating(true);
