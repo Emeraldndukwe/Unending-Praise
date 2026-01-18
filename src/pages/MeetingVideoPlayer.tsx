@@ -70,6 +70,8 @@ export default function MeetingVideoPlayer() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [useIframe, setUseIframe] = useState(false);
+  const [embedUrl, setEmbedUrl] = useState<string | null>(null);
 
   // Store token in state to persist across video changes
   const [storedToken, setStoredToken] = useState<string | null>(null);
@@ -159,6 +161,10 @@ export default function MeetingVideoPlayer() {
   useEffect(() => {
     if (!id) return;
     
+    // Reset iframe state when video changes
+    setUseIframe(false);
+    setEmbedUrl(null);
+    
     // If we have a stored token, use it directly
     if (storedToken) {
       loadData(storedToken);
@@ -240,6 +246,26 @@ export default function MeetingVideoPlayer() {
         throw new Error("Meeting not found");
       }
       setMeeting(found);
+      
+      // Check if video URL needs iframe embedding
+      if (found.video_url) {
+        const isDirect = isDirectVideoUrl(found.video_url);
+        if (!isDirect) {
+          const embed = getEmbedUrl(found.video_url);
+          if (embed) {
+            setEmbedUrl(embed);
+            setUseIframe(true);
+          } else {
+            // For other URLs (like KingsCloud), try using as iframe src directly
+            setEmbedUrl(found.video_url);
+            setUseIframe(true);
+          }
+        } else {
+          setUseIframe(false);
+          setEmbedUrl(null);
+        }
+      }
+      
       loadComments();
     } catch (e: any) {
       setError(e?.message || "Failed to load meeting");
@@ -460,22 +486,33 @@ export default function MeetingVideoPlayer() {
                 }
               }}
             >
-              <video
-                ref={videoRef}
-                src={meeting.video_url}
-                className="w-full h-full object-contain"
-                poster={meeting.thumbnail_url}
-                onClick={togglePlay}
-                controls={false}
-                preload="metadata"
-              />
+              {useIframe && embedUrl ? (
+                <iframe
+                  src={embedUrl}
+                  className="w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  style={{ border: 'none' }}
+                />
+              ) : (
+                <video
+                  ref={videoRef}
+                  src={meeting.video_url}
+                  className="w-full h-full object-contain"
+                  poster={meeting.thumbnail_url}
+                  onClick={togglePlay}
+                  controls={false}
+                  preload="metadata"
+                />
+              )}
 
-              {/* Controls Overlay */}
-              <div
-                className={`absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent transition-opacity duration-300 ${
-                  showControls ? "opacity-100" : "opacity-0"
-                }`}
-              >
+              {/* Controls Overlay - Only show for direct video, not iframe */}
+              {!useIframe && (
+                <div
+                  className={`absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent transition-opacity duration-300 ${
+                    showControls ? "opacity-100" : "opacity-0"
+                  }`}
+                >
                 {/* Bottom Controls */}
                 <div className="absolute bottom-0 left-0 right-0 p-4">
                   {/* Progress Bar */}
@@ -549,6 +586,7 @@ export default function MeetingVideoPlayer() {
                   </div>
                 </div>
               </div>
+              )}
             </div>
 
             {/* Video Title and Uploader Info */}
