@@ -4188,7 +4188,7 @@ function DocumentForm({
   onUploadMedia,
   existingSections = []
 }: { 
-  onSubmit: (payload: { title: string; document_url: string; document_type?: string; section?: string }) => Promise<void>;
+  onSubmit: (payload: { title: string; document_url: string; document_type?: string; section?: string; downloadable?: boolean }) => Promise<void>;
   onUploadMedia: (dataUrl: string) => Promise<string>;
   existingSections?: string[];
 }) {
@@ -4197,6 +4197,7 @@ function DocumentForm({
   const [documentType, setDocumentType] = useState("");
   const [section, setSection] = useState("");
   const [useExistingSection, setUseExistingSection] = useState(false);
+  const [downloadable, setDownloadable] = useState(false);
   const [uploading, setUploading] = useState(false);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

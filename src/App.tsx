@@ -27,6 +27,8 @@ export default function App() {
   const isAdmin = location.pathname.startsWith('/admin');
   const isEventUpload = location.pathname.startsWith('/event-upload');
   const isMeetings = location.pathname.startsWith('/meetings');
+  const isVideoPlayer = location.pathname.includes('/video/');
+  const isDocumentViewer = location.pathname.includes('/document/');
 
   // Scroll to top on route change
   useEffect(() => {

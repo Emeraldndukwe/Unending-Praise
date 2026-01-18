@@ -13,6 +13,7 @@ interface Document {
   title: string;
   document_url: string;
   document_type?: string;
+  downloadable?: boolean;
   created_at?: string;
 }
 
