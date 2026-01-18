@@ -159,7 +159,8 @@ const commonStep4: StepConfig = {
     },
     {
       id: "cells",
-      label: "Total Number of Cells",
+      label: "Total Number of Pastor Chris Live Unending Praise Cells",
+      description: "This refers to the total number of cells pioneered as a result of your Pastor Chris Live Unending Praise Crusade.",
       type: "text",
       required: true,
     },
@@ -172,7 +173,7 @@ const commonStep5: StepConfig = {
   questions: [
     {
       id: "media_link",
-      label: "Link Containing Multimedia",
+      label: "Link Containing Multimedia (pictures and videos)",
       type: "text",
       required: false,
     },
@@ -186,7 +187,7 @@ const commonStep5: StepConfig = {
     {
       id: "writeup",
       label: "Comprehensive Report on your Crusade",
-      description: "Please provide a detailed report outlining all activities carried out before, during, and after the crusade. This should include information on preparations made, the execution of the crusade itself, and post-crusade follow-up or impact, where applicable. You can type your report here, upload it as a Word Document or PDF, upload an audio file, or record an audio report.",
+      description: "Please provide a detailed report outlining all activities carried out before, during, and after the crusade. This should include information on preparations made, the execution of the crusade itself, and post-crusade follow-up or impact, where applicable. You can type your report here, upload it as a Word Document or PDF, or record an audio report.",
       type: "textarea",
       required: false,
       hasFileUpload: true,
