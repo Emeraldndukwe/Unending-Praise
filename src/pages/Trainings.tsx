@@ -415,7 +415,7 @@ export default function Trainings() {
                           <div
                             key={meeting.id}
                             onClick={() => navigate(`/trainings/video/${meeting.id}`)}
-                            className="rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all cursor-pointer transform hover:scale-105"
+                            className="rounded-xl overflow-hidden transition-all cursor-pointer transform hover:scale-105"
                           >
                             {/* Thumbnail */}
                             <div className="relative w-full aspect-video bg-gray-200 overflow-hidden rounded-xl">
@@ -466,7 +466,7 @@ export default function Trainings() {
                           <div
                             key={doc.id}
                             onClick={() => navigate(`/trainings/document/${doc.id}`)}
-                            className="rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all cursor-pointer transform hover:scale-105"
+                            className="rounded-xl overflow-hidden transition-all cursor-pointer transform hover:scale-105"
                           >
                             {/* Document Icon */}
                             <div className="relative w-full aspect-video bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center rounded-xl">
