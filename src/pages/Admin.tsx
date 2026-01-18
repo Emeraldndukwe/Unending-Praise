@@ -4345,6 +4345,18 @@ function DocumentForm({
         placeholder="Document type (e.g., PDF, DOC) - auto-detected on upload" 
         className="w-full px-4 py-2 border rounded-lg" 
       />
+      <div className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          id="downloadable-checkbox"
+          checked={downloadable}
+          onChange={(e) => setDownloadable(e.target.checked)}
+          className="w-4 h-4 text-[#54037C] border-gray-300 rounded focus:ring-[#54037C]"
+        />
+        <label htmlFor="downloadable-checkbox" className="text-sm text-gray-700 cursor-pointer">
+          Allow users to download this document
+        </label>
+      </div>
       <button 
         type="submit" 
         className="w-full px-4 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-lg"

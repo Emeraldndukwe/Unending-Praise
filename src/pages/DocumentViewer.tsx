@@ -310,8 +310,19 @@ export default function DocumentViewer() {
               </button>
             </div>
 
-            {/* Right: Zoom In */}
+            {/* Right: Download and Zoom In */}
             <div className="flex items-center gap-4">
+              {doc.downloadable && (
+                <a
+                  href={doc.document_url}
+                  download
+                  className="p-2 text-white hover:bg-white/20 rounded-lg transition flex items-center gap-2"
+                  title="Download Document"
+                >
+                  <Download className="w-5 h-5" />
+                  <span className="text-sm">Download</span>
+                </a>
+              )}
               <button
                 onClick={handleZoomIn}
                 disabled={zoom >= 200}
