@@ -250,7 +250,7 @@ export default function Trainings() {
 
   // Main trainings page - same layout as Meetings
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50">
+    <div className="min-h-screen bg-white">
       {/* Header Section - Below Navbar, centered */}
       <div className="pt-32 pb-8">
         <div className="max-w-7xl mx-auto px-4 md:px-8">
