@@ -3,6 +3,7 @@ import { compressImage, compressVideo } from "../utils/mediaOptimizer";
 import Analytics from "../components/Analytics";
 import * as XLSX from "xlsx";
 import mammoth from "mammoth";
+import { Download } from "lucide-react";
 
 type Testimony = { 
   id: string; 
@@ -1319,8 +1320,8 @@ export default function AdminPage() {
         <div className="flex flex-wrap gap-2 mb-6 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-2 border border-[#54037C]/10">
           {((() => {
             const base = ["testimonies", "crusades", "messages", "songs", "comments"] as const;
-            if (role === 'superadmin') return ([...base, 'crusade-types', 'users', 'analytics', 'trainings', 'form-submissions'] as const);
-            if (!role || role === 'admin') return ([...base, 'crusade-types', 'analytics', 'form-submissions'] as const);
+            if (role === 'superadmin') return ([...base, 'crusade-types', 'users', 'analytics', 'trainings', 'form-submissions', 'events'] as const);
+            if (!role || role === 'admin') return ([...base, 'crusade-types', 'analytics', 'form-submissions', 'events'] as const);
             if (role === 'testimony') return ["testimonies", "comments"] as const;
             if (role === 'crusade') return (["crusades", "crusade-types", "form-submissions", "comments"] as const);
             if (role === 'messages') return ["messages"] as const;
@@ -2134,6 +2135,10 @@ export default function AdminPage() {
             </div>
           </div>
         </section>
+      )}
+
+      {tab === "events" && (role === 'superadmin' || !role || role === 'admin') && (
+        <EventsManagementSection headers={headers} uploadMedia={uploadCrusadeMedia} />
       )}
 
       {tab === "users" && role === 'superadmin' && (
@@ -4616,31 +4621,79 @@ function FormSubmissionItem({
   const getFileExtensionFromUrl = (url: string): string => {
     if (!url || typeof url !== 'string') return '';
     
-    // Try to extract from filename in URL
+    // Try to extract from filename in URL first (most reliable)
     const pathParts = url.split('/');
     const lastPart = pathParts[pathParts.length - 1]?.split('?')[0] || '';
     
     if (lastPart.includes('.')) {
-      return lastPart.split('.').pop()?.toLowerCase() || '';
+      const ext = lastPart.split('.').pop()?.toLowerCase() || '';
+      // Only return if it's a valid extension (2-5 chars, alphanumeric)
+      if (ext && ext.length >= 2 && ext.length <= 5 && /^[a-z0-9]+$/.test(ext)) {
+        return ext;
+      }
     }
     
-    // Detect from URL patterns
-    if (url.includes('.pdf') || url.includes('/pdf') || url.includes('pdf')) return 'pdf';
-    if (url.includes('.docx') || url.includes('/docx') || url.includes('docx')) return 'docx';
-    if (url.includes('.doc') || url.includes('/doc') || url.includes('doc')) return 'doc';
-    if (url.includes('.xlsx') || url.includes('/xlsx') || url.includes('xlsx')) return 'xlsx';
-    if (url.includes('.xls') || url.includes('/xls') || url.includes('xls')) return 'xls';
-    if (url.includes('.webm') || url.includes('/webm') || url.includes('webm')) return 'webm';
-    if (url.includes('.mp3') || url.includes('/mp3') || url.includes('mp3')) return 'mp3';
-    if (url.includes('.wav') || url.includes('/wav') || url.includes('wav')) return 'wav';
-    if (url.includes('.m4a') || url.includes('/m4a') || url.includes('m4a')) return 'm4a';
-    if (url.includes('audio_recording')) return 'webm';
+    // Check URL query parameters for format hints
+    const urlParams = new URLSearchParams(url.split('?')[1] || '');
+    const formatParam = urlParams.get('f') || urlParams.get('format');
+    if (formatParam) {
+      return formatParam.toLowerCase();
+    }
     
-    // Detect from Cloudinary resource type in URL
-    if (url.includes('/image/upload/')) return 'image';
-    if (url.includes('/video/upload/')) return 'video';
-    if (url.includes('/raw/upload/')) return 'file';
+    // Detect from URL path patterns (check for file extensions anywhere in URL)
+    const urlLower = url.toLowerCase();
+    const extensionPatterns = [
+      { pattern: /\.pdf(\?|$|\/|&|#)/i, ext: 'pdf' },
+      { pattern: /\.docx(\?|$|\/|&|#)/i, ext: 'docx' },
+      { pattern: /\.doc(\?|$|\/|&|#)/i, ext: 'doc' },
+      { pattern: /\.xlsx(\?|$|\/|&|#)/i, ext: 'xlsx' },
+      { pattern: /\.xls(\?|$|\/|&|#)/i, ext: 'xls' },
+      { pattern: /\.webm(\?|$|\/|&|#)/i, ext: 'webm' },
+      { pattern: /\.mp3(\?|$|\/|&|#)/i, ext: 'mp3' },
+      { pattern: /\.wav(\?|$|\/|&|#)/i, ext: 'wav' },
+      { pattern: /\.m4a(\?|$|\/|&|#)/i, ext: 'm4a' },
+      { pattern: /\.ogg(\?|$|\/|&|#)/i, ext: 'ogg' },
+      { pattern: /\.aac(\?|$|\/|&|#)/i, ext: 'aac' },
+      { pattern: /\.txt(\?|$|\/|&|#)/i, ext: 'txt' },
+    ];
     
+    for (const { pattern, ext } of extensionPatterns) {
+      if (pattern.test(url)) {
+        return ext;
+      }
+    }
+    
+    // Also check for extensions in the public_id part of Cloudinary URLs
+    // Cloudinary format: .../upload/v1234567890/filename.ext
+    const publicIdMatch = url.match(/\/upload\/[^/]+\/([^/?]+)/);
+    if (publicIdMatch) {
+      const publicId = publicIdMatch[1];
+      for (const { pattern, ext } of extensionPatterns) {
+        if (pattern.test(publicId)) {
+          return ext;
+        }
+      }
+    }
+    
+    // Check for audio_recording pattern
+    if (url.includes('audio_recording') || url.includes('audio-recording')) {
+      return 'webm';
+    }
+    
+    // Last resort: check public_id in Cloudinary URL structure
+    // Cloudinary URLs: .../upload/v1234567890/public_id.format
+    const uploadMatch = url.match(/\/upload\/[^/]+\/([^/?]+)/);
+    if (uploadMatch) {
+      const publicId = uploadMatch[1];
+      if (publicId.includes('.')) {
+        const ext = publicId.split('.').pop()?.toLowerCase() || '';
+        if (ext && ext.length >= 2 && ext.length <= 5 && /^[a-z0-9]+$/.test(ext)) {
+          return ext;
+        }
+      }
+    }
+    
+    // Don't return 'file' as default - return empty string so caller can handle it
     return '';
   };
   
@@ -4947,14 +5000,13 @@ function FormSubmissionItem({
                         );
                       } else if (isUploadedDocument) {
                         // For Cloudinary documents, add flags=inline to force browser display instead of download
+                        // Use proxy endpoint for proper content-type and filename handling
                         const getDocumentUrl = (url: string): string => {
                           if (url.includes('cloudinary.com')) {
-                            // Add flags=inline to Cloudinary URL to force inline display
-                            if (url.includes('?')) {
-                              return url + '&flags=inline';
-                            } else {
-                              return url + '?flags=inline';
-                            }
+                            const extension = getFileExtensionFromUrl(url);
+                            const fileName = extension ? `document.${extension}` : 'document';
+                            // Use proxy endpoint to ensure correct content-type and filename
+                            return `/api/proxy/document?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(fileName)}`;
                           }
                           return url;
                         };
@@ -4966,10 +5018,42 @@ function FormSubmissionItem({
                             const extension = getFileExtensionFromUrl(url);
                             const displayName = extension && !fileName.includes('.') 
                               ? `${fileName}.${extension}` 
-                              : fileName;
+                              : (fileName.includes('.') ? fileName : `${fileName}.${extension || 'file'}`);
                             return `📄 ${displayName}`;
                           }
                           return '📄 View Document';
+                        };
+                        
+                        // Helper function to download file with proper filename
+                        const handleDownload = async (url: string) => {
+                          try {
+                            const extension = getFileExtensionFromUrl(url);
+                            const fileName = extension ? `comprehensive_report_${submission.id}.${extension}` : `comprehensive_report_${submission.id}`;
+                            
+                            // Use proxy endpoint for proper download
+                            const downloadUrl = url.includes('cloudinary.com') 
+                              ? `/api/proxy/document?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(fileName)}`
+                              : url;
+                            
+                            const response = await fetch(downloadUrl);
+                            if (!response.ok) throw new Error('Failed to fetch file');
+                            
+                            const blob = await response.blob();
+                            const blobUrl = window.URL.createObjectURL(blob);
+                            
+                            const link = document.createElement('a');
+                            link.href = blobUrl;
+                            link.download = fileName;
+                            document.body.appendChild(link);
+                            link.click();
+                            
+                            // Cleanup
+                            document.body.removeChild(link);
+                            window.URL.revokeObjectURL(blobUrl);
+                          } catch (error) {
+                            console.error('Download failed:', error);
+                            alert('Failed to download file. Please try opening it in a new tab instead.');
+                          }
                         };
                         
                         return (
@@ -4978,17 +5062,28 @@ function FormSubmissionItem({
                               <span className="text-gray-600 font-medium">📄 Document File (Uploaded):</span>
                             </div>
                             <div className="space-y-2">
-                              <a 
-                                href={isUrl ? getDocumentUrl(fileValue) : '#'} 
-                                target={isUrl ? "_blank" : undefined}
-                                rel={isUrl ? "noopener noreferrer" : undefined}
-                                className={`text-blue-600 hover:text-blue-800 ${isUrl ? 'underline' : 'cursor-not-allowed'} inline-flex items-center gap-2`}
-                              >
-                                <span>{isUrl ? getDisplayText(fileValue) : `Document: ${fileValue}`}</span>
-                              </a>
+                              <div className="flex flex-col sm:flex-row gap-2">
+                                <a 
+                                  href={isUrl ? getDocumentUrl(fileValue) : '#'} 
+                                  target={isUrl ? "_blank" : undefined}
+                                  rel={isUrl ? "noopener noreferrer" : undefined}
+                                  className={`text-blue-600 hover:text-blue-800 ${isUrl ? 'underline' : 'cursor-not-allowed'} inline-flex items-center gap-2`}
+                                >
+                                  <span>{isUrl ? getDisplayText(fileValue) : `Document: ${fileValue}`}</span>
+                                </a>
+                                {isUrl && (
+                                  <button
+                                    onClick={() => handleDownload(fileValue)}
+                                    className="inline-flex items-center gap-2 px-3 py-1 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-lg text-sm font-medium transition-colors"
+                                  >
+                                    <Download className="w-4 h-4" />
+                                    Download
+                                  </button>
+                                )}
+                              </div>
                               {isUrl && (
                                 <p className="text-xs text-gray-500">
-                                  Click to view in browser (will open instead of download)
+                                  Click to view in browser or download with proper filename
                                 </p>
                               )}
                             </div>
@@ -5169,6 +5264,391 @@ function FormSubmissionItem({
         </div>
       )}
     </div>
+  );
+}
+
+type StreamEvent = {
+  id: string;
+  name: string;
+  streamUrl?: string;
+  imageUrl?: string;
+  date?: string;
+  startTime?: string;
+  description?: string;
+  isActive: boolean;
+  displayOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+function EventsManagementSection({ headers, uploadMedia }: { headers: HeadersInit; uploadMedia: (dataUrl: string) => Promise<string> }) {
+  const [events, setEvents] = useState<StreamEvent[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  
+  // Form state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
+  const [formData, setFormData] = useState({
+    name: "",
+    streamUrl: "",
+    imageUrl: "",
+    date: "",
+    startTime: "",
+    description: "",
+    displayOrder: 0,
+  });
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    if (!file.type.startsWith("image/")) {
+      alert("Please select an image file");
+      return;
+    }
+    try {
+      setLoading(true);
+      const compressed = await compressImage(file);
+      setImagePreview(compressed);
+      const uploaded = await uploadMedia(compressed);
+      setFormData({ ...formData, imageUrl: uploaded });
+      setImagePreview(uploaded);
+    } catch (err: any) {
+      console.error('Image upload failed', err);
+      alert(`Error uploading image: ${err?.message || 'Upload failed'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const refresh = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await api<StreamEvent[]>("/api/stream-events", { headers });
+      setEvents(data);
+    } catch (e: any) {
+      setError(e?.message || "Failed to load events");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  const resetForm = () => {
+    setEditingId(null);
+    setImagePreview("");
+    setFormData({
+      name: "",
+      streamUrl: "",
+      imageUrl: "",
+      date: "",
+      startTime: "",
+      description: "",
+      displayOrder: 0,
+    });
+  };
+
+  const handleEdit = (event: StreamEvent) => {
+    setEditingId(event.id);
+    setImagePreview(event.imageUrl || "");
+    setFormData({
+      name: event.name || "",
+      streamUrl: event.streamUrl || "",
+      imageUrl: event.imageUrl || "",
+      date: event.date || "",
+      startTime: event.startTime || "",
+      description: event.description || "",
+      displayOrder: event.displayOrder || 0,
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      if (editingId) {
+        await api(`/api/stream-events/${editingId}`, {
+          method: "PUT",
+          headers: { ...headers, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: formData.name,
+            streamUrl: formData.streamUrl || null,
+            imageUrl: formData.imageUrl || null,
+            date: formData.date || null,
+            startTime: formData.startTime || null,
+            description: formData.description || null,
+            displayOrder: formData.displayOrder,
+          }),
+        });
+        setSuccess("Event updated successfully!");
+      } else {
+        await api("/api/stream-events", {
+          method: "POST",
+          headers: { ...headers, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: formData.name,
+            streamUrl: formData.streamUrl || null,
+            imageUrl: formData.imageUrl || null,
+            date: formData.date || null,
+            startTime: formData.startTime || null,
+            description: formData.description || null,
+            displayOrder: formData.displayOrder,
+          }),
+        });
+        setSuccess("Event created successfully!");
+      }
+      resetForm();
+      await refresh();
+    } catch (e: any) {
+      setError(e?.message || "Failed to save event");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this event?")) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await api(`/api/stream-events/${id}`, {
+        method: "DELETE",
+        headers,
+      });
+      setSuccess("Event deleted successfully!");
+      await refresh();
+    } catch (e: any) {
+      setError(e?.message || "Failed to delete event");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <section className="space-y-6">
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
+        <h2 className="text-xl font-bold text-[#54037C] mb-4">Event Management</h2>
+        
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl mb-4">
+            {success}
+          </div>
+        )}
+
+        {/* Form */}
+        <div className="bg-gray-50 rounded-lg p-4 mb-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">
+            {editingId ? "Edit Event" : "Create New Event"}
+          </h3>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Event Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
+                placeholder="e.g., PASTOR CHRIS LIVE UNENDING PRAISE ONLINE CRUSADE"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Background Image / Thumbnail
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent text-sm"
+              />
+              {imagePreview && (
+                <div className="mt-2">
+                  <img src={imagePreview} alt="Preview" className="max-w-xs h-32 object-cover rounded-lg border border-gray-300" />
+                </div>
+              )}
+              <p className="mt-1 text-sm text-gray-500">Upload image for banner background and video thumbnail</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Stream/Video URL
+              </label>
+              <input
+                type="url"
+                value={formData.streamUrl}
+                onChange={(e) => setFormData({ ...formData, streamUrl: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
+                placeholder="https://youtube.com/watch?v=... or https://vimeo.com/..."
+              />
+              <p className="mt-1 text-sm text-gray-500">YouTube, Vimeo, or other video URL (will auto-embed)</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Date
+                </label>
+                <input
+                  type="date"
+                  value={formData.date}
+                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Start Time
+                </label>
+                <input
+                  type="time"
+                  value={formData.startTime}
+                  onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
+                />
+                <p className="mt-1 text-sm text-gray-500">Time when the stream starts</p>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Description
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
+                rows={3}
+                placeholder="Event description"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Display Order
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={formData.displayOrder}
+                onChange={(e) => setFormData({ ...formData, displayOrder: parseInt(e.target.value) || 0 })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
+                placeholder="0"
+              />
+              <p className="mt-1 text-sm text-gray-500">Lower numbers appear first. Events are automatically active until deleted or after the date has passed.</p>
+            </div>
+
+            <div className="flex gap-4">
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-6 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-xl font-semibold transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? "Saving..." : editingId ? "Update Event" : "Create Event"}
+              </button>
+              {editingId && (
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="px-6 py-2 bg-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-300 transition-colors"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          </form>
+        </div>
+
+        {/* Events List */}
+        <div className="bg-gray-50 rounded-lg p-4">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">All Events</h3>
+
+          {loading && events.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">Loading...</div>
+          ) : events.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">No events found. Create one above.</div>
+          ) : (
+            <div className="space-y-4">
+              {events.map((event) => (
+                <div
+                  key={event.id}
+                  className={`border rounded-xl p-4 ${(!event.date || new Date(event.date) >= new Date()) ? "border-green-300 bg-green-50" : "border-gray-200 bg-white"}`}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="text-lg font-bold text-gray-800">{event.name}</h4>
+                        {(!event.date || new Date(event.date) >= new Date()) && (
+                          <span className="px-2 py-1 bg-green-500 text-white text-xs font-semibold rounded">
+                            ACTIVE
+                          </span>
+                        )}
+                        <span className="px-2 py-1 bg-gray-200 text-gray-700 text-xs font-semibold rounded">
+                          Order: {event.displayOrder}
+                        </span>
+                      </div>
+                      {event.date && (
+                        <p className="text-sm text-gray-600 mb-1">
+                          Date: {new Date(event.date).toLocaleDateString("en-US", {
+                            weekday: "long",
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          })}
+                        </p>
+                      )}
+                      {event.description && (
+                        <p className="text-gray-700 mb-2">{event.description}</p>
+                      )}
+                      {event.streamUrl && (
+                        <p className="text-sm text-gray-600 mb-1">
+                          <span className="font-semibold">Stream URL:</span>{" "}
+                          <a href={event.streamUrl} target="_blank" rel="noopener noreferrer" className="text-[#54037C] hover:underline">
+                            {event.streamUrl}
+                          </a>
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex gap-2 ml-4">
+                      <button
+                        onClick={() => handleEdit(event)}
+                        className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-semibold hover:bg-blue-600 transition-colors"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(event.id)}
+                        className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-semibold hover:bg-red-600 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
 

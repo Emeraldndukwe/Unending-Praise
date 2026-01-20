@@ -867,7 +867,7 @@ app.get('/api/proxy/pdf', async (req, res) => {
 // Proxy endpoint for Office documents (Word, Excel) to bypass Cloudinary access restrictions
 // This makes files accessible for Microsoft Office Online Viewer
 app.get('/api/proxy/document', async (req, res) => {
-  const { url } = req.query;
+  const { url, filename } = req.query;
   if (!url || typeof url !== 'string') {
     return res.status(400).json({ error: 'Missing or invalid URL parameter' });
   }
@@ -877,7 +877,7 @@ app.get('/api/proxy/document', async (req, res) => {
     let docUrl = url;
     if (docUrl.includes('/image/upload/')) {
       // Check if it's a document file
-      const isDoc = /\.(doc|docx|xls|xlsx|txt)$/i.test(docUrl);
+      const isDoc = /\.(doc|docx|xls|xlsx|txt|pdf)$/i.test(docUrl);
       if (isDoc) {
         docUrl = docUrl.replace('/image/upload/', '/raw/upload/');
       }
@@ -893,19 +893,39 @@ app.get('/api/proxy/document', async (req, res) => {
       return res.status(response.status).json({ error: 'Failed to fetch document' });
     }
     
-    // Determine content type based on file extension
+    // Determine content type based on file extension or filename
     let contentType = response.headers.get('content-type');
-    if (!contentType) {
-      if (docUrl.toLowerCase().endsWith('.docx')) contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-      else if (docUrl.toLowerCase().endsWith('.doc')) contentType = 'application/msword';
-      else if (docUrl.toLowerCase().endsWith('.xlsx')) contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-      else if (docUrl.toLowerCase().endsWith('.xls')) contentType = 'application/vnd.ms-excel';
-      else contentType = 'application/octet-stream';
+    const urlLower = docUrl.toLowerCase();
+    const filenameLower = filename ? String(filename).toLowerCase() : '';
+    
+    if (!contentType || contentType === 'application/octet-stream' || contentType.includes('text/plain')) {
+      // Detect from URL or filename
+      if (urlLower.includes('.pdf') || filenameLower.endsWith('.pdf')) {
+        contentType = 'application/pdf';
+      } else if (urlLower.includes('.docx') || filenameLower.endsWith('.docx')) {
+        contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      } else if (urlLower.includes('.doc') || filenameLower.endsWith('.doc')) {
+        contentType = 'application/msword';
+      } else if (urlLower.includes('.xlsx') || filenameLower.endsWith('.xlsx')) {
+        contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      } else if (urlLower.includes('.xls') || filenameLower.endsWith('.xls')) {
+        contentType = 'application/vnd.ms-excel';
+      } else if (urlLower.includes('.txt') || filenameLower.endsWith('.txt')) {
+        contentType = 'text/plain';
+      } else {
+        contentType = 'application/octet-stream';
+      }
     }
     
     res.setHeader('Content-Type', contentType);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Cache-Control', 'public, max-age=3600');
+    // Force inline display instead of download
+    if (filename) {
+      res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    } else {
+      res.setHeader('Content-Disposition', 'inline');
+    }
     
     const buffer = await response.arrayBuffer();
     res.send(Buffer.from(buffer));
@@ -1302,21 +1322,37 @@ app.post('/api/form-submissions/upload', upload.single('file'), async (req, res)
     const filePath = req.file.path;
     const resourceType = req.query.resourceType || 'auto';
     
-    // Preserve original filename if available
+    // Preserve original filename and extension
     const originalName = req.file.originalname || req.file.filename || 'file';
-    const fileExtension = originalName.includes('.') ? originalName.split('.').pop() : '';
+    const fileExtension = originalName.includes('.') ? originalName.split('.').pop()?.toLowerCase() : '';
     const baseName = originalName.includes('.') ? originalName.substring(0, originalName.lastIndexOf('.')) : originalName;
+    
+    // Clean baseName to be Cloudinary-safe (alphanumeric, hyphens, underscores only)
+    const safeBaseName = baseName.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 100);
+    
+    // Determine resource type from mimetype if not specified
+    let finalResourceType = resourceType;
+    if (finalResourceType === 'auto') {
+      if (req.file.mimetype.startsWith('video/')) {
+        finalResourceType = 'video';
+      } else if (req.file.mimetype.startsWith('image/')) {
+        finalResourceType = 'image';
+      } else {
+        finalResourceType = 'raw';
+      }
+    }
     
     // Stream file to Cloudinary
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder: 'unendingpraise/form-submissions',
-        resource_type: resourceType,
+        resource_type: finalResourceType,
         use_filename: true,
         unique_filename: true,
-        // Try to preserve original filename structure
-        public_id: baseName,
-        format: fileExtension || undefined,
+        // Preserve original filename structure with extension
+        public_id: fileExtension ? `${safeBaseName}.${fileExtension}` : safeBaseName,
+        // For raw files, explicitly set format to preserve extension
+        ...(finalResourceType === 'raw' && fileExtension ? { format: fileExtension } : {}),
       },
       async (error, result) => {
         // Clean up temp file
@@ -1337,7 +1373,13 @@ app.post('/api/form-submissions/upload', upload.single('file'), async (req, res)
           return res.status(500).json({ error: 'Upload failed', details: 'No result from Cloudinary' });
         }
         
-        res.json({ url: result.secure_url || result.url });
+        // Return URL with original filename metadata for proper download handling
+        res.json({ 
+          url: result.secure_url || result.url,
+          originalName: originalName,
+          extension: fileExtension,
+          mimetype: req.file.mimetype
+        });
       }
     );
     

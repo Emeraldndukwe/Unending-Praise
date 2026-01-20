@@ -312,6 +312,7 @@ export default function TestFormContent() {
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [uploadingAudio, setUploadingAudio] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null); // Store the actual File object
 
   // Build dynamic form config with crusades
   const getFormConfigs = (): FormConfigs => {
@@ -541,9 +542,37 @@ export default function TestFormContent() {
           alert(`Warning: Could not upload audio recording. The form will be submitted without the audio file. Error: ${uploadError.message}`);
           audioFileUrl = '';
         }
+      } else if (uploadedFile && !formData.writeup_file.startsWith('http')) {
+        // If we have a file object but no URL yet, upload it now
+        try {
+          const uploadFormData = new FormData();
+          uploadFormData.append('file', uploadedFile);
+          
+          // Determine resource type - PDFs and documents should be 'raw'
+          const resourceType = uploadedFile.type.startsWith('audio/') ? 'raw' : 'auto';
+          const uploadRes = await fetch(`/api/form-submissions/upload?resourceType=${resourceType}`, {
+            method: 'POST',
+            body: uploadFormData,
+          });
+          
+          if (!uploadRes.ok) {
+            const errorText = await uploadRes.text();
+            throw new Error(errorText || 'Failed to upload file');
+          }
+          
+          const uploadResult = await uploadRes.json();
+          audioFileUrl = uploadResult.url || '';
+          
+          if (!audioFileUrl) {
+            throw new Error('Upload succeeded but no URL returned');
+          }
+        } catch (uploadError: any) {
+          console.error('File upload error during submission:', uploadError);
+          alert(`Failed to upload file: ${uploadError.message || 'Unknown error'}. The form will be submitted without the file.`);
+          audioFileUrl = '';
+        }
       } else if (formData.writeup_file && typeof formData.writeup_file === 'string' && !formData.writeup_file.startsWith('http')) {
-        // If it's a file name but not a URL, try to upload the file if it exists
-        // This handles the case where a file was selected but not yet uploaded
+        // Fallback: try to find file input if file object wasn't stored
         const fileInput = document.querySelector(`input[type="file"][id*="writeup_file"]`) as HTMLInputElement;
         if (fileInput?.files?.[0]) {
           try {
@@ -556,13 +585,26 @@ export default function TestFormContent() {
               body: uploadFormData,
             });
             
-            if (uploadRes.ok) {
-              const uploadResult = await uploadRes.json();
-              audioFileUrl = uploadResult.url || '';
+            if (!uploadRes.ok) {
+              const errorText = await uploadRes.text();
+              throw new Error(errorText || 'Failed to upload file');
             }
-          } catch (e) {
-            console.error('File upload error:', e);
+            
+            const uploadResult = await uploadRes.json();
+            audioFileUrl = uploadResult.url || '';
+            
+            if (!audioFileUrl) {
+              throw new Error('Upload succeeded but no URL returned');
+            }
+          } catch (e: any) {
+            console.error('File upload error (fallback):', e);
+            alert(`Failed to upload file: ${e?.message || 'Unknown error'}. The form will be submitted without the file.`);
+            audioFileUrl = '';
           }
+        } else {
+          // File was selected but can't be found - warn user
+          console.warn('File was selected but cannot be found for upload');
+          alert('Warning: A file was selected but could not be uploaded. The form will be submitted without the file.');
         }
       }
       
@@ -602,6 +644,7 @@ export default function TestFormContent() {
       }
       setAudioUrl(null);
       setAudioBlob(null);
+      setUploadedFile(null);
       setIsRecording(false);
       setMediaRecorder(null);
     } catch (error: any) {
@@ -681,9 +724,45 @@ export default function TestFormContent() {
                 const url = URL.createObjectURL(file);
                 setAudioUrl(url);
                 setAudioBlob(file);
+                setUploadedFile(file); // Store file for upload
               } else {
+                // For non-audio files (PDF, Word, etc.), store the file and upload immediately
                 handleInputChange('writeup_file', file.name);
-                // For non-audio files, we'll upload them during submission
+                setUploadedFile(file);
+                setUploadingAudio(true);
+                
+                try {
+                  const uploadFormData = new FormData();
+                  uploadFormData.append('file', file);
+                  
+                  // Determine resource type - PDFs and documents should be 'raw'
+                  const resourceType = file.type.startsWith('audio/') ? 'raw' : 'auto';
+                  const uploadRes = await fetch(`/api/form-submissions/upload?resourceType=${resourceType}`, {
+                    method: 'POST',
+                    body: uploadFormData,
+                  });
+                  
+                  if (!uploadRes.ok) {
+                    const errorText = await uploadRes.text();
+                    throw new Error(errorText || 'Failed to upload file');
+                  }
+                  
+                  const uploadResult = await uploadRes.json();
+                  // Store the Cloudinary URL
+                  handleInputChange('writeup_file', uploadResult.url || '');
+                  alert('File uploaded successfully!');
+                } catch (uploadError: any) {
+                  console.error('File upload error:', uploadError);
+                  alert(`Failed to upload file: ${uploadError.message || 'Unknown error'}. Please try again.`);
+                  // Reset file selection on error
+                  setUploadedFile(null);
+                  handleInputChange('writeup_file', '');
+                  if (e.target) {
+                    e.target.value = ''; // Clear the file input
+                  }
+                } finally {
+                  setUploadingAudio(false);
+                }
               }
             }
           };
@@ -748,6 +827,7 @@ export default function TestFormContent() {
                         }
                         setAudioUrl(null);
                         setAudioBlob(null);
+                        setUploadedFile(null);
                         handleInputChange('writeup_file', '');
                       }}
                       className="text-red-500 hover:text-red-700 text-sm text-center"
