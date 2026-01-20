@@ -2402,14 +2402,24 @@ app.post('/api/documents', requireAuth, requireSuperAdmin, async (req, res) => {
 // Update document
 app.put('/api/documents/:id', requireAuth, requireSuperAdmin, async (req, res) => {
   const { id } = req.params;
-  const { title, document_url, document_type, section } = req.body || {};
+  const { title, document_url, document_type, section, downloadable } = req.body || {};
   if (!title || !document_url) {
     return res.status(400).json({ error: 'Missing title or document_url' });
   }
   try {
+    // If downloadable is not provided, get current value from database to preserve it
+    let finalDownloadable = downloadable;
+    if (downloadable === undefined) {
+      const currentDoc = await pool.query('SELECT downloadable FROM meeting_documents WHERE id = $1', [id]);
+      if (currentDoc.rows.length > 0) {
+        finalDownloadable = currentDoc.rows[0].downloadable;
+      } else {
+        finalDownloadable = true; // Default to true if document doesn't exist (shouldn't happen)
+      }
+    }
     const result = await pool.query(
       'UPDATE meeting_documents SET title=$1, document_url=$2, document_type=$3, section=$4, downloadable=$5, updated_at=NOW() WHERE id=$6 RETURNING id, title, document_url, document_type, section, downloadable, created_at, updated_at',
-      [title, document_url, document_type || null, section || null, downloadable !== undefined ? Boolean(downloadable) : undefined, id]
+      [title, document_url, document_type || null, section || null, Boolean(finalDownloadable), id]
     );
     if (result.rowCount === 0) {
       return res.status(404).json({ error: 'Document not found' });

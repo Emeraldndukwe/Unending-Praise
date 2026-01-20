@@ -78,7 +78,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<Array<{id:string; name:string; email:string; role:string; status:string; created_at?: string;}>>([]);
   const [crusadeTypes, setCrusadeTypes] = useState<Array<{id:string; name:string; description?:string; created_at?:string;}>>([]);
   const [meetings, setMeetings] = useState<Array<{id:string; title:string; video_url:string; thumbnail_url?:string; section?:string; created_at?:string; updated_at?:string}>>([]);
-  const [documents, setDocuments] = useState<Array<{id:string; title:string; document_url:string; document_type?:string; section?:string; created_at?:string; updated_at?:string}>>([]);
+  const [documents, setDocuments] = useState<Array<{id:string; title:string; document_url:string; document_type?:string; section?:string; downloadable?:boolean; created_at?:string; updated_at?:string}>>([]);
   const [meetingSettings, setMeetingSettings] = useState<{access_token?:string; updated_at?:string}>({});
   const [meetingPassword, setMeetingPassword] = useState("");
   const [meetingPasswordLoading, setMeetingPasswordLoading] = useState(false);
@@ -2079,6 +2079,7 @@ export default function AdminPage() {
                         <h3 className="font-bold text-lg mb-2">{doc.title}</h3>
                         <div className="text-xs text-gray-500">
                           {doc.document_type && <span className="mr-2">Type: {doc.document_type}</span>}
+                          {doc.downloadable === false && <span className="mr-2 text-orange-600 font-semibold">⚠️ Not Downloadable</span>}
                           {doc.created_at && `Created: ${new Date(doc.created_at).toLocaleString()}`}
                         </div>
                       </div>
@@ -2092,7 +2093,13 @@ export default function AdminPage() {
                               await fetch(`/api/documents/${doc.id}`, {
                                 method: 'PUT',
                                 headers: Object.assign({}, headers as Record<string, string>, { 'content-type': 'application/json' }),
-                                body: JSON.stringify({ title, document_url: doc.document_url, document_type: doc.document_type || null, section: doc.section || null }),
+                                body: JSON.stringify({ 
+                                  title, 
+                                  document_url: doc.document_url, 
+                                  document_type: doc.document_type || null, 
+                                  section: doc.section || null,
+                                  downloadable: doc.downloadable !== false
+                                }),
                               });
                               await refreshDocuments();
                             } catch (e: any) {
@@ -4779,7 +4786,15 @@ function FormSubmissionItem({
                       rel="noopener noreferrer"
                       className="text-blue-600 hover:text-blue-800 underline break-all"
                     >
-                      {String(submission.form_data.media_link)}
+                      {(() => {
+                        const url = String(submission.form_data.media_link);
+                        // Show shorter, user-friendly text for Cloudinary URLs
+                        if (url.includes('cloudinary.com')) {
+                          const fileName = url.split('/').pop()?.split('?')[0] || 'View Link';
+                          return `🔗 ${fileName}`;
+                        }
+                        return url;
+                      })()}
                     </a>
                   </div>
                 )}
@@ -4792,7 +4807,15 @@ function FormSubmissionItem({
                       rel="noopener noreferrer"
                       className="text-blue-600 hover:text-blue-800 underline break-all"
                     >
-                      {String(submission.form_data.testimonies_link)}
+                      {(() => {
+                        const url = String(submission.form_data.testimonies_link);
+                        // Show shorter, user-friendly text for Cloudinary URLs
+                        if (url.includes('cloudinary.com')) {
+                          const fileName = url.split('/').pop()?.split('?')[0] || 'View Link';
+                          return `🔗 ${fileName}`;
+                        }
+                        return url;
+                      })()}
                     </a>
                   </div>
                 )}
@@ -4804,11 +4827,18 @@ function FormSubmissionItem({
                       const isUrl = fileValue.startsWith('http://') || fileValue.startsWith('https://') || fileValue.startsWith('blob:');
                       
                       // Check if it's an audio file (by extension or URL pattern)
-                      if (isAudioFile(fileValue) || (isUrl && (fileValue.includes('audio') || fileValue.includes('.webm') || fileValue.includes('.mp3') || fileValue.includes('.wav') || fileValue.includes('.m4a') || fileValue.includes('.ogg') || fileValue.includes('.aac')))) {
+                      // Distinguish between recorded audio (webm from form) vs uploaded audio/document
+                      const isRecordedAudio = fileValue.includes('.webm') || (isUrl && fileValue.includes('audio_recording'));
+                      const isUploadedAudio = isAudioFile(fileValue) && !isRecordedAudio;
+                      const isUploadedDocument = isDocumentFile(fileValue) || (isUrl && (fileValue.includes('.pdf') || fileValue.includes('.doc') || fileValue.includes('.docx'))) && !isRecordedAudio;
+                      
+                      if (isRecordedAudio || isUploadedAudio || (isUrl && (fileValue.includes('audio') || fileValue.includes('.mp3') || fileValue.includes('.wav') || fileValue.includes('.m4a') || fileValue.includes('.ogg') || fileValue.includes('.aac')))) {
                         return (
                           <div className="bg-white rounded-lg p-3 border border-gray-200">
                             <div className="flex items-center gap-2 mb-2">
-                              <span className="text-gray-600 font-medium">🎵 Audio Recording:</span>
+                              <span className="text-gray-600 font-medium">
+                                {isRecordedAudio ? '🎤 Audio Recording (Recorded in Form)' : '🎵 Audio File (Uploaded)'}:
+                              </span>
                               {isUrl ? (
                                 <>
                                   <a 
@@ -4862,21 +4892,55 @@ function FormSubmissionItem({
                             )}
                           </div>
                         );
-                      } else if (isDocumentFile(fileValue) || (isUrl && (fileValue.includes('.pdf') || fileValue.includes('.doc') || fileValue.includes('.docx')))) {
+                      } else if (isUploadedDocument) {
+                        // For Cloudinary documents, add flags=inline to force browser display instead of download
+                        const getDocumentUrl = (url: string): string => {
+                          if (url.includes('cloudinary.com')) {
+                            // Add flags=inline to Cloudinary URL to force inline display
+                            if (url.includes('?')) {
+                              return url + '&flags=inline';
+                            } else {
+                              return url + '?flags=inline';
+                            }
+                          }
+                          return url;
+                        };
+                        
+                        const getDisplayText = (url: string): string => {
+                          if (url.includes('cloudinary.com')) {
+                            const fileName = url.split('/').pop()?.split('?')[0] || 'document';
+                            return `📄 ${fileName}`;
+                          }
+                          return '📄 View Document';
+                        };
+                        
                         return (
                           <div className="bg-white rounded-lg p-3 border border-gray-200">
-                            <a 
-                              href={isUrl ? fileValue : '#'} 
-                              target={isUrl ? "_blank" : undefined}
-                              rel={isUrl ? "noopener noreferrer" : undefined}
-                              className={`text-blue-600 hover:text-blue-800 ${isUrl ? 'underline' : 'cursor-not-allowed'} break-all inline-flex items-center gap-2`}
-                            >
-                              <span>📄</span>
-                              <span>{isUrl ? 'View Document' : `Document: ${fileValue}`}</span>
-                            </a>
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-gray-600 font-medium">📄 Document File (Uploaded):</span>
+                            </div>
+                            <div className="space-y-2">
+                              <a 
+                                href={isUrl ? getDocumentUrl(fileValue) : '#'} 
+                                target={isUrl ? "_blank" : undefined}
+                                rel={isUrl ? "noopener noreferrer" : undefined}
+                                className={`text-blue-600 hover:text-blue-800 ${isUrl ? 'underline' : 'cursor-not-allowed'} inline-flex items-center gap-2`}
+                              >
+                                <span>{isUrl ? getDisplayText(fileValue) : `Document: ${fileValue}`}</span>
+                              </a>
+                              {isUrl && (
+                                <p className="text-xs text-gray-500">
+                                  Click to view in browser (will open instead of download)
+                                </p>
+                              )}
+                            </div>
                           </div>
                         );
                       } else if (isUrl) {
+                        // For other URLs, show user-friendly text for Cloudinary links
+                        const displayText = fileValue.includes('cloudinary.com') 
+                          ? `🔗 ${fileValue.split('/').pop()?.split('?')[0] || 'View File'}`
+                          : fileValue;
                         return (
                           <a 
                             href={fileValue} 
@@ -4884,7 +4948,7 @@ function FormSubmissionItem({
                             rel="noopener noreferrer"
                             className="text-blue-600 hover:text-blue-800 underline break-all"
                           >
-                            {fileValue}
+                            {displayText}
                           </a>
                         );
                       } else {
