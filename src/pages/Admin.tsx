@@ -2134,7 +2134,7 @@ export default function AdminPage() {
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
               <div>
-                <h2 className="text-xl font-bold text-[#54037C]">User Management</h2>
+              <h2 className="text-xl font-bold text-[#54037C]">User Management</h2>
                 {currentUser && (
                   <p className="text-xs text-gray-500 mt-1">
                     Signed in as <span className="font-semibold">{currentUser.name || currentUser.email}</span> ({currentUser.email}) • role: {currentUser.role}

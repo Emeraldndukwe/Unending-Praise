@@ -2,9 +2,9 @@ import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 import CrusadeForm from "../components/CrusadeForm";
 import CrusadeCarousel from "../components/CrusadeCarousel";
-import TestForm from "./TestForm";
 import { motion } from "framer-motion";
 import { ArrowUpRight } from "lucide-react";
+import TestFormContent from "../components/TestFormContent";
 
 type Crusade = {
   id: string;
@@ -208,12 +208,10 @@ export default function Crusades() {
           </p>
         </div>
 
-        <CrusadeForm />
-      </div>
-
-      {/* Test Form Section */}
-      <div className="max-w-6xl mx-auto px-4 py-10">
-        <TestForm />
+        <div className="space-y-6">
+          <CrusadeForm />
+          <TestFormContent />
+        </div>
       </div>
 
       {/* Crusade Sections */}
