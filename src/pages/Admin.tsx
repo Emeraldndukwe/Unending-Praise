@@ -61,7 +61,7 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 
 export default function AdminPage() {
   const { token, setToken, headers } = useAuthToken();
-  const [tab, setTab] = useState<"testimonies" | "crusades" | "messages" | "songs" | "comments" | "users" | "crusade-types" | "analytics" | "trainings" | "form-submissions">("testimonies");
+  const [tab, setTab] = useState<"testimonies" | "crusades" | "messages" | "songs" | "comments" | "users" | "crusade-types" | "analytics" | "trainings" | "form-submissions" | "events">("testimonies");
   const [role, setRole] = useState<string>("");
   const [currentUser, setCurrentUser] = useState<{id:string; name:string; email:string; role:string; status:string} | null>(null);
   const [testimonies, setTestimonies] = useState<Testimony[]>([]);
@@ -4641,7 +4641,6 @@ function FormSubmissionItem({
     }
     
     // Detect from URL path patterns (check for file extensions anywhere in URL)
-    const urlLower = url.toLowerCase();
     const extensionPatterns = [
       { pattern: /\.pdf(\?|$|\/|&|#)/i, ext: 'pdf' },
       { pattern: /\.docx(\?|$|\/|&|#)/i, ext: 'docx' },
