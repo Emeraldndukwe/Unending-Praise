@@ -4593,12 +4593,55 @@ function FormSubmissionItem({
   // Get audio URL with proper format for Cloudinary
   const getAudioUrl = (url: string): string => {
     if (!url || typeof url !== 'string') return url;
-    // If it's a Cloudinary URL and doesn't have format specified, ensure it's served as raw
-    if (url.includes('cloudinary.com') && url.includes('/raw/upload/')) {
-      // Cloudinary raw uploads should work, but we can add format if needed
-      return url;
+    // If it's a Cloudinary URL, ensure it's served correctly for audio playback
+    if (url.includes('cloudinary.com')) {
+      // For raw uploads (audio files), ensure proper format
+      if (url.includes('/raw/upload/')) {
+        // Add format parameter if not present to ensure proper content-type
+        if (!url.includes('f_') && !url.includes('format=')) {
+          // Detect audio format from URL
+          if (url.includes('.webm') || url.includes('webm')) {
+            return url + (url.includes('?') ? '&' : '?') + 'f_webm';
+          } else if (url.includes('.mp3') || url.includes('mp3')) {
+            return url + (url.includes('?') ? '&' : '?') + 'f_mp3';
+          }
+        }
+        return url;
+      }
     }
     return url;
+  };
+
+  // Extract file extension from Cloudinary URL or detect from URL pattern
+  const getFileExtensionFromUrl = (url: string): string => {
+    if (!url || typeof url !== 'string') return '';
+    
+    // Try to extract from filename in URL
+    const pathParts = url.split('/');
+    const lastPart = pathParts[pathParts.length - 1]?.split('?')[0] || '';
+    
+    if (lastPart.includes('.')) {
+      return lastPart.split('.').pop()?.toLowerCase() || '';
+    }
+    
+    // Detect from URL patterns
+    if (url.includes('.pdf') || url.includes('/pdf') || url.includes('pdf')) return 'pdf';
+    if (url.includes('.docx') || url.includes('/docx') || url.includes('docx')) return 'docx';
+    if (url.includes('.doc') || url.includes('/doc') || url.includes('doc')) return 'doc';
+    if (url.includes('.xlsx') || url.includes('/xlsx') || url.includes('xlsx')) return 'xlsx';
+    if (url.includes('.xls') || url.includes('/xls') || url.includes('xls')) return 'xls';
+    if (url.includes('.webm') || url.includes('/webm') || url.includes('webm')) return 'webm';
+    if (url.includes('.mp3') || url.includes('/mp3') || url.includes('mp3')) return 'mp3';
+    if (url.includes('.wav') || url.includes('/wav') || url.includes('wav')) return 'wav';
+    if (url.includes('.m4a') || url.includes('/m4a') || url.includes('m4a')) return 'm4a';
+    if (url.includes('audio_recording')) return 'webm';
+    
+    // Detect from Cloudinary resource type in URL
+    if (url.includes('/image/upload/')) return 'image';
+    if (url.includes('/video/upload/')) return 'video';
+    if (url.includes('/raw/upload/')) return 'file';
+    
+    return '';
   };
   
   // Check if a URL is a document file
@@ -4788,10 +4831,15 @@ function FormSubmissionItem({
                     >
                       {(() => {
                         const url = String(submission.form_data.media_link);
-                        // Show shorter, user-friendly text for Cloudinary URLs
+                        // Show shorter, user-friendly text for Cloudinary URLs with file extension
                         if (url.includes('cloudinary.com')) {
-                          const fileName = url.split('/').pop()?.split('?')[0] || 'View Link';
-                          return `🔗 ${fileName}`;
+                          const pathParts = url.split('/');
+                          const fileName = pathParts[pathParts.length - 1]?.split('?')[0] || 'file';
+                          const extension = getFileExtensionFromUrl(url);
+                          const displayName = extension && !fileName.includes('.') 
+                            ? `${fileName}.${extension}` 
+                            : fileName;
+                          return `🔗 ${displayName}`;
                         }
                         return url;
                       })()}
@@ -4809,10 +4857,15 @@ function FormSubmissionItem({
                     >
                       {(() => {
                         const url = String(submission.form_data.testimonies_link);
-                        // Show shorter, user-friendly text for Cloudinary URLs
+                        // Show shorter, user-friendly text for Cloudinary URLs with file extension
                         if (url.includes('cloudinary.com')) {
-                          const fileName = url.split('/').pop()?.split('?')[0] || 'View Link';
-                          return `🔗 ${fileName}`;
+                          const pathParts = url.split('/');
+                          const fileName = pathParts[pathParts.length - 1]?.split('?')[0] || 'file';
+                          const extension = getFileExtensionFromUrl(url);
+                          const displayName = extension && !fileName.includes('.') 
+                            ? `${fileName}.${extension}` 
+                            : fileName;
+                          return `🔗 ${displayName}`;
                         }
                         return url;
                       })()}
@@ -4908,8 +4961,13 @@ function FormSubmissionItem({
                         
                         const getDisplayText = (url: string): string => {
                           if (url.includes('cloudinary.com')) {
-                            const fileName = url.split('/').pop()?.split('?')[0] || 'document';
-                            return `📄 ${fileName}`;
+                            const pathParts = url.split('/');
+                            const fileName = pathParts[pathParts.length - 1]?.split('?')[0] || 'document';
+                            const extension = getFileExtensionFromUrl(url);
+                            const displayName = extension && !fileName.includes('.') 
+                              ? `${fileName}.${extension}` 
+                              : fileName;
+                            return `📄 ${displayName}`;
                           }
                           return '📄 View Document';
                         };
@@ -4937,10 +4995,19 @@ function FormSubmissionItem({
                           </div>
                         );
                       } else if (isUrl) {
-                        // For other URLs, show user-friendly text for Cloudinary links
-                        const displayText = fileValue.includes('cloudinary.com') 
-                          ? `🔗 ${fileValue.split('/').pop()?.split('?')[0] || 'View File'}`
-                          : fileValue;
+                        // For other URLs, show user-friendly text for Cloudinary links with extension
+                        const displayText = (() => {
+                          if (fileValue.includes('cloudinary.com')) {
+                            const pathParts = fileValue.split('/');
+                            const fileName = pathParts[pathParts.length - 1]?.split('?')[0] || 'file';
+                            const extension = getFileExtensionFromUrl(fileValue);
+                            const displayName = extension && !fileName.includes('.') 
+                              ? `${fileName}.${extension}` 
+                              : fileName;
+                            return `🔗 ${displayName}`;
+                          }
+                          return fileValue;
+                        })();
                         return (
                           <a 
                             href={fileValue} 

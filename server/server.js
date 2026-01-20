@@ -1302,6 +1302,11 @@ app.post('/api/form-submissions/upload', upload.single('file'), async (req, res)
     const filePath = req.file.path;
     const resourceType = req.query.resourceType || 'auto';
     
+    // Preserve original filename if available
+    const originalName = req.file.originalname || req.file.filename || 'file';
+    const fileExtension = originalName.includes('.') ? originalName.split('.').pop() : '';
+    const baseName = originalName.includes('.') ? originalName.substring(0, originalName.lastIndexOf('.')) : originalName;
+    
     // Stream file to Cloudinary
     const uploadStream = cloudinary.uploader.upload_stream(
       {
@@ -1309,6 +1314,9 @@ app.post('/api/form-submissions/upload', upload.single('file'), async (req, res)
         resource_type: resourceType,
         use_filename: true,
         unique_filename: true,
+        // Try to preserve original filename structure
+        public_id: baseName,
+        format: fileExtension || undefined,
       },
       async (error, result) => {
         // Clean up temp file
