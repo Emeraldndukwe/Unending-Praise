@@ -387,6 +387,10 @@ export default function DocumentViewer() {
   const handleDownload = async (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
     if (!doc?.document_url) return;
+    if (doc.downloadable === false) {
+      alert('This document is not available for download.');
+      return;
+    }
     
     try {
       // Use proxy endpoint for PDFs (to handle CORS/Cloudinary issues)
@@ -551,7 +555,7 @@ export default function DocumentViewer() {
 
             {/* Right: Download and Zoom In */}
             <div className="flex items-center gap-4">
-              {doc.document_url && (
+              {doc.document_url && doc.downloadable !== false && (
                 <a
                   href={doc.document_url}
                   onClick={handleDownload}
@@ -738,18 +742,20 @@ export default function DocumentViewer() {
                         {doc.title || "Office Document"}
                       </h2>
                       <p className="text-gray-600 mb-6 leading-relaxed">
-                        Failed to load document preview. Please download the file or open it in a new tab.
+                        Failed to load document preview. {doc.downloadable !== false ? 'Please download the file or' : ''} open it in a new tab.
                       </p>
                       <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                        <a
-                          href={doc.document_url}
-                          onClick={handleDownload}
-                          className="inline-flex items-center justify-center gap-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white px-6 py-3 rounded-full font-semibold transition-colors shadow-lg"
-                        >
-                          {getFileIcon()}
-                          <Download className="w-5 h-5" />
-                          <span>Download File</span>
-                        </a>
+                        {doc.downloadable !== false && (
+                          <a
+                            href={doc.document_url}
+                            onClick={handleDownload}
+                            className="inline-flex items-center justify-center gap-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white px-6 py-3 rounded-full font-semibold transition-colors shadow-lg"
+                          >
+                            {getFileIcon()}
+                            <Download className="w-5 h-5" />
+                            <span>Download File</span>
+                          </a>
+                        )}
                         <a
                           href={doc.document_url}
                           target="_blank"
