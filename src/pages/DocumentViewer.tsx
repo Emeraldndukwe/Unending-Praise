@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, ZoomIn, ZoomOut, Download, FileText, File, Image, ArrowUpRight } from "lucide-react";
+import mammoth from "mammoth";
+import * as XLSX from "xlsx";
 
 declare global {
   interface Window {
@@ -28,7 +30,11 @@ export default function DocumentViewer() {
   const [totalPages, setTotalPages] = useState(1);
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [officeContent, setOfficeContent] = useState<string | null>(null);
+  const [officeLoading, setOfficeLoading] = useState(false);
+  const [isExcel, setIsExcel] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const officeContentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!id) {
@@ -139,6 +145,10 @@ export default function DocumentViewer() {
       if (found.document_url.toLowerCase().endsWith(".pdf") || found.document_type?.toLowerCase() === "pdf") {
         // Load the PDF document for rendering
         await loadPDFDocument(found.document_url);
+      } else if (isOfficeDocument(found.document_url, found.document_type)) {
+        // Load Office document for preview
+        await loadOfficeDocument(found.document_url, found.document_type);
+        setTotalPages(1); // Office docs are treated as single page
       } else {
         setTotalPages(1); // Images are single page
       }
@@ -146,6 +156,100 @@ export default function DocumentViewer() {
       setError(e?.message || "Failed to load document");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const isOfficeDocument = (url: string, docType?: string): boolean => {
+    const lowerUrl = url.toLowerCase();
+    const lowerType = docType?.toLowerCase() || '';
+    return (
+      lowerUrl.endsWith('.doc') ||
+      lowerUrl.endsWith('.docx') ||
+      lowerUrl.endsWith('.xls') ||
+      lowerUrl.endsWith('.xlsx') ||
+      lowerType === 'doc' ||
+      lowerType === 'docx' ||
+      lowerType === 'xls' ||
+      lowerType === 'xlsx'
+    );
+  };
+
+  const loadOfficeDocument = async (docUrl: string, docType?: string) => {
+    setOfficeLoading(true);
+    setOfficeContent(null);
+    setIsExcel(false);
+    
+    try {
+      // Fix Cloudinary URL if needed
+      let proxyUrl = docUrl;
+      if (proxyUrl.includes('/image/upload/')) {
+        proxyUrl = proxyUrl.replace('/image/upload/', '/raw/upload/');
+      }
+      
+      // Use proxy endpoint to avoid CORS issues
+      const proxyEndpoint = `/api/proxy/document?url=${encodeURIComponent(proxyUrl)}`;
+      
+      const response = await fetch(proxyEndpoint);
+      if (!response.ok) {
+        throw new Error('Failed to fetch document');
+      }
+      
+      const arrayBuffer = await response.arrayBuffer();
+      const lowerUrl = docUrl.toLowerCase();
+      const lowerType = docType?.toLowerCase() || '';
+      
+      // Check if it's an Excel file
+      const isExcelFile = 
+        lowerUrl.endsWith('.xls') || 
+        lowerUrl.endsWith('.xlsx') ||
+        lowerType === 'xls' ||
+        lowerType === 'xlsx';
+      
+      setIsExcel(isExcelFile);
+      
+      if (isExcelFile) {
+        // Parse Excel file
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        
+        // Convert all sheets to HTML
+        let htmlContent = '<div class="excel-preview">';
+        
+        workbook.SheetNames.forEach((sheetName, index) => {
+          const worksheet = workbook.Sheets[sheetName];
+          const html = XLSX.utils.sheet_to_html(worksheet, { 
+            id: `sheet-${index}`,
+            editable: false
+          });
+          
+          htmlContent += `<div class="excel-sheet mb-8">`;
+          htmlContent += `<h3 class="text-lg font-bold mb-4 text-gray-800">${sheetName}</h3>`;
+          htmlContent += html;
+          htmlContent += `</div>`;
+        });
+        
+        htmlContent += '</div>';
+        setOfficeContent(htmlContent);
+      } else {
+        // Parse Word document
+        const result = await mammoth.convertToHtml({ arrayBuffer }, {
+          styleMap: [
+            "p[style-name='Heading 1'] => h1:fresh",
+            "p[style-name='Heading 2'] => h2:fresh",
+            "p[style-name='Heading 3'] => h3:fresh",
+          ],
+        });
+        
+        setOfficeContent(result.value);
+        
+        if (result.messages.length > 0) {
+          console.warn('Word document conversion warnings:', result.messages);
+        }
+      }
+    } catch (e: any) {
+      console.error('Failed to load Office document:', e);
+      setError('Failed to load document: ' + (e?.message || 'Unknown error'));
+    } finally {
+      setOfficeLoading(false);
     }
   };
 
@@ -389,14 +493,7 @@ export default function DocumentViewer() {
   }
 
   const isPDF = doc.document_url.toLowerCase().endsWith(".pdf") || doc.document_type?.toLowerCase() === "pdf";
-  const lowerUrl = doc.document_url.toLowerCase();
-  const docType = doc.document_type?.toLowerCase();
-  const isOfficeDoc =
-    !!docType && (docType === "doc" || docType === "docx" || docType === "xls" || docType === "xlsx") ||
-    lowerUrl.endsWith(".doc") ||
-    lowerUrl.endsWith(".docx") ||
-    lowerUrl.endsWith(".xls") ||
-    lowerUrl.endsWith(".xlsx");
+  const isOfficeDoc = isOfficeDocument(doc.document_url, doc.document_type);
 
   // Office files cannot be reliably previewed in browsers without external services
   // which often have authentication/CORS issues. Instead, we provide direct download/open options.
@@ -430,25 +527,27 @@ export default function DocumentViewer() {
             </div>
 
             {/* Center: Page Navigation */}
-            <div className="flex items-center gap-4">
-              <button
-                onClick={handlePrevPage}
-                disabled={currentPage <= 1}
-                className="px-4 py-2 text-white hover:bg-white/20 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                ←
-              </button>
-              <span className="text-white font-semibold min-w-[120px] text-center">
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                onClick={handleNextPage}
-                disabled={currentPage >= totalPages}
-                className="px-4 py-2 text-white hover:bg-white/20 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                →
-              </button>
-            </div>
+            {isPDF && (
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={handlePrevPage}
+                  disabled={currentPage <= 1}
+                  className="px-4 py-2 text-white hover:bg-white/20 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  ←
+                </button>
+                <span className="text-white font-semibold min-w-[120px] text-center">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={handleNextPage}
+                  disabled={currentPage >= totalPages}
+                  className="px-4 py-2 text-white hover:bg-white/20 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  →
+                </button>
+              </div>
+            )}
 
             {/* Right: Download and Zoom In */}
             <div className="flex items-center gap-4">
@@ -519,44 +618,151 @@ export default function DocumentViewer() {
                 )}
               </div>
             ) : isOfficeDoc ? (
-              // Office documents (Word, Excel) cannot be previewed directly in browsers
-              // Show a friendly interface with download/open options
-              <div className="w-full h-full flex flex-col items-center justify-center text-center px-4 py-16">
-                <div className="max-w-md">
-                  <div className="mb-6">
-                    {getFileIcon()}
+              // Office documents (Word, Excel) preview
+              <div className="w-full h-full flex flex-col">
+                {officeLoading ? (
+                  <div className="flex flex-col items-center justify-center h-full">
+                    <img 
+                      src="/logo.png" 
+                      alt="Loading..." 
+                      className="h-16 mx-auto mb-4 animate-pulse" 
+                    />
+                    <div className="text-gray-600">Loading document...</div>
                   </div>
-                  <h2 className="text-2xl font-bold text-gray-800 mb-3">
-                    {doc.title || "Office Document"}
-                  </h2>
-                  <p className="text-gray-600 mb-6 leading-relaxed">
-                    Word and Excel files cannot be previewed directly in the browser. 
-                    Please download the file or open it in a new tab to view its contents.
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                    <a
-                      href={doc.document_url}
-                      onClick={handleDownload}
-                      className="inline-flex items-center justify-center gap-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white px-6 py-3 rounded-full font-semibold transition-colors shadow-lg"
+                ) : officeContent ? (
+                  <>
+                    <style>{`
+                      .excel-container table {
+                        border-collapse: collapse;
+                        width: 100%;
+                        margin: 1rem 0;
+                        font-size: 14px;
+                      }
+                      .excel-container table td,
+                      .excel-container table th {
+                        border: 1px solid #d1d5db;
+                        padding: 8px 12px;
+                        text-align: left;
+                      }
+                      .excel-container table th {
+                        background-color: #f3f4f6;
+                        font-weight: 600;
+                        color: #1f2937;
+                      }
+                      .excel-container table tr:nth-child(even) {
+                        background-color: #f9fafb;
+                      }
+                      .excel-container table tr:hover {
+                        background-color: #f3f4f6;
+                      }
+                      .word-container {
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                        line-height: 1.6;
+                        color: #1f2937;
+                      }
+                      .word-container h1 {
+                        font-size: 2em;
+                        font-weight: bold;
+                        margin: 1em 0 0.5em 0;
+                        color: #111827;
+                      }
+                      .word-container h2 {
+                        font-size: 1.5em;
+                        font-weight: bold;
+                        margin: 0.8em 0 0.4em 0;
+                        color: #111827;
+                      }
+                      .word-container h3 {
+                        font-size: 1.25em;
+                        font-weight: bold;
+                        margin: 0.6em 0 0.3em 0;
+                        color: #111827;
+                      }
+                      .word-container p {
+                        margin: 0.5em 0;
+                      }
+                      .word-container ul,
+                      .word-container ol {
+                        margin: 0.5em 0;
+                        padding-left: 2em;
+                      }
+                      .word-container table {
+                        border-collapse: collapse;
+                        width: 100%;
+                        margin: 1em 0;
+                      }
+                      .word-container table td,
+                      .word-container table th {
+                        border: 1px solid #d1d5db;
+                        padding: 8px;
+                      }
+                      .word-container table th {
+                        background-color: #f3f4f6;
+                        font-weight: 600;
+                      }
+                    `}</style>
+                    <div 
+                      ref={officeContentRef}
+                      className="flex-1 overflow-auto p-6 md:p-8 bg-white"
+                      style={{
+                        transform: `scale(${zoom / 100})`,
+                        transformOrigin: "top left",
+                      }}
                     >
-                      {getFileIcon()}
-                      <Download className="w-5 h-5" />
-                      <span>Download File</span>
-                    </a>
-                    <a
-                      href={doc.document_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center gap-2 bg-white border-2 border-[#54037C] text-[#54037C] hover:bg-[#54037C]/5 px-6 py-3 rounded-full font-semibold transition-colors"
-                    >
-                      <span>Open in New Tab</span>
-                      <ArrowUpRight className="w-5 h-5" />
-                    </a>
+                      {isExcel ? (
+                        <div 
+                          className="excel-container"
+                          dangerouslySetInnerHTML={{ __html: officeContent }}
+                          style={{
+                            maxWidth: `${100 / (zoom / 100)}%`,
+                          }}
+                        />
+                      ) : (
+                        <div 
+                          className="word-container"
+                          dangerouslySetInnerHTML={{ __html: officeContent }}
+                          style={{
+                            maxWidth: `${100 / (zoom / 100)}%`,
+                          }}
+                        />
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center text-center px-4 py-16">
+                    <div className="max-w-md">
+                      <div className="mb-6">
+                        {getFileIcon()}
+                      </div>
+                      <h2 className="text-2xl font-bold text-gray-800 mb-3">
+                        {doc.title || "Office Document"}
+                      </h2>
+                      <p className="text-gray-600 mb-6 leading-relaxed">
+                        Failed to load document preview. Please download the file or open it in a new tab.
+                      </p>
+                      <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                        <a
+                          href={doc.document_url}
+                          onClick={handleDownload}
+                          className="inline-flex items-center justify-center gap-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white px-6 py-3 rounded-full font-semibold transition-colors shadow-lg"
+                        >
+                          {getFileIcon()}
+                          <Download className="w-5 h-5" />
+                          <span>Download File</span>
+                        </a>
+                        <a
+                          href={doc.document_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center justify-center gap-2 bg-white border-2 border-[#54037C] text-[#54037C] hover:bg-[#54037C]/5 px-6 py-3 rounded-full font-semibold transition-colors"
+                        >
+                          <span>Open in New Tab</span>
+                          <ArrowUpRight className="w-5 h-5" />
+                        </a>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-xs text-gray-500 mt-6">
-                    File will be downloaded as: <strong>{getDownloadFilename()}</strong>
-                  </p>
-                </div>
+                )}
               </div>
             ) : (
               <div
