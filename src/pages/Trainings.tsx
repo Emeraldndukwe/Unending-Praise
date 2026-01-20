@@ -366,8 +366,15 @@ export default function Trainings() {
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 md:px-8 pb-16">
-        {loading && meetings.length === 0 && documents.length === 0 ? (
-          <div className="text-center py-16 text-gray-500">Loading content...</div>
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-16">
+            <img 
+              src="/logo.png" 
+              alt="Unending praise" 
+              className="h-20 md:h-24 mx-auto mb-4 animate-pulse" 
+            />
+            <p className="text-gray-500">Loading content...</p>
+          </div>
         ) : error ? (
           <div className="text-center py-16 text-red-500">{error}</div>
         ) : sections.length === 0 ? (

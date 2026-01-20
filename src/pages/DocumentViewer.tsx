@@ -368,7 +368,14 @@ export default function DocumentViewer() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center">
-        <div className="text-[#54037C] text-xl">Loading document...</div>
+        <div className="flex flex-col items-center">
+          <img 
+            src="/logo.png" 
+            alt="Unending praise" 
+            className="h-20 md:h-24 mx-auto mb-4 animate-pulse" 
+          />
+          <div className="text-[#54037C] text-xl">Loading document...</div>
+        </div>
       </div>
     );
   }
@@ -395,23 +402,24 @@ export default function DocumentViewer() {
   const getOfficeViewerUrl = (): string => {
     if (!doc?.document_url) return '';
     
-    // Use proxy endpoint to handle CORS/Cloudinary issues
-    // The proxy makes the file accessible to Microsoft Office Online Viewer
     let fileUrl = doc.document_url;
     
-    // Fix Cloudinary URLs if needed
+    // Fix Cloudinary URLs if needed - convert image uploads to raw uploads for documents
     if (fileUrl.includes('/image/upload/')) {
       fileUrl = fileUrl.replace('/image/upload/', '/raw/upload/');
     }
     
-    // Use our proxy endpoint to serve the file
-    // This ensures CORS headers and proper content type
-    const proxyUrl = `${window.location.origin}/api/proxy/document?url=${encodeURIComponent(fileUrl)}`;
+    // Ensure we have a full URL (not relative)
+    if (fileUrl.startsWith('//')) {
+      fileUrl = `https:${fileUrl}`;
+    } else if (fileUrl.startsWith('/')) {
+      fileUrl = `${window.location.origin}${fileUrl}`;
+    }
     
-    // Microsoft Office Online Viewer
-    // Note: For this to work in production, the proxy URL must be publicly accessible (HTTPS)
-    const encodedUrl = encodeURIComponent(proxyUrl);
-    return `https://view.officeapps.live.com/op/view.aspx?src=${encodedUrl}`;
+    // Use Google Docs Viewer as primary - it's more flexible with URLs
+    // It can handle Cloudinary URLs and other publicly accessible URLs
+    const encodedUrl = encodeURIComponent(fileUrl);
+    return `https://docs.google.com/viewer?url=${encodedUrl}&embedded=true`;
   };
 
   return (
@@ -532,7 +540,7 @@ export default function DocumentViewer() {
                 )}
               </div>
             ) : isOfficeDoc ? (
-              // Use Microsoft Office Online Viewer to display Word/Excel files
+              // Use Microsoft Office Online Viewer or Google Docs Viewer to display Word/Excel files
               <div className="w-full h-full flex flex-col">
                 <iframe
                   src={getOfficeViewerUrl()}
@@ -540,12 +548,12 @@ export default function DocumentViewer() {
                   title={doc.title || "Office Document Viewer"}
                   style={{ minHeight: "600px" }}
                   onError={() => {
-                    console.error("Office Online Viewer failed to load");
+                    console.error("Document viewer failed to load");
                   }}
                 />
                 <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg mx-4">
                   <p className="text-sm text-blue-800 mb-2">
-                    <strong>Note:</strong> If the document doesn't load above, Microsoft Office Online Viewer may require a publicly accessible HTTPS URL.
+                    <strong>Note:</strong> If the document doesn't load above, the file may need to be publicly accessible. You can download or open it directly.
                   </p>
                   <div className="flex gap-3 justify-center">
                     <a
