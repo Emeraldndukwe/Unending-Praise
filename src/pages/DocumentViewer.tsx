@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, ZoomIn, ZoomOut, Download } from "lucide-react";
+import { ArrowLeft, ZoomIn, ZoomOut, Download, FileText, File, Image } from "lucide-react";
 
 declare global {
   interface Window {
@@ -229,6 +229,106 @@ export default function DocumentViewer() {
     setCurrentPage((prev) => Math.min(totalPages, prev + 1));
   };
 
+  // Get file extension from URL or document type
+  const getFileExtension = (): string => {
+    if (doc?.document_type) {
+      const type = doc.document_type.toLowerCase();
+      if (type === 'pdf') return '.pdf';
+      if (type === 'doc' || type === 'docx') return '.docx';
+      if (type === 'xls' || type === 'xlsx') return '.xlsx';
+      if (type === 'txt') return '.txt';
+    }
+    if (doc?.document_url) {
+      const url = doc.document_url.toLowerCase();
+      if (url.endsWith('.pdf')) return '.pdf';
+      if (url.endsWith('.docx')) return '.docx';
+      if (url.endsWith('.doc')) return '.doc';
+      if (url.endsWith('.xlsx')) return '.xlsx';
+      if (url.endsWith('.xls')) return '.xls';
+      if (url.endsWith('.txt')) return '.txt';
+      if (url.match(/\.(jpg|jpeg|png|gif|webp)$/)) {
+        const match = url.match(/\.(jpg|jpeg|png|gif|webp)$/);
+        return match ? `.${match[1]}` : '.jpg';
+      }
+    }
+    return '.pdf'; // Default fallback
+  };
+
+  // Generate proper filename for download
+  const getDownloadFilename = (): string => {
+    if (!doc) return 'document';
+    const title = doc.title || 'document';
+    // Clean title: remove special characters that might cause issues in filenames
+    const cleanTitle = title.replace(/[^a-z0-9\s-]/gi, '').trim().replace(/\s+/g, '_');
+    const extension = getFileExtension();
+    return `${cleanTitle}${extension}`;
+  };
+
+  // Get appropriate icon for file type
+  const getFileIcon = () => {
+    const extension = getFileExtension().toLowerCase();
+    if (extension === '.pdf') {
+      return <FileText className="w-5 h-5" />;
+    } else if (['.doc', '.docx'].includes(extension)) {
+      return <FileText className="w-5 h-5" />;
+    } else if (['.xls', '.xlsx'].includes(extension)) {
+      return <File className="w-5 h-5" />;
+    } else if (['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(extension)) {
+      return <Image className="w-5 h-5" />;
+    }
+    return <File className="w-5 h-5" />;
+  };
+
+  // Handle download with proper filename
+  const handleDownload = async (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    if (!doc?.document_url) return;
+    
+    try {
+      // Use proxy endpoint for PDFs (to handle CORS/Cloudinary issues)
+      // For other files, try direct download first
+      const isPDF = getFileExtension().toLowerCase() === '.pdf';
+      let downloadUrl = doc.document_url;
+      
+      if (isPDF) {
+        // Fix Cloudinary URL if needed
+        let proxyUrl = doc.document_url;
+        if (proxyUrl.includes('/image/upload/') && proxyUrl.endsWith('.pdf')) {
+          proxyUrl = proxyUrl.replace('/image/upload/', '/raw/upload/');
+        }
+        downloadUrl = `/api/proxy/pdf?url=${encodeURIComponent(proxyUrl)}`;
+      }
+      
+      // Fetch the file as a blob
+      const response = await fetch(downloadUrl);
+      if (!response.ok) throw new Error('Failed to fetch file');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      
+      // Create a temporary anchor element for download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = getDownloadFilename();
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download failed:', error);
+      // Fallback: use direct link with download attribute (browser will handle it)
+      const link = document.createElement('a');
+      link.href = doc.document_url;
+      link.download = getDownloadFilename();
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
   // Render PDF page when currentPage or pdfDoc changes
   useEffect(() => {
     if (!pdfDoc || !canvasRef.current) return;
@@ -291,6 +391,29 @@ export default function DocumentViewer() {
     lowerUrl.endsWith(".xls") ||
     lowerUrl.endsWith(".xlsx");
 
+  // Get Office Online Viewer URL for Word/Excel files
+  const getOfficeViewerUrl = (): string => {
+    if (!doc?.document_url) return '';
+    
+    // Use proxy endpoint to handle CORS/Cloudinary issues
+    // The proxy makes the file accessible to Microsoft Office Online Viewer
+    let fileUrl = doc.document_url;
+    
+    // Fix Cloudinary URLs if needed
+    if (fileUrl.includes('/image/upload/')) {
+      fileUrl = fileUrl.replace('/image/upload/', '/raw/upload/');
+    }
+    
+    // Use our proxy endpoint to serve the file
+    // This ensures CORS headers and proper content type
+    const proxyUrl = `${window.location.origin}/api/proxy/document?url=${encodeURIComponent(fileUrl)}`;
+    
+    // Microsoft Office Online Viewer
+    // Note: For this to work in production, the proxy URL must be publicly accessible (HTTPS)
+    const encodedUrl = encodeURIComponent(proxyUrl);
+    return `https://view.officeapps.live.com/op/view.aspx?src=${encodedUrl}`;
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50">
       {/* Top Navigation Bar - Matching Navbar Color */}
@@ -345,13 +468,12 @@ export default function DocumentViewer() {
               {doc.document_url && (
                 <a
                   href={doc.document_url}
-                  download
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-2 text-white hover:bg-white/20 rounded-lg transition flex items-center gap-2"
-                  title="Download Document"
+                  onClick={handleDownload}
+                  className="p-2 text-white hover:bg-white/20 rounded-lg transition flex items-center gap-2 cursor-pointer"
+                  title={`Download ${getDownloadFilename()}`}
                 >
-                  <Download className="w-5 h-5" />
+                  {getFileIcon()}
+                  <Download className="w-4 h-4" />
                   <span className="text-sm">Download</span>
                 </a>
               )}
@@ -410,25 +532,40 @@ export default function DocumentViewer() {
                 )}
               </div>
             ) : isOfficeDoc ? (
-              // Office documents can't be rendered directly in the browser without a viewer service.
-              // Show a friendly message and direct download/open link instead of a broken preview.
-              <div className="w-full h-full flex flex-col items-center justify-center text-center px-4">
-                <h2 className="text-xl font-semibold text-gray-800 mb-3">
-                  This document type is not previewable here
-                </h2>
-                <p className="text-gray-600 mb-6 max-w-md">
-                  Word and Excel files can't be displayed inside the viewer, but you can open or
-                  download the file directly on your device.
-                </p>
-                <a
-                  href={doc.document_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white px-6 py-3 rounded-full font-semibold transition-colors"
-                >
-                  <Download className="w-5 h-5" />
-                  <span>Open / Download Document</span>
-                </a>
+              // Use Microsoft Office Online Viewer to display Word/Excel files
+              <div className="w-full h-full flex flex-col">
+                <iframe
+                  src={getOfficeViewerUrl()}
+                  className="w-full h-full border-0"
+                  title={doc.title || "Office Document Viewer"}
+                  style={{ minHeight: "600px" }}
+                  onError={() => {
+                    console.error("Office Online Viewer failed to load");
+                  }}
+                />
+                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg mx-4">
+                  <p className="text-sm text-blue-800 mb-2">
+                    <strong>Note:</strong> If the document doesn't load above, Microsoft Office Online Viewer may require a publicly accessible HTTPS URL.
+                  </p>
+                  <div className="flex gap-3 justify-center">
+                    <a
+                      href={doc.document_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#54037C] underline hover:text-[#8A4EBF] text-sm font-medium"
+                    >
+                      Open in new tab
+                    </a>
+                    <span className="text-blue-600">•</span>
+                    <a
+                      href={doc.document_url}
+                      onClick={handleDownload}
+                      className="text-[#54037C] underline hover:text-[#8A4EBF] text-sm font-medium cursor-pointer"
+                    >
+                      Download file
+                    </a>
+                  </div>
+                </div>
               </div>
             ) : (
               <div

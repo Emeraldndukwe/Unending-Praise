@@ -864,6 +864,57 @@ app.get('/api/proxy/pdf', async (req, res) => {
   }
 });
 
+// Proxy endpoint for Office documents (Word, Excel) to bypass Cloudinary access restrictions
+// This makes files accessible for Microsoft Office Online Viewer
+app.get('/api/proxy/document', async (req, res) => {
+  const { url } = req.query;
+  if (!url || typeof url !== 'string') {
+    return res.status(400).json({ error: 'Missing or invalid URL parameter' });
+  }
+  
+  try {
+    // Fix Cloudinary URLs: convert image uploads to raw uploads for documents
+    let docUrl = url;
+    if (docUrl.includes('/image/upload/')) {
+      // Check if it's a document file
+      const isDoc = /\.(doc|docx|xls|xlsx|txt)$/i.test(docUrl);
+      if (isDoc) {
+        docUrl = docUrl.replace('/image/upload/', '/raw/upload/');
+      }
+    }
+    
+    const response = await fetch(docUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; UnendingPraise/1.0)',
+      },
+    });
+    
+    if (!response.ok) {
+      return res.status(response.status).json({ error: 'Failed to fetch document' });
+    }
+    
+    // Determine content type based on file extension
+    let contentType = response.headers.get('content-type');
+    if (!contentType) {
+      if (docUrl.toLowerCase().endsWith('.docx')) contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      else if (docUrl.toLowerCase().endsWith('.doc')) contentType = 'application/msword';
+      else if (docUrl.toLowerCase().endsWith('.xlsx')) contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      else if (docUrl.toLowerCase().endsWith('.xls')) contentType = 'application/vnd.ms-excel';
+      else contentType = 'application/octet-stream';
+    }
+    
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    
+    const buffer = await response.arrayBuffer();
+    res.send(Buffer.from(buffer));
+  } catch (e) {
+    console.error('Document proxy error:', e);
+    res.status(500).json({ error: 'Proxy failed', details: e?.message || 'Unknown error' });
+  }
+});
+
 // Entities: messages, songs now backed by Postgres
 app.get('/api/messages', async (_req, res) => {
   try {
