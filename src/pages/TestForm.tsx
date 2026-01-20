@@ -273,6 +273,8 @@ const createStep3 = (): StepConfig => ({
                       options: [
                         "Praise Night '24",
                         "Praise Night '25",
+                        "Praise Night '26",
+                        "Praise Night '27",
                       ],
                       required: true,
                     },

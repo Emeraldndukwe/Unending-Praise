@@ -4582,6 +4582,17 @@ function FormSubmissionItem({
     const lowerUrl = url.toLowerCase();
     return audioExtensions.some(ext => lowerUrl.includes(ext)) || lowerUrl.includes('audio');
   };
+
+  // Get audio URL with proper format for Cloudinary
+  const getAudioUrl = (url: string): string => {
+    if (!url || typeof url !== 'string') return url;
+    // If it's a Cloudinary URL and doesn't have format specified, ensure it's served as raw
+    if (url.includes('cloudinary.com') && url.includes('/raw/upload/')) {
+      // Cloudinary raw uploads should work, but we can add format if needed
+      return url;
+    }
+    return url;
+  };
   
   // Check if a URL is a document file
   const isDocumentFile = (url: string): boolean => {
@@ -4799,27 +4810,51 @@ function FormSubmissionItem({
                             <div className="flex items-center gap-2 mb-2">
                               <span className="text-gray-600 font-medium">🎵 Audio Recording:</span>
                               {isUrl ? (
-                                <a 
-                                  href={fileValue} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 hover:text-blue-800 underline text-xs"
-                                >
-                                  Open in new tab
-                                </a>
+                                <>
+                                  <a 
+                                    href={fileValue} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 hover:text-blue-800 underline text-xs"
+                                    onClick={(e) => {
+                                      // Prevent download, let browser handle audio playback
+                                      e.preventDefault();
+                                      window.open(fileValue, '_blank');
+                                    }}
+                                  >
+                                    Open in new tab
+                                  </a>
+                                  <a
+                                    href={fileValue}
+                                    download={`audio_recording_${submission.id}.webm`}
+                                    className="text-blue-600 hover:text-blue-800 underline text-xs ml-2"
+                                  >
+                                    Download
+                                  </a>
+                                </>
                               ) : (
                                 <span className="text-xs text-gray-500">(Filename: {fileValue})</span>
                               )}
                             </div>
                             {isUrl ? (
-                              <audio 
-                                controls 
-                                className="w-full"
-                                src={fileValue}
-                                preload="metadata"
-                              >
-                                Your browser does not support the audio element.
-                              </audio>
+                              <div className="space-y-2">
+                                <audio 
+                                  controls 
+                                  className="w-full"
+                                  src={getAudioUrl(fileValue)}
+                                  preload="metadata"
+                                  style={{ outline: 'none' }}
+                                  onError={(e) => {
+                                    console.error('Audio playback error:', e);
+                                  }}
+                                >
+                                  Your browser does not support the audio element.
+                                  <a href={fileValue} download>Download audio</a>
+                                </audio>
+                                <p className="text-xs text-gray-500">
+                                  If the audio doesn't play, try clicking "Open in new tab" or "Download"
+                                </p>
+                              </div>
                             ) : (
                               <div className="text-xs text-gray-500 italic p-2 bg-gray-50 rounded">
                                 Audio file not available as URL. The file may need to be uploaded separately.
