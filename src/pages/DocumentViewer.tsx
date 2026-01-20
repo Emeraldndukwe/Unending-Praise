@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, ZoomIn, ZoomOut, Download, FileText, File, Image } from "lucide-react";
+import { ArrowLeft, ZoomIn, ZoomOut, Download, FileText, File, Image, ArrowUpRight } from "lucide-react";
 
 declare global {
   interface Window {
@@ -398,29 +398,8 @@ export default function DocumentViewer() {
     lowerUrl.endsWith(".xls") ||
     lowerUrl.endsWith(".xlsx");
 
-  // Get Office Online Viewer URL for Word/Excel files
-  const getOfficeViewerUrl = (): string => {
-    if (!doc?.document_url) return '';
-    
-    let fileUrl = doc.document_url;
-    
-    // Fix Cloudinary URLs if needed - convert image uploads to raw uploads for documents
-    if (fileUrl.includes('/image/upload/')) {
-      fileUrl = fileUrl.replace('/image/upload/', '/raw/upload/');
-    }
-    
-    // Ensure we have a full URL (not relative)
-    if (fileUrl.startsWith('//')) {
-      fileUrl = `https:${fileUrl}`;
-    } else if (fileUrl.startsWith('/')) {
-      fileUrl = `${window.location.origin}${fileUrl}`;
-    }
-    
-    // Use Google Docs Viewer as primary - it's more flexible with URLs
-    // It can handle Cloudinary URLs and other publicly accessible URLs
-    const encodedUrl = encodeURIComponent(fileUrl);
-    return `https://docs.google.com/viewer?url=${encodedUrl}&embedded=true`;
-  };
+  // Office files cannot be reliably previewed in browsers without external services
+  // which often have authentication/CORS issues. Instead, we provide direct download/open options.
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50">
@@ -540,39 +519,43 @@ export default function DocumentViewer() {
                 )}
               </div>
             ) : isOfficeDoc ? (
-              // Use Microsoft Office Online Viewer or Google Docs Viewer to display Word/Excel files
-              <div className="w-full h-full flex flex-col">
-                <iframe
-                  src={getOfficeViewerUrl()}
-                  className="w-full h-full border-0"
-                  title={doc.title || "Office Document Viewer"}
-                  style={{ minHeight: "600px" }}
-                  onError={() => {
-                    console.error("Document viewer failed to load");
-                  }}
-                />
-                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg mx-4">
-                  <p className="text-sm text-blue-800 mb-2">
-                    <strong>Note:</strong> If the document doesn't load above, the file may need to be publicly accessible. You can download or open it directly.
+              // Office documents (Word, Excel) cannot be previewed directly in browsers
+              // Show a friendly interface with download/open options
+              <div className="w-full h-full flex flex-col items-center justify-center text-center px-4 py-16">
+                <div className="max-w-md">
+                  <div className="mb-6">
+                    {getFileIcon()}
+                  </div>
+                  <h2 className="text-2xl font-bold text-gray-800 mb-3">
+                    {doc.title || "Office Document"}
+                  </h2>
+                  <p className="text-gray-600 mb-6 leading-relaxed">
+                    Word and Excel files cannot be previewed directly in the browser. 
+                    Please download the file or open it in a new tab to view its contents.
                   </p>
-                  <div className="flex gap-3 justify-center">
+                  <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                    <a
+                      href={doc.document_url}
+                      onClick={handleDownload}
+                      className="inline-flex items-center justify-center gap-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white px-6 py-3 rounded-full font-semibold transition-colors shadow-lg"
+                    >
+                      {getFileIcon()}
+                      <Download className="w-5 h-5" />
+                      <span>Download File</span>
+                    </a>
                     <a
                       href={doc.document_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[#54037C] underline hover:text-[#8A4EBF] text-sm font-medium"
+                      className="inline-flex items-center justify-center gap-2 bg-white border-2 border-[#54037C] text-[#54037C] hover:bg-[#54037C]/5 px-6 py-3 rounded-full font-semibold transition-colors"
                     >
-                      Open in new tab
-                    </a>
-                    <span className="text-blue-600">•</span>
-                    <a
-                      href={doc.document_url}
-                      onClick={handleDownload}
-                      className="text-[#54037C] underline hover:text-[#8A4EBF] text-sm font-medium cursor-pointer"
-                    >
-                      Download file
+                      <span>Open in New Tab</span>
+                      <ArrowUpRight className="w-5 h-5" />
                     </a>
                   </div>
+                  <p className="text-xs text-gray-500 mt-6">
+                    File will be downloaded as: <strong>{getDownloadFilename()}</strong>
+                  </p>
                 </div>
               </div>
             ) : (
