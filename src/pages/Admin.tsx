@@ -62,6 +62,7 @@ export default function AdminPage() {
   const { token, setToken, headers } = useAuthToken();
   const [tab, setTab] = useState<"testimonies" | "crusades" | "messages" | "songs" | "comments" | "users" | "crusade-types" | "analytics" | "trainings" | "form-submissions">("testimonies");
   const [role, setRole] = useState<string>("");
+  const [currentUser, setCurrentUser] = useState<{id:string; name:string; email:string; role:string; status:string} | null>(null);
   const [testimonies, setTestimonies] = useState<Testimony[]>([]);
   const [crusades, setCrusades] = useState<Crusade[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -320,10 +321,12 @@ export default function AdminPage() {
         if (res.ok) {
           const data = await res.json();
           setRole(data?.user?.role || "");
+          setCurrentUser(data?.user || null);
         } else if (res.status === 401) {
           // Token is invalid/expired, clear it
           setToken("");
           setRole("");
+          setCurrentUser(null);
         }
       } catch (err) {
         // Silently handle network errors - don't log expected auth failures
@@ -331,6 +334,7 @@ export default function AdminPage() {
           // Only clear token if we have one (prevents infinite loops)
           setToken("");
           setRole("");
+          setCurrentUser(null);
         }
       }
     };
@@ -1234,6 +1238,7 @@ export default function AdminPage() {
           if (res.ok) {
             const userData = await res.json();
             setRole(userData?.user?.role || "");
+            setCurrentUser(userData?.user || null);
           }
         } catch {}
       }, 100);
@@ -2127,10 +2132,17 @@ export default function AdminPage() {
       {tab === "users" && role === 'superadmin' && (
         <section className="space-y-6">
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-[#54037C]">User Management</h2>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-[#54037C]">User Management</h2>
+                {currentUser && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Signed in as <span className="font-semibold">{currentUser.name || currentUser.email}</span> ({currentUser.email}) • role: {currentUser.role}
+                  </p>
+                )}
+              </div>
               <button
-                className="px-3 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-xl text-sm"
+                className="px-3 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-xl text-sm self-start md:self-auto"
                 onClick={async () => {
                   try {
                     const list = await api<typeof users>("/api/admin/users", { headers: headers as HeadersInit });
@@ -2187,10 +2199,11 @@ export default function AdminPage() {
                         <div className="font-medium">{u.name} <span className="text-gray-500 text-sm">{u.email}</span></div>
                         <div className="text-xs text-gray-500">role: {u.role} • status: {u.status}</div>
                       </div>
-                      <div>
+                      <div className="flex items-center gap-2">
                         <select
                           className="border rounded px-2 py-1 text-sm"
                           value={u.role}
+                          disabled={currentUser?.id === u.id}
                           onChange={async (e) => {
                             const roleVal = e.target.value;
                             await fetch(`/api/admin/users/${u.id}/role`, { method:'PUT', headers: Object.assign({}, headers as Record<string,string>, { 'content-type':'application/json' }), body: JSON.stringify({ role: roleVal }) });
@@ -2200,6 +2213,19 @@ export default function AdminPage() {
                         >
                           {['superadmin','admin','testimony','crusade','messages','songs'].map(r => <option key={r} value={r}>{r}</option>)}
                         </select>
+                        {currentUser?.id !== u.id && (
+                          <button
+                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm"
+                            onClick={async () => {
+                              if (!window.confirm(`Remove user ${u.email}? This cannot be undone.`)) return;
+                              await fetch(`/api/admin/users/${u.id}`, { method:'DELETE', headers: headers as HeadersInit });
+                              const list = await api<typeof users>("/api/admin/users", { headers: headers as HeadersInit });
+                              setUsers(list);
+                            }}
+                          >
+                            Remove
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}

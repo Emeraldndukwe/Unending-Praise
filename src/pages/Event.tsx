@@ -49,8 +49,8 @@ function getEmbedUrl(url: string): string | null {
     return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
   }
   
-  // Return original URL if not YouTube/Vimeo (could be HLS or other)
-  return url;
+  // Return null for non-embeddable URLs (will show fallback UI)
+  return null;
 }
 
 export default function Event() {
@@ -491,6 +491,26 @@ export default function Event() {
                             </motion.div>
                           )}
                         </>
+                      ) : selectedEvent?.streamUrl ? (
+                        // Fallback UI for non-embeddable URLs (like kingscloud.co)
+                        <div className="w-full h-full flex flex-col items-center justify-center text-white p-8 bg-gradient-to-br from-[#54037C] to-[#8A4EBF]">
+                          <div className="text-center max-w-md">
+                            <AlertCircle size={48} className="mx-auto mb-4 opacity-80" />
+                            <h3 className="text-2xl font-bold mb-3">Stream Not Embeddable</h3>
+                            <p className="text-white/90 mb-6 leading-relaxed">
+                              This stream cannot be embedded in this page due to security restrictions. Please open it in a new tab to watch.
+                            </p>
+                            <a
+                              href={selectedEvent.streamUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 bg-white text-[#54037C] px-6 py-3 rounded-full font-semibold hover:bg-white/90 transition-colors shadow-lg"
+                            >
+                              Open Stream in New Tab
+                              <ArrowUpRight size={20} />
+                            </a>
+                          </div>
+                        </div>
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-white">
                           <p>Video URL not available</p>

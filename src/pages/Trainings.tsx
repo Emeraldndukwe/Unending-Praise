@@ -30,7 +30,15 @@ interface SectionData {
 export default function Trainings() {
   const navigate = useNavigate();
   const [password, setPassword] = useState("");
-  const [token, setToken] = useState<string | null>(null);
+  // Try to restore token immediately so going "back" feels instant
+  const [token, setToken] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      return sessionStorage.getItem("trainings_token");
+    } catch {
+      return null;
+    }
+  });
   // Check sessionStorage immediately for existing auth
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     // Try to find any auth key in sessionStorage
@@ -74,6 +82,12 @@ export default function Trainings() {
         const data = await res.json();
         if (data.token) {
           setToken(data.token);
+          // Persist token so subsequent visits/back navigation are instant
+          try {
+            sessionStorage.setItem("trainings_token", data.token);
+          } catch {
+            // Ignore storage errors (e.g., private mode)
+          }
           // Check if already authenticated (stored in sessionStorage)
           const authKey = `meetings_auth_${data.token}`;
           const storedAuth = sessionStorage.getItem(authKey);

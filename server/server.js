@@ -1639,6 +1639,22 @@ app.put('/api/admin/users/:id/activate', requireAuth, requireSuperAdmin, async (
   }
 });
 
+app.delete('/api/admin/users/:id', requireAuth, requireSuperAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    // Prevent a superadmin from deleting their own account for safety
+    if (req.user && String(req.user.id) === String(id)) {
+      return res.status(400).json({ error: 'You cannot delete your own account' });
+    }
+    const result = await pool.query('DELETE FROM users WHERE id=$1 RETURNING id, name, email, role, status', [id]);
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    res.json({ success: true, user: result.rows[0] });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Utility endpoint to fix admin accounts (one-time setup - can be removed after use)
 app.post('/api/admin/fix-superadmin', async (req, res) => {
   const { email, password } = req.body || {};

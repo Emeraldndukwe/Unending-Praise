@@ -59,7 +59,33 @@ export default function DocumentViewer() {
       }
       loadDocument(token);
     } else {
-      // Fetch token from API for trainings route
+      // Trainings route: try to reuse stored token first for faster navigation
+      try {
+        const storedToken = sessionStorage.getItem("trainings_token");
+        if (storedToken) {
+          const authKey = `meetings_auth_${storedToken}`;
+          const authData = sessionStorage.getItem(authKey);
+          let isAuth = authData === "true";
+          if (!isAuth && authData) {
+            try {
+              const parsed = JSON.parse(authData);
+              isAuth = parsed.authenticated === true;
+            } catch (e) {
+              isAuth = false;
+            }
+          }
+          if (!isAuth) {
+            navigate("/trainings");
+            return;
+          }
+          loadDocument(storedToken);
+          return;
+        }
+      } catch {
+        // Fall through to API token fetch
+      }
+
+      // Fallback: fetch token from API for trainings route
       fetch('/api/trainings/token')
         .then(res => res.json())
         .then(data => {
@@ -256,6 +282,14 @@ export default function DocumentViewer() {
   }
 
   const isPDF = doc.document_url.toLowerCase().endsWith(".pdf") || doc.document_type?.toLowerCase() === "pdf";
+  const lowerUrl = doc.document_url.toLowerCase();
+  const docType = doc.document_type?.toLowerCase();
+  const isOfficeDoc =
+    !!docType && (docType === "doc" || docType === "docx" || docType === "xls" || docType === "xlsx") ||
+    lowerUrl.endsWith(".doc") ||
+    lowerUrl.endsWith(".docx") ||
+    lowerUrl.endsWith(".xls") ||
+    lowerUrl.endsWith(".xlsx");
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50">
@@ -308,10 +342,12 @@ export default function DocumentViewer() {
 
             {/* Right: Download and Zoom In */}
             <div className="flex items-center gap-4">
-              {doc.downloadable && (
+              {doc.document_url && (
                 <a
                   href={doc.document_url}
                   download
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="p-2 text-white hover:bg-white/20 rounded-lg transition flex items-center gap-2"
                   title="Download Document"
                 >
@@ -336,9 +372,9 @@ export default function DocumentViewer() {
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-6">
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
           <div
-            className="overflow-auto flex items-center justify-center p-8"
+            className="flex items-center justify-center p-4 md:p-8"
             style={{
-              maxHeight: "calc(100vh - 200px)",
+              height: "calc(100vh - 140px)",
             }}
           >
             {isPDF ? (
@@ -346,11 +382,17 @@ export default function DocumentViewer() {
                 {pdfLoading ? (
                   <div className="text-center py-16 text-gray-500">Loading PDF...</div>
                 ) : pdfDoc ? (
-                  <div className="flex justify-center" style={{ transform: `scale(${zoom / 100})`, transformOrigin: "top center" }}>
+                  <div
+                    className="flex justify-center"
+                    style={{
+                      transform: `scale(${zoom / 100})`,
+                      transformOrigin: "top center",
+                    }}
+                  >
                     <canvas
                       ref={canvasRef}
                       className="border border-gray-300 shadow-lg"
-                      style={{ maxWidth: "100%" }}
+                      style={{ maxWidth: "100%", maxHeight: "100%" }}
                     />
                   </div>
                 ) : (
@@ -367,13 +409,37 @@ export default function DocumentViewer() {
                   </div>
                 )}
               </div>
+            ) : isOfficeDoc ? (
+              // Office documents can't be rendered directly in the browser without a viewer service.
+              // Show a friendly message and direct download/open link instead of a broken preview.
+              <div className="w-full h-full flex flex-col items-center justify-center text-center px-4">
+                <h2 className="text-xl font-semibold text-gray-800 mb-3">
+                  This document type is not previewable here
+                </h2>
+                <p className="text-gray-600 mb-6 max-w-md">
+                  Word and Excel files can't be displayed inside the viewer, but you can open or
+                  download the file directly on your device.
+                </p>
+                <a
+                  href={doc.document_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white px-6 py-3 rounded-full font-semibold transition-colors"
+                >
+                  <Download className="w-5 h-5" />
+                  <span>Open / Download Document</span>
+                </a>
+              </div>
             ) : (
-              <div className="text-center" style={{ transform: `scale(${zoom / 100})`, transformOrigin: "center" }}>
+              <div
+                className="text-center"
+                style={{ transform: `scale(${zoom / 100})`, transformOrigin: "center" }}
+              >
                 <img
                   src={doc.document_url}
                   alt={doc.title}
                   className="max-w-full h-auto"
-                  style={{ maxHeight: "80vh" }}
+                  style={{ maxHeight: "100%" }}
                   onError={() => {
                     setError("Failed to load document image");
                   }}
