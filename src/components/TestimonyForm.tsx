@@ -2,7 +2,12 @@ import { useState } from "react";
 import { Upload } from "lucide-react";
 import { compressImage, compressVideo, formatFileSize, getFileSizeMB } from "../utils/mediaOptimizer";
 
-export default function TestimonyForm() {
+type TestimonyFormProps = {
+  embedded?: boolean;
+  onSuccess?: () => void;
+};
+
+export default function TestimonyForm({ embedded, onSuccess }: TestimonyFormProps = {}) {
   const [formData, setFormData] = useState({
     title: "",
     name: "",
@@ -86,6 +91,7 @@ export default function TestimonyForm() {
       attachments: [],
         salutation: "",
     });
+        onSuccess?.();
       } else {
         throw new Error('Submission failed');
       }
@@ -96,8 +102,8 @@ export default function TestimonyForm() {
   };
 
   return (
-    <div className="bg-[#f8f4ea] rounded-lg p-6 shadow-md">
-      <h3 className="font-bold text-xl mb-4 text-center">SHARE YOUR TESTIMONY</h3>
+    <div className={embedded ? "" : "bg-[#f8f4ea] rounded-lg p-6 shadow-md"}>
+      {!embedded && <h3 className="font-bold text-xl mb-4 text-center">SHARE YOUR TESTIMONY</h3>}
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

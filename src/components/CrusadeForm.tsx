@@ -1,7 +1,12 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 
-export default function CrusadeForm() {
+type CrusadeFormProps = {
+  embedded?: boolean;
+  onSuccess?: () => void;
+};
+
+export default function CrusadeForm({ embedded, onSuccess }: CrusadeFormProps = {}) {
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
@@ -30,6 +35,7 @@ export default function CrusadeForm() {
       if (!res.ok) throw new Error('Failed to submit request');
       alert('Your crusade request has been submitted!');
       setFormData({ name: "", phone: "", email: "", kingschat: "" });
+      onSuccess?.();
     } catch (err) {
       alert('Could not submit request. Please try again later.');
     }
@@ -40,12 +46,16 @@ export default function CrusadeForm() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="bg-[#f8f4ea] rounded-lg p-6 shadow-md"
+      className={embedded ? "" : "bg-[#f8f4ea] rounded-lg p-6 shadow-md"}
     >
-      <h3 className="font-bold text-xl mb-4 text-center">ORGANIZE A CRUSADE</h3>
-      <p className="text-sm text-gray-700 mb-4 text-center">
-        Want to organize a crusade? Kindly fill the form below and we will reach out to you.
-      </p>
+      {!embedded && (
+        <>
+          <h3 className="font-bold text-xl mb-4 text-center">ORGANIZE A CRUSADE</h3>
+          <p className="text-sm text-gray-700 mb-4 text-center">
+            Want to organize a crusade? Kindly fill the form below and we will reach out to you.
+          </p>
+        </>
+      )}
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <div>

@@ -301,7 +301,12 @@ const createStep3 = (): StepConfig => ({
 });
 
 
-export default function TestFormContent() {
+type TestFormContentProps = {
+  embedded?: boolean;
+  onSuccess?: () => void;
+};
+
+export default function TestFormContent({ embedded, onSuccess }: TestFormContentProps = {}) {
   const [memberType, setMemberType] = useState<MemberType>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<FormData>({ memberType: null });
@@ -647,6 +652,7 @@ export default function TestFormContent() {
       setUploadedFile(null);
       setIsRecording(false);
       setMediaRecorder(null);
+      onSuccess?.();
     } catch (error: any) {
       console.error('Form submission error:', error);
       alert(`Failed to submit form: ${error.message || 'Please try again.'}`);
@@ -944,9 +950,9 @@ export default function TestFormContent() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="bg-[#f8f4ea] rounded-lg p-6 shadow-md"
+        className={embedded ? "" : "bg-[#f8f4ea] rounded-lg p-6 shadow-md"}
       >
-        <h3 className="font-bold text-xl mb-4 text-center">CRUSADE REPORT FORM</h3>
+        {!embedded && <h3 className="font-bold text-xl mb-4 text-center">CRUSADE REPORT FORM</h3>}
         <p className="text-center text-gray-600 mb-6 text-sm">
           Step {currentStep} of {memberType ? (getFormConfigs()[memberType].length + 1) : 1}
         </p>
