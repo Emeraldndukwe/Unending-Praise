@@ -264,8 +264,8 @@ const Contacts: React.FC = () => {
         </div>
 
         {/* ── QUESTION LINKS ─────────────────────────────────────────── */}
-        <div className="space-y-6 text-center mb-12">
-          <p className="text-lg font-bold text-gray-800">
+        <div className="space-y-5 text-center mb-12">
+          <p className="text-sm sm:text-base md:text-lg font-bold text-gray-800">
             Want to share your testimony?{" "}
             <button
               onClick={() => setTestimonyModalOpen(true)}
@@ -275,7 +275,7 @@ const Contacts: React.FC = () => {
             </button>
           </p>
 
-          <p className="text-lg font-bold text-gray-800">
+          <p className="text-sm sm:text-base md:text-lg font-bold text-gray-800">
             Want to submit your Pastor Chris Live Unending Praise report?{" "}
             <button
               onClick={() => setReportModalOpen(true)}
@@ -285,8 +285,8 @@ const Contacts: React.FC = () => {
             </button>
           </p>
 
-          <p className="text-lg font-bold text-gray-800">
-            Want to book a Praise Time slot?{" "}
+          <p className="text-sm sm:text-base md:text-lg font-bold text-gray-800">
+            Request for a worship slot?{" "}
             <button
               onClick={() => setBookingModalOpen(true)}
               className="text-[#1a3a4a] hover:underline font-normal"
@@ -295,7 +295,7 @@ const Contacts: React.FC = () => {
             </button>
           </p>
 
-          <p className="text-lg font-bold text-gray-800">
+          <p className="text-sm sm:text-base md:text-lg font-bold text-gray-800">
             Quick Contact?{" "}
             <a
               href="https://kingschat.online/user/uepcommunications"
