@@ -296,14 +296,14 @@ const Contacts: React.FC = () => {
           </p>
 
           <p className="text-lg font-bold text-gray-800">
-            Chat with us on KingsChat?{" "}
+            Quick Contact?{" "}
             <a
               href="https://kingschat.online/user/uepcommunications"
               target="_blank"
               rel="noopener noreferrer"
               className="text-[#1a3a4a] hover:underline font-normal"
             >
-              Message Us
+              Click Here
             </a>
           </p>
         </div>
