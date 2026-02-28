@@ -14,23 +14,29 @@ const Modal: React.FC<{
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/50 px-4">
-      <div className="relative bg-[#F5F1DD] rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto modal-scroll p-8">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 bg-gray-900 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-gray-700 transition"
-          aria-label="Close"
-        >
-          <X size={18} />
-        </button>
+      <div className="relative bg-[#F5F1DD] rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        {/* Sticky close button row */}
+        <div className="flex justify-end p-3 pb-0 shrink-0">
+          <button
+            onClick={onClose}
+            className="bg-gray-900 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-gray-700 transition"
+            aria-label="Close"
+          >
+            <X size={18} />
+          </button>
+        </div>
 
-        <h2 className="text-2xl md:text-3xl font-bold text-[#1a3a4a] text-center mb-2">
-          {title}
-        </h2>
-        {subtitle && (
-          <p className="text-gray-600 text-center mb-6">{subtitle}</p>
-        )}
+        {/* Scrollable content */}
+        <div className="overflow-y-auto modal-scroll px-6 sm:px-8 pb-8 pt-2">
+          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-[#1a3a4a] text-center mb-2">
+            {title}
+          </h2>
+          {subtitle && (
+            <p className="text-gray-600 text-center text-sm sm:text-base mb-6">{subtitle}</p>
+          )}
 
-        {children}
+          {children}
+        </div>
       </div>
     </div>
   );
