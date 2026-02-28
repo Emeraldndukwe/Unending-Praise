@@ -13,8 +13,8 @@ const Modal: React.FC<{
 }> = ({ open, onClose, title, subtitle, children }) => {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-8">
+    <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/50 px-4">
+      <div className="relative bg-[#F5F1DD] rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-8">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 bg-gray-900 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-gray-700 transition"
