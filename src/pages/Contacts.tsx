@@ -282,7 +282,7 @@ const Contacts: React.FC = () => {
           </p>
 
           <p className="text-sm sm:text-base md:text-lg font-bold text-gray-800">
-            Want to submit your Pastor Chris Live Unending Praise report?{" "}
+            Want to submit your Pastor Chris Live Unending Praise crusade report?{" "}
             <button
               onClick={() => setReportModalOpen(true)}
               className="text-[#1a3a4a] hover:underline font-normal"
