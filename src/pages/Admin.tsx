@@ -3220,6 +3220,10 @@ function TestimonyForm({ onSubmit, onUploadMedia }: { onSubmit: (payload: Partia
   const [previewVideo, setPreviewVideo] = useState("");
   const [videoUploading, setVideoUploading] = useState(false);
   const [thumbnailUploading, setThumbnailUploading] = useState(false);
+  // For video mode: separate thumbnail from additional media
+  const [thumbnailImage, setThumbnailImage] = useState("");
+  const [additionalImages, setAdditionalImages] = useState<string[]>([]);
+  const [additionalVideos, setAdditionalVideos] = useState<string[]>([]);
 
   // Standard mode: mixed media upload
   const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -3282,16 +3286,65 @@ function TestimonyForm({ onSubmit, onUploadMedia }: { onSubmit: (payload: Partia
       setThumbnailUploading(true);
       const compressed = await compressImage(file);
       const uploaded = await onUploadMedia(compressed);
-      setPreviewImage(uploaded);
+      if (mode === "video") {
+        setThumbnailImage(uploaded);
+        setPreviewImage(uploaded);
+      } else {
+        setPreviewImage(uploaded);
+      }
     } catch (err: any) {
       alert(`Error uploading thumbnail: ${err?.message || 'Upload failed'}`);
     } finally { setThumbnailUploading(false); }
+  };
+
+  // For video mode: handle additional media
+  const handleAdditionalMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    for (const file of Array.from(files)) {
+      try {
+        if (file.type.startsWith("image/")) {
+          const compressed = await compressImage(file);
+          const uploaded = await onUploadMedia(compressed);
+          setAdditionalImages(prev => [...prev, uploaded]);
+        } else if (file.type.startsWith("video/")) {
+          const compressed = await compressVideo(file);
+          const uploaded = await onUploadMedia(compressed);
+          setAdditionalVideos(prev => [...prev, uploaded]);
+        }
+      } catch (err: any) {
+        alert(`Error processing ${file.name}: ${err?.message || 'Upload failed'}`);
+      }
+    }
+  };
+
+  const handleAdditionalUrlAdd = (url: string, type: 'image' | 'video') => {
+    if (!url.trim()) { alert('Please enter a URL'); return; }
+    try {
+      new URL(url);
+      if (type === 'image') {
+        setAdditionalImages(prev => [...prev, url]);
+      } else {
+        setAdditionalVideos(prev => [...prev, url]);
+      }
+    } catch (err) {
+      alert('Please enter a valid URL');
+    }
+  };
+
+  const removeAdditionalImage = (index: number) => {
+    setAdditionalImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeAdditionalVideo = (index: number) => {
+    setAdditionalVideos(prev => prev.filter((_, i) => i !== index));
   };
 
   const resetForm = () => {
     setName(""); setTitle(""); setContent(""); setSummary("");
     setImages([]); setVideos([]);
     setPreviewImage(""); setPreviewVideo("");
+    setThumbnailImage(""); setAdditionalImages([]); setAdditionalVideos([]);
   };
 
   const isUploading = videoUploading || thumbnailUploading;
@@ -3304,7 +3357,13 @@ function TestimonyForm({ onSubmit, onUploadMedia }: { onSubmit: (payload: Partia
       <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-5 w-fit">
         <button
           type="button"
-          onClick={() => setMode("standard")}
+          onClick={() => {
+            setMode("standard");
+            // Reset video-specific state when switching to standard
+            setThumbnailImage("");
+            setAdditionalImages([]);
+            setAdditionalVideos([]);
+          }}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
             mode === "standard"
               ? "bg-white text-[#54037C] shadow-sm"
@@ -3315,7 +3374,12 @@ function TestimonyForm({ onSubmit, onUploadMedia }: { onSubmit: (payload: Partia
         </button>
         <button
           type="button"
-          onClick={() => setMode("video")}
+          onClick={() => {
+            setMode("video");
+            // Reset standard mode state when switching to video
+            setImages([]);
+            setVideos([]);
+          }}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${
             mode === "video"
               ? "bg-white text-[#54037C] shadow-sm"
@@ -3337,9 +3401,9 @@ function TestimonyForm({ onSubmit, onUploadMedia }: { onSubmit: (payload: Partia
             if (!name.trim()) { alert("Please enter the person's name."); return; }
             onSubmit({
               name, title, content, summary,
-              images: previewImage ? [previewImage] : [],
-              videos: [previewVideo],
-              previewImage,
+              images: additionalImages, // Only additional images, NOT the thumbnail
+              videos: [previewVideo, ...additionalVideos], // Main video + additional videos
+              previewImage: thumbnailImage || previewImage, // Thumbnail for preview
               previewVideo,
               approved: false,
             }).then(resetForm);
@@ -3528,12 +3592,12 @@ function TestimonyForm({ onSubmit, onUploadMedia }: { onSubmit: (payload: Partia
             <div className="border border-dashed border-gray-300 rounded-xl p-4 bg-gray-50/50">
               <label className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                Thumbnail Image (for preview)
+                Thumbnail Image (for preview card)
               </label>
-              {previewImage ? (
+              {thumbnailImage || previewImage ? (
                 <div className="relative mb-3 inline-block">
-                  <img src={previewImage} alt="Thumbnail" className="w-48 h-32 object-cover rounded-lg border-2 border-gray-200" />
-                  <button type="button" onClick={() => setPreviewImage("")} className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm shadow-lg">×</button>
+                  <img src={thumbnailImage || previewImage} alt="Thumbnail" className="w-48 h-32 object-cover rounded-lg border-2 border-gray-200" />
+                  <button type="button" onClick={() => { setThumbnailImage(""); setPreviewImage(""); }} className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm shadow-lg">×</button>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -3546,13 +3610,82 @@ function TestimonyForm({ onSubmit, onUploadMedia }: { onSubmit: (payload: Partia
                     <label className="text-xs text-gray-600 mb-1 block">Or paste Image URL:</label>
                     <div className="flex gap-1">
                       <input type="text" placeholder="https://example.com/thumbnail.jpg" className="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm"
-                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); try { new URL(e.currentTarget.value); setPreviewImage(e.currentTarget.value); e.currentTarget.value = ''; } catch { alert('Please enter a valid image URL'); } } }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); try { new URL(e.currentTarget.value); setThumbnailImage(e.currentTarget.value); setPreviewImage(e.currentTarget.value); e.currentTarget.value = ''; } catch { alert('Please enter a valid image URL'); } } }}
                       />
-                      <button type="button" onClick={(e) => { const input = (e.target as HTMLElement).previousElementSibling as HTMLInputElement; if (input?.value) { try { new URL(input.value); setPreviewImage(input.value); input.value = ''; } catch { alert('Please enter a valid image URL'); } } }}
+                      <button type="button" onClick={(e) => { const input = (e.target as HTMLElement).previousElementSibling as HTMLInputElement; if (input?.value) { try { new URL(input.value); setThumbnailImage(input.value); setPreviewImage(input.value); input.value = ''; } catch { alert('Please enter a valid image URL'); } } }}
                         className="px-3 py-2 bg-[#54037C] text-white rounded-xl text-sm hover:bg-[#54037C]/90"
                       >Add</button>
                     </div>
                   </div>
+                </div>
+              )}
+            </div>
+
+            {/* Additional Media Section */}
+            <div className="border border-gray-200 rounded-xl p-4 bg-white">
+              <label className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                Additional Media (Optional)
+              </label>
+              <p className="text-xs text-gray-500 mb-3">Add more images or videos to show in the gallery below the main video.</p>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-gray-600 mb-1 block">Upload Additional Files:</label>
+                  <input type="file" accept="image/*,video/*" multiple onChange={handleAdditionalMediaUpload} className="w-full border border-gray-300 rounded-xl px-4 py-2 text-sm" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs text-gray-600 mb-1 block">Add Image URL:</label>
+                    <div className="flex gap-1">
+                      <input type="text" placeholder="https://example.com/image.jpg" className="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm"
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAdditionalUrlAdd(e.currentTarget.value, 'image'); e.currentTarget.value = ''; } }}
+                      />
+                      <button type="button" onClick={(e) => { const input = (e.target as HTMLElement).previousElementSibling as HTMLInputElement; if (input?.value) { handleAdditionalUrlAdd(input.value, 'image'); input.value = ''; } }}
+                        className="px-3 py-2 bg-[#54037C] text-white rounded-xl text-sm hover:bg-[#54037C]/90"
+                      >Add</button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600 mb-1 block">Add Video URL:</label>
+                    <div className="flex gap-1">
+                      <input type="text" placeholder="https://example.com/video.mp4" className="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm"
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAdditionalUrlAdd(e.currentTarget.value, 'video'); e.currentTarget.value = ''; } }}
+                      />
+                      <button type="button" onClick={(e) => { const input = (e.target as HTMLElement).previousElementSibling as HTMLInputElement; if (input?.value) { handleAdditionalUrlAdd(input.value, 'video'); input.value = ''; } }}
+                        className="px-3 py-2 bg-[#54037C] text-white rounded-xl text-sm hover:bg-[#54037C]/90"
+                      >Add</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {(additionalImages.length > 0 || additionalVideos.length > 0) && (
+                <div className="mt-4 space-y-4">
+                  {additionalImages.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium text-gray-600 mb-2">Additional Images:</p>
+                      <div className="grid grid-cols-4 gap-2">
+                        {additionalImages.map((img, idx) => (
+                          <div key={`add-img-${idx}`} className="relative">
+                            <img src={img} alt={`Additional ${idx}`} className="w-full h-24 object-cover rounded-lg border-2 border-gray-200" />
+                            <button type="button" onClick={() => removeAdditionalImage(idx)} className="absolute top-1 left-1 text-xs px-2 py-1 rounded bg-red-500 text-white">×</button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {additionalVideos.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium text-gray-600 mb-2">Additional Videos:</p>
+                      <div className="grid grid-cols-4 gap-2">
+                        {additionalVideos.map((vid, idx) => (
+                          <div key={`add-vid-${idx}`} className="relative">
+                            <video src={vid} className="w-full h-24 object-cover rounded-lg border-2 border-gray-200" muted />
+                            <button type="button" onClick={() => removeAdditionalVideo(idx)} className="absolute top-1 left-1 text-xs px-2 py-1 rounded bg-red-500 text-white">×</button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

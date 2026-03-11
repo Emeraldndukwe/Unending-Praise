@@ -12,13 +12,25 @@ interface Testimony {
 
 export default function TestimonyCard({ id, title, name, summary, content, previewImage, previewVideo }: Testimony) {
   const displaySummary = summary || content?.substring(0, 150) + "..." || "";
-  const previewMedia = previewVideo || previewImage;
+  // For video testimonies, show the thumbnail image (previewImage) instead of the video itself
+  // For non-video testimonies, show previewVideo if available, otherwise previewImage
+  const previewMedia = previewVideo && previewImage ? previewImage : (previewVideo || previewImage);
 
   return (
     <div className="flex flex-col md:flex-row gap-4 border-b border-gray-300 pb-4 mb-6">
       <div className="w-full md:w-1/3 bg-gray-200 h-48 flex items-center justify-center overflow-hidden rounded-lg relative">
         {previewMedia ? (
-          previewVideo ? (
+          previewVideo && previewImage ? (
+            // Video testimony: show thumbnail image
+            <img
+              src={previewImage}
+              alt={title || "Testimony"}
+              className="object-cover object-center w-full h-full"
+              loading="lazy"
+              decoding="async"
+            />
+          ) : previewVideo ? (
+            // Only video, no thumbnail
             <video
               src={previewVideo}
               className="object-cover w-full h-full"
@@ -26,6 +38,7 @@ export default function TestimonyCard({ id, title, name, summary, content, previ
               playsInline
             />
           ) : (
+            // Only image
             <img
               src={previewImage}
               alt={title || "Testimony"}

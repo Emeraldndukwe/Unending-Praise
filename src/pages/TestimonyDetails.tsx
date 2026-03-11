@@ -122,14 +122,16 @@ export default function TestimonyDetails() {
   const videoUrl = testimony.previewVideo || testimony.videos?.[0];
   const hasVideo = !!videoUrl;
 
-  // Build extra media array (for gallery, excluding the primary video)
+  // Build extra media array (for gallery, excluding the primary video AND the thumbnail image)
   const extraMedia: MediaItem[] = [];
   if (testimony.images) {
-    testimony.images.forEach(img => extraMedia.push({ type: "image", url: img }));
+    testimony.images
+      .filter(img => img !== testimony.previewImage) // Exclude thumbnail from gallery
+      .forEach(img => extraMedia.push({ type: "image", url: img }));
   }
   if (testimony.videos) {
     testimony.videos
-      .filter(vid => vid !== videoUrl)
+      .filter(vid => vid !== videoUrl) // Exclude primary video from gallery
       .forEach(vid => extraMedia.push({ type: "video", url: vid }));
   }
 
