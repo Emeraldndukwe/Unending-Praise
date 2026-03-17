@@ -80,6 +80,7 @@ export default function AdminPage() {
   const [crusadeTypes, setCrusadeTypes] = useState<Array<{id:string; name:string; description?:string; created_at?:string;}>>([]);
   const [meetings, setMeetings] = useState<Array<{id:string; title:string; video_url:string; thumbnail_url?:string; section?:string; created_at?:string; updated_at?:string}>>([]);
   const [documents, setDocuments] = useState<Array<{id:string; title:string; document_url:string; document_type?:string; section?:string; downloadable?:boolean; created_at?:string; updated_at?:string}>>([]);
+  const [trainingLinks, setTrainingLinks] = useState<Array<{id:string; title:string; url:string; description?:string; section?:string; display_order:number; created_at?:string; updated_at?:string}>>([]);
   const [meetingSettings, setMeetingSettings] = useState<{access_token?:string; updated_at?:string}>({});
   const [meetingPassword, setMeetingPassword] = useState("");
   const [meetingPasswordLoading, setMeetingPasswordLoading] = useState(false);
@@ -302,6 +303,16 @@ export default function AdminPage() {
     }
   };
 
+  const refreshTrainingLinks = async () => {
+    if (role !== 'superadmin') return;
+    try {
+      const list = await api<typeof trainingLinks>("/api/training-links", { headers: headers as HeadersInit });
+      setTrainingLinks(list);
+    } catch (e: any) {
+      console.error("Failed to load training links:", e);
+    }
+  };
+
   const refreshMeetingSettings = async () => {
     if (role !== 'superadmin') return;
     try {
@@ -347,6 +358,7 @@ export default function AdminPage() {
     if (role === 'superadmin' && tab === 'trainings') {
       refreshMeetings();
       refreshDocuments();
+      refreshTrainingLinks();
       refreshMeetingSettings();
     }
     // Load form submissions when tab changes to form-submissions
@@ -2133,6 +2145,38 @@ export default function AdminPage() {
                 ))}
               </div>
             </div>
+
+            {/* Featured Banner Link */}
+            <div className="border-t pt-6">
+              <h2 className="text-xl font-bold text-[#54037C] mb-2">Featured Banner Link</h2>
+              <p className="text-sm text-gray-600 mb-4">This link appears as a banner at the top of the Training & Resources page. Users can click it to visit the URL.</p>
+              
+              <FeaturedLinkForm
+                current={trainingLinks[0] || null}
+                onSave={async (data) => {
+                  const existing = trainingLinks[0];
+                  if (existing) {
+                    await fetch(`/api/training-links/${existing.id}`, {
+                      method: 'PUT',
+                      headers: Object.assign({}, headers as Record<string, string>, { 'content-type': 'application/json' }),
+                      body: JSON.stringify({ ...data, display_order: 0 }),
+                    });
+                  } else {
+                    await fetch('/api/training-links', {
+                      method: 'POST',
+                      headers: Object.assign({}, headers as Record<string, string>, { 'content-type': 'application/json' }),
+                      body: JSON.stringify({ ...data, display_order: 0 }),
+                    });
+                  }
+                  await refreshTrainingLinks();
+                }}
+                onRemove={trainingLinks[0] ? async () => {
+                  if (!confirm('Remove the featured banner link?')) return;
+                  await fetch(`/api/training-links/${trainingLinks[0].id}`, { method: 'DELETE', headers: headers as HeadersInit });
+                  await refreshTrainingLinks();
+                } : undefined}
+              />
+            </div>
           </div>
         </section>
       )}
@@ -2140,6 +2184,7 @@ export default function AdminPage() {
       {tab === "events" && (role === 'superadmin' || !role || role === 'admin') && (
         <EventsManagementSection headers={headers} uploadMedia={uploadCrusadeMedia} />
       )}
+
 
       {tab === "users" && role === 'superadmin' && (
         <section className="space-y-6">
@@ -5903,3 +5948,77 @@ function EventsManagementSection({ headers, uploadMedia }: { headers: HeadersIni
   );
 }
 
+function FeaturedLinkForm({ current, onSave, onRemove }: {
+  current: { title: string; url: string; description?: string } | null;
+  onSave: (data: { title: string; url: string; description?: string }) => Promise<void>;
+  onRemove?: () => Promise<void>;
+}) {
+  const [title, setTitle] = useState(current?.title || "");
+  const [url, setUrl] = useState(current?.url || "");
+  const [description, setDescription] = useState(current?.description || "");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setTitle(current?.title || "");
+    setUrl(current?.url || "");
+    setDescription(current?.description || "");
+  }, [current?.title, current?.url, current?.description]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim() || !url.trim()) return;
+    setSaving(true);
+    try {
+      await onSave({ title: title.trim(), url: url.trim(), description: description.trim() || undefined });
+    } catch (e: any) {
+      alert('Failed to save: ' + (e?.message || 'Unknown error'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="p-4 bg-gray-50 rounded-xl border">
+      {current && (
+        <div className="mb-4 p-3 bg-white rounded-lg border border-[#54037C]/20">
+          <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Currently showing:</p>
+          <p className="font-bold text-[#54037C]">{current.title}</p>
+          <a href={current.url} target="_blank" rel="noopener noreferrer" className="text-sm text-[#54037C] hover:underline break-all">{current.url}</a>
+          {current.description && <p className="text-sm text-gray-600 mt-1">{current.description}</p>}
+        </div>
+      )}
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Banner Title <span className="text-red-500">*</span></label>
+          <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
+            placeholder="e.g., Celebrate our 3-Year Anniversary!" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Link URL <span className="text-red-500">*</span></label>
+          <input type="url" required value={url} onChange={(e) => setUrl(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
+            placeholder="https://example.com/create" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Short Description</label>
+          <input type="text" value={description} onChange={(e) => setDescription(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
+            placeholder="e.g., Click to create your special tribute" />
+        </div>
+        <div className="flex gap-2">
+          <button type="submit" disabled={saving}
+            className="px-5 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-xl font-semibold text-sm transition shadow-md disabled:opacity-50">
+            {saving ? "Saving..." : current ? "Update Banner" : "Set Banner"}
+          </button>
+          {onRemove && (
+            <button type="button" onClick={onRemove}
+              className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold text-sm transition">
+              Remove Banner
+            </button>
+          )}
+        </div>
+      </form>
+    </div>
+  );
+}

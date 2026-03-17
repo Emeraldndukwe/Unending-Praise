@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
+const STREAM_URL = "https://vcpout-ams01.internetmultimediaonline.org/lmampraise/stream1/playlist.m3u8";
+
 const SongList = lazy(() => import("./SongList"));
 const LiveChat = lazy(() => import("./LiveChat"));
 
@@ -12,6 +14,8 @@ export default function HeroSection() {
   const [activeTab, setActiveTab] = useState("songs");
   const [isMuted, setIsMuted] = useState(false);
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
+  const [showSharePanel, setShowSharePanel] = useState(false);
+  const [copied, setCopied] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const playerRef = useRef<any>(null);
   const videoJsModuleRef = useRef<any>(null);
@@ -43,7 +47,7 @@ export default function HeroSection() {
     console.log("[HeroSection] Initializing Video.js player");
 
     try {
-      const streamSrc = "https://vcpout-ams01.internetmultimediaonline.org/lmampraise/stream1/playlist.m3u8";
+      const streamSrc = STREAM_URL;
 
       console.log("[HeroSection] Creating Video.js player with source:", streamSrc);
 
@@ -359,6 +363,77 @@ export default function HeroSection() {
               )}
             </AnimatePresence>
           </div>
+
+          {/* Share Stream Link Button */}
+          {showLiveVideo && (
+            <div className="relative mt-3">
+              <button
+                onClick={() => setShowSharePanel((v) => !v)}
+                className="flex items-center gap-2 px-4 py-2 bg-[#54037C]/10 hover:bg-[#54037C]/20 text-[#54037C] rounded-xl text-sm font-semibold transition"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                Stream to your platform
+              </button>
+
+              <AnimatePresence>
+                {showSharePanel && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.2 }}
+                    className="absolute left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-[#54037C]/15 p-5 z-30"
+                    style={{ minWidth: "min(100%, 420px)" }}
+                  >
+                    <h3 className="font-bold text-[#54037C] text-base mb-1">
+                      Stream to Facebook, Instagram, YouTube & more
+                    </h3>
+                    <p className="text-gray-600 text-xs mb-3">
+                      Copy this livestream link and paste it into any multi-stream service to broadcast on your own social media pages.
+                    </p>
+
+                    <div className="flex items-center gap-2 mb-3">
+                      <input
+                        type="text"
+                        readOnly
+                        value={STREAM_URL}
+                        className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-mono text-gray-700 select-all min-w-0"
+                        onClick={(e) => (e.target as HTMLInputElement).select()}
+                      />
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(STREAM_URL);
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2000);
+                        }}
+                        className={`px-4 py-2 rounded-lg font-semibold text-xs transition whitespace-nowrap ${
+                          copied ? "bg-green-600 text-white" : "bg-[#54037C] hover:bg-[#54037C]/90 text-white"
+                        }`}
+                      >
+                        {copied ? "Copied!" : "Copy"}
+                      </button>
+                    </div>
+
+                    <div className="text-xs text-gray-500 space-y-1">
+                      <p className="font-semibold text-gray-700">How to use:</p>
+                      <ol className="list-decimal list-inside space-y-0.5 ml-1">
+                        <li>Go to <a href="https://restream.io" target="_blank" rel="noopener noreferrer" className="text-[#54037C] underline">Restream.io</a>, <a href="https://castr.io" target="_blank" rel="noopener noreferrer" className="text-[#54037C] underline">Castr.io</a>, or similar service</li>
+                        <li>Set up an <strong>HLS pull source</strong> and paste the copied URL</li>
+                        <li>Connect your social media accounts and go live</li>
+                      </ol>
+                    </div>
+
+                    <button
+                      onClick={() => setShowSharePanel(false)}
+                      className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
         </div>
 
         {/* RIGHT SIDE (TABS + CONTENT) */}

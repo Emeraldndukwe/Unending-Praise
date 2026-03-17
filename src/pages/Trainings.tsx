@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Video, FileText } from "lucide-react";
+import { Search, Video, FileText, ExternalLink } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface Meeting {
@@ -19,6 +19,13 @@ interface Document {
   document_type?: string;
   section?: string;
   created_at?: string;
+}
+
+interface FeaturedLink {
+  id: string;
+  title: string;
+  url: string;
+  description?: string;
 }
 
 interface SectionData {
@@ -64,6 +71,7 @@ export default function Trainings() {
   });
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [featuredLink, setFeaturedLink] = useState<FeaturedLink | null>(null);
   const [sections, setSections] = useState<SectionData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -135,16 +143,10 @@ export default function Trainings() {
   }, [meetings, documents]);
 
   const organizeSections = () => {
-    // Get all unique sections
     const sectionNames = new Set<string>();
-    meetings.forEach((m) => {
-      if (m.section) sectionNames.add(m.section);
-    });
-    documents.forEach((d) => {
-      if (d.section) sectionNames.add(d.section);
-    });
+    meetings.forEach((m) => { if (m.section) sectionNames.add(m.section); });
+    documents.forEach((d) => { if (d.section) sectionNames.add(d.section); });
 
-    // If no sections, create a default one
     if (sectionNames.size === 0) {
       sectionNames.add("All Content");
     }
@@ -153,7 +155,6 @@ export default function Trainings() {
       const sectionVideos = meetings.filter((m) => (m.section || "All Content") === sectionName);
       const sectionDocs = documents.filter((d) => (d.section || "All Content") === sectionName);
 
-      // Set default tab for this section
       if (!activeTabs[sectionName]) {
         setActiveTabs((prev) => ({
           ...prev,
@@ -161,11 +162,7 @@ export default function Trainings() {
         }));
       }
 
-      return {
-        name: sectionName,
-        videos: sectionVideos,
-        documents: sectionDocs,
-      };
+      return { name: sectionName, videos: sectionVideos, documents: sectionDocs };
     });
 
     setSections(sectionsData);
@@ -182,6 +179,8 @@ export default function Trainings() {
       const data = await res.json();
       setMeetings(data.videos || []);
       setDocuments(data.documents || []);
+      const allLinks = data.links || [];
+      setFeaturedLink(allLinks.length > 0 ? allLinks[0] : null);
     } catch (e: any) {
       setError(e?.message || "Failed to load content");
     } finally {
@@ -223,7 +222,7 @@ export default function Trainings() {
     }
   };
 
-  const filterBySearch = <T extends Meeting | Document>(items: T[]): T[] => {
+  const filterBySearch = <T extends { title: string }>(items: T[]): T[] => {
     if (!searchQuery) return items;
     return items.filter((item) =>
       item.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -377,10 +376,44 @@ export default function Trainings() {
           </div>
         ) : error ? (
           <div className="text-center py-16 text-red-500">{error}</div>
-        ) : sections.length === 0 ? (
+        ) : sections.length === 0 && !featuredLink ? (
           <div className="text-center py-16 text-gray-500">No content available.</div>
         ) : (
           <div className="space-y-12">
+            {/* Featured Banner Link */}
+            {featuredLink && (
+              <a
+                href={featuredLink.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block group"
+              >
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#54037C] via-[#8A4EBF] to-[#54037C] p-[2px]"
+                >
+                  <div className="relative rounded-2xl bg-gradient-to-r from-[#54037C]/95 via-[#6B1D99]/90 to-[#54037C]/95 px-6 py-5 md:px-8 md:py-6 flex items-center gap-4 overflow-hidden">
+                    <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PHBhdGggZD0iTTM2IDE4YzMuMzEzIDAgNiAyLjY4NyA2IDZzLTIuNjg3IDYtNiA2LTYtMi42ODctNi02IDIuNjg3LTYgNi02eiIvPjwvZz48L2c+PC9zdmc+')] opacity-50" />
+                    <div className="shrink-0 w-12 h-12 md:w-14 md:h-14 rounded-xl bg-white/15 flex items-center justify-center group-hover:bg-white/25 transition">
+                      <ExternalLink className="w-6 h-6 md:w-7 md:h-7 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-white font-bold text-lg md:text-xl leading-tight group-hover:underline decoration-2 underline-offset-2">
+                        {featuredLink.title}
+                      </h3>
+                      {featuredLink.description && (
+                        <p className="text-white/75 text-sm mt-1">{featuredLink.description}</p>
+                      )}
+                    </div>
+                    <div className="shrink-0 text-white/60 group-hover:text-white group-hover:translate-x-1 transition-all">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                    </div>
+                  </div>
+                </motion.div>
+              </a>
+            )}
+
             {sections.map((section) => {
               const activeTab = activeTabs[section.name] || "video";
               const filteredVideos: Meeting[] = filterBySearch(section.videos);
@@ -396,7 +429,7 @@ export default function Trainings() {
                     </button>
                   </div>
 
-                  {/* Tabs - Like Songs of the Day */}
+                  {/* Tabs */}
                   <div className="flex justify-center">
                     <div className="px-1 py-1 rounded-full bg-black/5">
                       <button

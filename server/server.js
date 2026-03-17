@@ -228,6 +228,18 @@ async function ensureSchema() {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
 
+      -- Training links (clickable links for trainings page)
+      CREATE TABLE IF NOT EXISTS training_links (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        title TEXT NOT NULL,
+        url TEXT NOT NULL,
+        description TEXT,
+        section TEXT,
+        display_order INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+
       -- Crusade form submissions
       CREATE TABLE IF NOT EXISTS crusade_form_submissions (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -2196,11 +2208,12 @@ app.get('/api/trainings/public/:token', async (req, res) => {
     if (settingsResult.rowCount === 0 || settingsResult.rows[0].access_token !== token) {
       return res.status(404).json({ error: 'Invalid access token' });
     }
-    const [videos, documents] = await Promise.all([
+    const [videos, documents, links] = await Promise.all([
       pool.query('SELECT id, title, video_url, thumbnail_url, section, created_at FROM meeting_recordings ORDER BY section, created_at DESC'),
-      pool.query('SELECT id, title, document_url, document_type, section, created_at FROM meeting_documents ORDER BY section, created_at DESC')
+      pool.query('SELECT id, title, document_url, document_type, section, created_at FROM meeting_documents ORDER BY section, created_at DESC'),
+      pool.query('SELECT id, title, url, description, section, display_order, created_at FROM training_links ORDER BY section, display_order ASC, created_at DESC')
     ]);
-    res.json({ videos: videos.rows, documents: documents.rows });
+    res.json({ videos: videos.rows, documents: documents.rows, links: links.rows });
   } catch (e) {
     console.error('Get public trainings error:', e);
     res.status(500).json({ error: 'Server error' });
@@ -2273,6 +2286,62 @@ app.get('/api/trainings/password-timestamp', async (_req, res) => {
   }
 });
 
+// Training Links API - Superadmin only
+app.get('/api/training-links', requireAuth, requireSuperAdmin, async (_req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, title, url, description, section, display_order, created_at, updated_at FROM training_links ORDER BY display_order ASC, created_at DESC'
+    );
+    res.json(result.rows);
+  } catch (e) {
+    console.error('Get training links error:', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.post('/api/training-links', requireAuth, requireSuperAdmin, async (req, res) => {
+  const { title, url, description, section, display_order } = req.body || {};
+  if (!title || !url) return res.status(400).json({ error: 'Missing title or url' });
+  try {
+    const result = await pool.query(
+      'INSERT INTO training_links (title, url, description, section, display_order) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+      [title, url, description || null, section || null, display_order ?? 0]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (e) {
+    console.error('Create training link error:', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.put('/api/training-links/:id', requireAuth, requireSuperAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { title, url, description, section, display_order } = req.body || {};
+  if (!title || !url) return res.status(400).json({ error: 'Missing title or url' });
+  try {
+    const result = await pool.query(
+      'UPDATE training_links SET title=$1, url=$2, description=$3, section=$4, display_order=$5, updated_at=NOW() WHERE id=$6 RETURNING *',
+      [title, url, description || null, section || null, display_order ?? 0, id]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    res.json(result.rows[0]);
+  } catch (e) {
+    console.error('Update training link error:', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.delete('/api/training-links/:id', requireAuth, requireSuperAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query('DELETE FROM training_links WHERE id=$1', [id]);
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    res.status(204).end();
+  } catch (e) {
+    console.error('Delete training link error:', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 
 // Stream Events API - Admin only
 // Get all stream events
@@ -2415,6 +2484,11 @@ app.delete('/api/stream-events/:id', requireAuth, requireAdmin, async (req, res)
     console.error('Delete stream event error:', e);
     res.status(500).json({ error: 'Server error' });
   }
+});
+
+// Public endpoint: get the 24hr livestream HLS URL (no auth required)
+app.get('/api/stream-url', (_req, res) => {
+  res.json({ hlsUrl: HLS_ORIGIN_BASE + '/playlist.m3u8' });
 });
 
 // Document Management API - Superadmin only
