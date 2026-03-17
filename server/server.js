@@ -2486,9 +2486,11 @@ app.delete('/api/stream-events/:id', requireAuth, requireAdmin, async (req, res)
   }
 });
 
-// Public endpoint: get the 24hr livestream HLS URL (no auth required)
-app.get('/api/stream-url', (_req, res) => {
-  res.json({ hlsUrl: HLS_ORIGIN_BASE + '/playlist.m3u8' });
+// Public endpoint: get the 24hr livestream proxy URL (hides the real origin)
+app.get('/api/stream-url', (req, res) => {
+  const host = req.get('host');
+  const protocol = req.protocol;
+  res.json({ hlsUrl: `${protocol}://${host}/api/hls/playlist.m3u8` });
 });
 
 // Document Management API - Superadmin only
