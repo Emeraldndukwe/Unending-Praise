@@ -52,44 +52,36 @@ export default function CelebrationPopup() {
           {/* Overlay */}
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
 
-          {/* Card */}
           <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 30 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ duration: 0.35, ease: "easeOut" }}
-            className="relative w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl bg-[#f5f0f8]"
+            className="relative w-full max-w-lg flex flex-col items-center gap-6"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Close Button */}
             <button
               onClick={close}
-              className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-black/40 hover:bg-black/60 text-white transition"
+              className="absolute -top-2 -right-2 z-10 w-9 h-9 flex items-center justify-center rounded-full bg-black/50 hover:bg-black/70 text-white transition"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
 
-            {/* Image */}
-            <div className="w-full">
-              <img
-                src={imgSrc}
-                alt="Celebrating 3 Years of Unending Praise"
-                className="w-full h-auto object-cover"
-                loading="eager"
-              />
-            </div>
+            <img
+              src={imgSrc}
+              alt="Celebrating 3 Years of Unending Praise"
+              className="w-full h-auto rounded-2xl shadow-2xl"
+              loading="eager"
+            />
 
-            {/* CTA */}
-            <div className="px-6 py-5 flex justify-center">
-              <a
-                href={AVATAR_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-8 py-3 rounded-full bg-[#54037C]/15 hover:bg-[#54037C]/25 text-[#54037C] font-semibold text-base transition shadow-sm"
-              >
-                Create your avatar today
-              </a>
-            </div>
+            <a
+              href={AVATAR_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-8 py-3 rounded-full bg-[#54037C]/15 hover:bg-[#54037C]/25 text-[#54037C] font-semibold text-base transition shadow-sm backdrop-blur-sm"
+            >
+              Create your avatar today
+            </a>
           </motion.div>
         </motion.div>
       )}
