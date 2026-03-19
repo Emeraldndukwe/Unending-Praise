@@ -4,6 +4,7 @@ import { Suspense, lazy, useEffect } from "react";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import ScrollToTopButton from "./components/ScrollToTopButton";
+import CelebrationPopup from "./components/CelebrationPopup";
 
 const Home = lazy(() => import("./pages/Home"));
 const About = lazy(() => import("./pages/About"));
@@ -273,6 +274,7 @@ export default function App() {
         </AnimatePresence>
       </main>
       {!isAdmin && !isEventUpload && !isMeetings && <ScrollToTopButton />}
+      {!isAdmin && !isEventUpload && !isMeetings && <CelebrationPopup />}
       {!isAdmin && !isEventUpload && !isMeetings && <Footer />}
     </div>
   );
