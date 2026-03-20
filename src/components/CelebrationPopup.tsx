@@ -57,28 +57,30 @@ export default function CelebrationPopup() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ duration: 0.35, ease: "easeOut" }}
-            className="relative w-full max-w-lg flex flex-col items-center gap-6"
+            className="relative w-[90vw] sm:w-[85vw] md:w-full max-w-2xl flex flex-col items-center gap-5 sm:gap-6"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               onClick={close}
-              className="absolute -top-2 -right-2 z-10 w-9 h-9 flex items-center justify-center rounded-full bg-black/50 hover:bg-black/70 text-white transition"
+              className="absolute -top-10 right-0 sm:-top-11 sm:-right-11 z-10 w-9 h-9 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/40 text-white transition"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
 
-            <img
-              src={imgSrc}
-              alt="Celebrating 3 Years of Unending Praise"
-              className="w-full h-auto rounded-2xl shadow-2xl"
-              loading="eager"
-            />
+            <div className="w-full overflow-hidden rounded-2xl shadow-2xl">
+              <img
+                src={imgSrc}
+                alt="Celebrating 3 Years of Unending Praise"
+                className="w-full h-[50vh] sm:h-[55vh] md:h-[60vh] object-cover"
+                loading="eager"
+              />
+            </div>
 
             <a
               href={AVATAR_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-8 py-3 rounded-full bg-[#54037C]/15 hover:bg-[#54037C]/25 text-[#54037C] font-semibold text-base transition shadow-sm backdrop-blur-sm"
+              className="px-8 py-3 rounded-full bg-[#54037C] hover:bg-[#6B1A9E] text-white font-semibold text-sm sm:text-base transition shadow-lg"
             >
               Create your avatar today
             </a>
