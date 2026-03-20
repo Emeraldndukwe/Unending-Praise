@@ -57,7 +57,7 @@ export default function CelebrationPopup() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ duration: 0.35, ease: "easeOut" }}
-            className="relative w-[90vw] sm:w-[85vw] md:w-full max-w-2xl flex flex-col items-center gap-5 sm:gap-6"
+            className="relative w-[85vw] sm:w-[75vw] md:w-full max-w-lg flex flex-col items-center gap-5 sm:gap-6"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -71,7 +71,7 @@ export default function CelebrationPopup() {
               <img
                 src={imgSrc}
                 alt="Celebrating 3 Years of Unending Praise"
-                className="w-full h-auto"
+                className="w-full h-[60vh] sm:h-[65vh] object-cover object-bottom"
                 loading="eager"
               />
             </div>
