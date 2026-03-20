@@ -67,11 +67,11 @@ export default function CelebrationPopup() {
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
 
-            <div className="w-full max-h-[75vh] overflow-hidden rounded-2xl shadow-2xl">
+            <div className="w-full rounded-2xl shadow-2xl overflow-hidden">
               <img
                 src={imgSrc}
                 alt="Celebrating 3 Years of Unending Praise"
-                className="w-full h-auto object-contain"
+                className="w-full h-auto"
                 loading="eager"
               />
             </div>
