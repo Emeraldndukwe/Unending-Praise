@@ -28,8 +28,17 @@ export default function CelebrationPopup() {
     const src = DAY_IMAGES[day];
     if (src) {
       setImgSrc(src);
-      const timer = setTimeout(() => setOpen(true), 800);
-      return () => clearTimeout(timer);
+      const img = new Image();
+      img.src = src;
+      img.onload = () => {
+        setTimeout(() => setOpen(true), 400);
+      };
+      const fallback = setTimeout(() => setOpen(true), 5000);
+      img.onload = () => {
+        clearTimeout(fallback);
+        setTimeout(() => setOpen(true), 400);
+      };
+      return () => clearTimeout(fallback);
     }
   }, []);
 

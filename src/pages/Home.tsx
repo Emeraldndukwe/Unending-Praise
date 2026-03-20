@@ -23,8 +23,13 @@ const Home = () => {
             alt="Celebrating 3 Years of Unending Praise"
             className="w-full h-auto object-cover"
           />
-          <div className="absolute inset-0 flex items-end justify-center pb-5 sm:pb-7">
-            <span className="px-6 sm:px-8 py-2.5 sm:py-3 rounded-full bg-amber-300/90 hover:bg-amber-300 text-[#54037C] font-semibold text-sm sm:text-base transition backdrop-blur-sm animate-pulse-zoom">
+          <div className="hidden sm:flex absolute inset-0 items-end justify-center pb-7">
+            <span className="px-8 py-3 rounded-full bg-amber-300/90 hover:bg-amber-300 text-[#54037C] font-semibold text-base transition backdrop-blur-sm animate-pulse-zoom">
+              Create your avatar today
+            </span>
+          </div>
+          <div className="flex sm:hidden justify-center -mt-5 relative z-10">
+            <span className="px-6 py-2.5 rounded-full bg-amber-300/90 hover:bg-amber-300 text-[#54037C] font-semibold text-sm transition shadow-lg animate-pulse-zoom">
               Create your avatar today
             </span>
           </div>
