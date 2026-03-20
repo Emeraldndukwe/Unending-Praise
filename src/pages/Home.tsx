@@ -24,7 +24,7 @@ const Home = () => {
             className="w-full h-auto object-cover"
           />
           <div className="absolute inset-0 flex items-end justify-center pb-5 sm:pb-7">
-            <span className="px-6 sm:px-8 py-2.5 sm:py-3 rounded-full bg-black/50 hover:bg-black/70 text-white font-semibold text-sm sm:text-base transition backdrop-blur-sm animate-pulse-zoom">
+            <span className="px-6 sm:px-8 py-2.5 sm:py-3 rounded-full bg-amber-300/90 hover:bg-amber-300 text-[#54037C] font-semibold text-sm sm:text-base transition backdrop-blur-sm animate-pulse-zoom">
               Create your avatar today
             </span>
           </div>
