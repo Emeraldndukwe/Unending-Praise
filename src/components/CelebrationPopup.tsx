@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 const DAY_IMAGES: Record<number, string> = {
   19: "/UK Z 2 DSP & USA R 1 z 1 (19).jpg",
   20: "/South pacific & Western Europe zone 4 (20).jpg",
+  21: "/SOUTH WEST ZONE 5 & South South Zone 3 (21).jpg",
+  22: "/South East Z1 & Port Harcourt Z2 (22).jpg",
   23: "/EWCA zone 3 & EWCA ZONE 4 (23).jpg",
   24: "/Lagos zone 1  & M.C Warri (24).jpg",
   25: "/Capetown Z 2 & Ce Nig North central z 1 (25).jpg",
