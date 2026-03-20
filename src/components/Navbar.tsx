@@ -123,7 +123,7 @@ const Navbar = () => {
         <img 
           src="/logo.png" 
           alt="Unending praise" 
-          className="h-10 md:h-12 object-contain"
+          className="h-14 md:h-16 object-contain"
         />
         {countdown ? (
           <span className="text-[9px] sm:text-[10px] font-bold tracking-wide text-amber-300 whitespace-nowrap leading-none">
