@@ -29,3 +29,11 @@
 .modal-scroll::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.6);
 }
+
+@keyframes pulse-zoom {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+.animate-pulse-zoom {
+  animation: pulse-zoom 2s ease-in-out infinite;
+}

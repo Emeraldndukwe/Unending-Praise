@@ -21,10 +21,10 @@ const Home = () => {
           <img
             src="/UEP_3_YEAR_Expanded_Banner.png"
             alt="Celebrating 3 Years of Unending Praise"
-            className="w-full h-auto object-cover"
+            className="w-full h-[180px] sm:h-[240px] md:h-[300px] lg:h-[360px] object-cover"
           />
-          <div className="absolute inset-0 flex items-end justify-center pb-6 sm:pb-8">
-            <span className="px-6 sm:px-8 py-2.5 sm:py-3 rounded-full bg-black/50 hover:bg-black/70 text-white font-semibold text-sm sm:text-base transition backdrop-blur-sm group-hover:scale-105">
+          <div className="absolute inset-0 flex items-end justify-center pb-5 sm:pb-7">
+            <span className="px-6 sm:px-8 py-2.5 sm:py-3 rounded-full bg-black/50 hover:bg-black/70 text-white font-semibold text-sm sm:text-base transition backdrop-blur-sm animate-pulse-zoom">
               Create your avatar today
             </span>
           </div>
