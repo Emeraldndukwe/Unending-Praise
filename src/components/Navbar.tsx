@@ -1,7 +1,37 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";
+import confetti from "canvas-confetti";
+
+const ANNIVERSARY_DATE = new Date("2026-03-27T00:00:00");
+
+function useCountdown() {
+  const [diff, setDiff] = useState(() => ANNIVERSARY_DATE.getTime() - Date.now());
+  const [arrived, setArrived] = useState(() => ANNIVERSARY_DATE.getTime() - Date.now() <= 0);
+  const firedRef = useRef(false);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const remaining = ANNIVERSARY_DATE.getTime() - Date.now();
+      setDiff(remaining);
+      if (remaining <= 0 && !firedRef.current) {
+        firedRef.current = true;
+        setArrived(true);
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  if (diff <= 0) return { countdown: null, arrived };
+
+  const days = Math.floor(diff / 86400000);
+  const hrs = Math.floor((diff % 86400000) / 3600000);
+  const mins = Math.floor((diff % 3600000) / 60000);
+  const secs = Math.floor((diff % 60000) / 1000);
+
+  return { countdown: { days, hrs, mins, secs }, arrived };
+}
 
 const Navbar = () => {
   const navLinks = [
@@ -15,9 +45,41 @@ const Navbar = () => {
 
   const { pathname } = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const { countdown, arrived } = useCountdown();
 
   const [hidden, setHidden] = useState(false);
   const [lastScroll, setLastScroll] = useState(0);
+
+  const fireConfetti = useCallback(() => {
+    const duration = 6000;
+    const end = Date.now() + duration;
+    const colors = ["#54037C", "#FFD700", "#FF69B4", "#FFFFFF", "#9B59B6"];
+
+    const frame = () => {
+      confetti({
+        particleCount: 3,
+        angle: 60,
+        spread: 55,
+        origin: { x: 0, y: 0.6 },
+        colors,
+      });
+      confetti({
+        particleCount: 3,
+        angle: 120,
+        spread: 55,
+        origin: { x: 1, y: 0.6 },
+        colors,
+      });
+      if (Date.now() < end) requestAnimationFrame(frame);
+    };
+    frame();
+  }, []);
+
+  useEffect(() => {
+    if (arrived) {
+      fireConfetti();
+    }
+  }, [arrived, fireConfetti]);
 
   // ✅ Hide on scroll down, show on scroll up
   useEffect(() => {
@@ -54,16 +116,24 @@ const Navbar = () => {
         px-6 py-4 flex justify-between items-center
       "
     >
-      {/* ✅ Logo */}
       <Link
         to="/"
-        className="flex items-center"
+        className="flex flex-col items-center gap-0.5"
       >
         <img 
           src="/logo.png" 
           alt="Unending praise" 
           className="h-10 md:h-12 object-contain"
         />
+        {countdown ? (
+          <span className="text-[9px] sm:text-[10px] font-bold tracking-wide text-amber-300 whitespace-nowrap leading-none">
+            {countdown.days}d {countdown.hrs}h {countdown.mins}m {countdown.secs}s
+          </span>
+        ) : arrived ? (
+          <span className="text-[9px] sm:text-[10px] font-bold tracking-wide text-amber-300 whitespace-nowrap leading-none animate-pulse">
+            3 Years! 🎉
+          </span>
+        ) : null}
       </Link>
 
       {/* ✅ Desktop Links */}
