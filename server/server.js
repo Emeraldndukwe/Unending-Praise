@@ -840,7 +840,6 @@ app.post('/api/admin/upload-large', requireAuth, requireRole('crusade', 'testimo
 });
 
 // Chunked upload endpoint - receives small chunks and combines them before uploading to Cloudinary
-// Each chunk is small enough (10-20MB) to avoid reverse-proxy body size limits
 app.post('/api/admin/upload-chunk', requireAuth, requireRole('crusade', 'testimony', 'songs'), upload.single('chunk'), async (req, res) => {
   if (!cloudinaryEnabled) {
     return res.status(503).json({ error: 'Cloudinary not configured' });
@@ -869,11 +868,13 @@ app.post('/api/admin/upload-chunk', requireAuth, requireRole('crusade', 'testimo
     }
 
     // Last chunk received — verify all chunks exist
+    const missing = [];
     for (let i = 0; i < total; i++) {
       const cp = path.join(chunkDir, `chunk_${String(i).padStart(5, '0')}`);
-      if (!fs.existsSync(cp)) {
-        return res.status(400).json({ error: `Missing chunk ${i}` });
-      }
+      if (!fs.existsSync(cp)) missing.push(i);
+    }
+    if (missing.length > 0) {
+      return res.status(400).json({ error: `Missing chunks: ${missing.join(', ')}` });
     }
 
     req.setTimeout(60 * 60 * 1000);
@@ -890,14 +891,33 @@ app.post('/api/admin/upload-chunk', requireAuth, requireRole('crusade', 'testimo
       else finalResourceType = 'raw';
     }
 
-    console.log(`Combining ${total} chunks for upload ${uploadId} (${fileName})`);
+    // Step 1: Combine all chunks into a single file on disk
+    const combinedPath = path.join(chunkDir, fileName || 'combined_upload');
+    console.log(`Combining ${total} chunks into ${combinedPath} for upload ${uploadId}`);
 
+    const writeStream = fs.createWriteStream(combinedPath);
+    for (let i = 0; i < total; i++) {
+      const cp = path.join(chunkDir, `chunk_${String(i).padStart(5, '0')}`);
+      await new Promise((resolve, reject) => {
+        const rs = fs.createReadStream(cp);
+        rs.pipe(writeStream, { end: false });
+        rs.on('end', resolve);
+        rs.on('error', reject);
+      });
+    }
+    writeStream.end();
+    await new Promise((resolve) => writeStream.on('finish', resolve));
+
+    const combinedSize = fs.statSync(combinedPath).size;
+    console.log(`Combined file size: ${(combinedSize / (1024 * 1024)).toFixed(2)}MB — uploading to Cloudinary`);
+
+    // Step 2: Stream the combined file to Cloudinary
     const result = await new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
           folder: String(folder || 'unendingpraise/trainings'),
           resource_type: finalResourceType,
-          chunk_size: 6000000,
+          chunk_size: 20000000,
           timeout: 60 * 60 * 1000,
         },
         (error, uploadResult) => {
@@ -906,29 +926,12 @@ app.post('/api/admin/upload-chunk', requireAuth, requireRole('crusade', 'testimo
         }
       );
 
-      let current = 0;
-      const pipeNext = () => {
-        if (current >= total) {
-          uploadStream.end();
-          return;
-        }
-        const cp = path.join(chunkDir, `chunk_${String(current).padStart(5, '0')}`);
-        const readStream = fs.createReadStream(cp, { highWaterMark: 5 * 1024 * 1024 });
-        readStream.on('data', (chunk) => uploadStream.write(chunk));
-        readStream.on('end', () => {
-          current++;
-          pipeNext();
-        });
-        readStream.on('error', reject);
-      };
-      pipeNext();
+      const fileStream = fs.createReadStream(combinedPath, { highWaterMark: 2 * 1024 * 1024 });
+      fileStream.pipe(uploadStream);
+      fileStream.on('error', reject);
     });
 
-    // Clean up chunk files
-    for (let i = 0; i < total; i++) {
-      const cp = path.join(chunkDir, `chunk_${String(i).padStart(5, '0')}`);
-      if (fs.existsSync(cp)) fs.unlinkSync(cp);
-    }
+    // Clean up only on success
     try { fs.rmSync(chunkDir, { recursive: true, force: true }); } catch (_) {}
 
     console.log(`Chunked upload complete: ${result.secure_url}`);
@@ -941,11 +944,8 @@ app.post('/api/admin/upload-chunk', requireAuth, requireRole('crusade', 'testimo
     });
   } catch (e) {
     console.error('Chunk upload error:', e);
-    const { uploadId } = req.body || {};
-    if (uploadId) {
-      const chunkDir = path.join(__dirname, '../temp/chunks', uploadId);
-      try { fs.rmSync(chunkDir, { recursive: true, force: true }); } catch (_) {}
-    }
+    console.error('Error details:', e?.stack || e);
+    // Do NOT clean up chunks on error — allows client to retry the last chunk
     if (!res.headersSent) {
       res.status(500).json({ error: 'Upload failed', details: e?.message });
     }
