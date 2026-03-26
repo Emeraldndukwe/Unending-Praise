@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 export default function About() {
   // Livestream began March 27th, 2023
-  const startDate = new Date("2023-03-27T00:00:00Z");
+  const startDate = new Date("2023-03-27T00:00:00");
 
   const [elapsed, setElapsed] = useState({
     days: 0,
