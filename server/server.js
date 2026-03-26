@@ -839,6 +839,119 @@ app.post('/api/admin/upload-large', requireAuth, requireRole('crusade', 'testimo
   }
 });
 
+// Chunked upload endpoint - receives small chunks and combines them before uploading to Cloudinary
+// Each chunk is small enough (10-20MB) to avoid reverse-proxy body size limits
+app.post('/api/admin/upload-chunk', requireAuth, requireRole('crusade', 'testimony', 'songs'), upload.single('chunk'), async (req, res) => {
+  if (!cloudinaryEnabled) {
+    return res.status(503).json({ error: 'Cloudinary not configured' });
+  }
+
+  try {
+    const { uploadId, chunkIndex, totalChunks, fileName, folder, resourceType } = req.body || {};
+
+    if (!uploadId || chunkIndex === undefined || !totalChunks || !req.file) {
+      return res.status(400).json({ error: 'Missing chunk data or metadata' });
+    }
+
+    const idx = parseInt(chunkIndex);
+    const total = parseInt(totalChunks);
+
+    const chunkDir = path.join(__dirname, '../temp/chunks', uploadId);
+    if (!fs.existsSync(chunkDir)) {
+      fs.mkdirSync(chunkDir, { recursive: true });
+    }
+
+    const chunkPath = path.join(chunkDir, `chunk_${String(idx).padStart(5, '0')}`);
+    fs.renameSync(req.file.path, chunkPath);
+
+    if (idx < total - 1) {
+      return res.json({ done: false, received: idx });
+    }
+
+    // Last chunk received — verify all chunks exist
+    for (let i = 0; i < total; i++) {
+      const cp = path.join(chunkDir, `chunk_${String(i).padStart(5, '0')}`);
+      if (!fs.existsSync(cp)) {
+        return res.status(400).json({ error: `Missing chunk ${i}` });
+      }
+    }
+
+    req.setTimeout(60 * 60 * 1000);
+    res.setTimeout(60 * 60 * 1000);
+    if (req.socket) {
+      req.socket.setTimeout(60 * 60 * 1000);
+      req.socket.setKeepAlive(true);
+    }
+
+    let finalResourceType = String(resourceType || 'auto');
+    if (finalResourceType === 'auto' && req.file.mimetype) {
+      if (req.file.mimetype.startsWith('video/')) finalResourceType = 'video';
+      else if (req.file.mimetype.startsWith('image/')) finalResourceType = 'image';
+      else finalResourceType = 'raw';
+    }
+
+    console.log(`Combining ${total} chunks for upload ${uploadId} (${fileName})`);
+
+    const result = await new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: String(folder || 'unendingpraise/trainings'),
+          resource_type: finalResourceType,
+          chunk_size: 6000000,
+          timeout: 60 * 60 * 1000,
+        },
+        (error, uploadResult) => {
+          if (error) reject(error);
+          else resolve(uploadResult);
+        }
+      );
+
+      let current = 0;
+      const pipeNext = () => {
+        if (current >= total) {
+          uploadStream.end();
+          return;
+        }
+        const cp = path.join(chunkDir, `chunk_${String(current).padStart(5, '0')}`);
+        const readStream = fs.createReadStream(cp, { highWaterMark: 5 * 1024 * 1024 });
+        readStream.on('data', (chunk) => uploadStream.write(chunk));
+        readStream.on('end', () => {
+          current++;
+          pipeNext();
+        });
+        readStream.on('error', reject);
+      };
+      pipeNext();
+    });
+
+    // Clean up chunk files
+    for (let i = 0; i < total; i++) {
+      const cp = path.join(chunkDir, `chunk_${String(i).padStart(5, '0')}`);
+      if (fs.existsSync(cp)) fs.unlinkSync(cp);
+    }
+    try { fs.rmSync(chunkDir, { recursive: true, force: true }); } catch (_) {}
+
+    console.log(`Chunked upload complete: ${result.secure_url}`);
+    res.json({
+      url: result.secure_url,
+      publicId: result.public_id,
+      bytes: result.bytes,
+      resourceType: result.resource_type,
+      done: true,
+    });
+  } catch (e) {
+    console.error('Chunk upload error:', e);
+    const { uploadId } = req.body || {};
+    if (uploadId) {
+      const chunkDir = path.join(__dirname, '../temp/chunks', uploadId);
+      try { fs.rmSync(chunkDir, { recursive: true, force: true }); } catch (_) {}
+    }
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Upload failed', details: e?.message });
+    }
+  }
+});
+
 // Proxy endpoint for PDFs to bypass Cloudinary access restrictions
 app.get('/api/proxy/pdf', async (req, res) => {
   const { url } = req.query;

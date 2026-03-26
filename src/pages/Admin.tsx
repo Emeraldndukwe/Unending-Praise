@@ -4168,199 +4168,86 @@ function MeetingForm({
         }
       }
 
-      // For large files or when direct upload failed, try chunked upload to Cloudinary
-      if (!useDirectUpload && uploadConfig?.cloudName) {
-        try {
-          const CHUNK_SIZE = 20 * 1024 * 1024; // 20MB per chunk
-          const totalSize = file.size;
-          const totalChunks = Math.ceil(totalSize / CHUNK_SIZE);
-          const uniqueUploadId = `uqid-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
-          const cloudResType = resourceType === 'video' ? 'video' : 'image';
-          const chunkUploadUrl = uploadConfig.uploadUrl ||
-            `https://api.cloudinary.com/v1_1/${uploadConfig.cloudName}/${cloudResType}/upload`;
+      // For large files or when direct upload failed, use chunked upload through server
+      if (!useDirectUpload) {
+        const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB per chunk — small enough for any hosting
+        const totalSize = file.size;
+        const totalChunks = Math.ceil(totalSize / CHUNK_SIZE);
+        const uploadId = `upload-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
 
-          console.log(`Starting chunked upload: ${totalChunks} chunks of ~20MB for ${fileSizeMB.toFixed(2)}MB file`);
+        console.log(`Starting chunked server upload: ${totalChunks} chunks of ~10MB for ${fileSizeMB.toFixed(2)}MB file`);
 
+        for (let chunkIdx = 0; chunkIdx < totalChunks; chunkIdx++) {
+          const start = chunkIdx * CHUNK_SIZE;
+          const end = Math.min(start + CHUNK_SIZE, totalSize);
+          const chunk = file.slice(start, end);
+
+          const chunkForm = new FormData();
+          chunkForm.append('chunk', chunk, file.name);
+          chunkForm.append('uploadId', uploadId);
+          chunkForm.append('chunkIndex', String(chunkIdx));
+          chunkForm.append('totalChunks', String(totalChunks));
+          chunkForm.append('fileName', file.name);
+          chunkForm.append('folder', 'unendingpraise/trainings');
+          chunkForm.append('resourceType', resourceType);
+
+          const maxChunkRetries = 3;
+          let chunkSuccess = false;
           let lastResponse: any = null;
 
-          for (let chunkIdx = 0; chunkIdx < totalChunks; chunkIdx++) {
-            const start = chunkIdx * CHUNK_SIZE;
-            const end = Math.min(start + CHUNK_SIZE, totalSize);
-            const chunk = file.slice(start, end);
+          for (let attempt = 0; attempt < maxChunkRetries && !chunkSuccess; attempt++) {
+            try {
+              lastResponse = await new Promise<any>((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
 
-            const chunkForm = new FormData();
-            chunkForm.append('file', chunk, file.name);
-            if (uploadConfig.uploadPreset) {
-              chunkForm.append('upload_preset', uploadConfig.uploadPreset);
-            }
-            chunkForm.append('folder', uploadConfig.folder || 'unendingpraise/trainings');
-
-            if (!uploadConfig.uploadPreset && uploadConfig.signature) {
-              chunkForm.append('signature', uploadConfig.signature);
-              chunkForm.append('timestamp', String(uploadConfig.timestamp));
-              chunkForm.append('api_key', uploadConfig.apiKey);
-            }
-
-            const maxChunkRetries = 3;
-            let chunkSuccess = false;
-
-            for (let attempt = 0; attempt < maxChunkRetries && !chunkSuccess; attempt++) {
-              try {
-                const chunkRes = await fetch(chunkUploadUrl, {
-                  method: 'POST',
-                  headers: {
-                    'X-Unique-Upload-Id': uniqueUploadId,
-                    'Content-Range': `bytes ${start}-${end - 1}/${totalSize}`,
-                  },
-                  body: chunkForm,
+                xhr.upload.addEventListener('progress', (e) => {
+                  if (e.lengthComputable) {
+                    const chunkProgress = e.loaded / e.total;
+                    const overallProgress = ((chunkIdx + chunkProgress) / totalChunks) * 100;
+                    setUploadProgress(Math.min(overallProgress, 99));
+                  }
                 });
 
-                if (!chunkRes.ok) {
-                  const errText = await chunkRes.text();
-                  if (attempt === maxChunkRetries - 1) {
-                    throw new Error(`Chunk ${chunkIdx + 1}/${totalChunks} failed (${chunkRes.status}): ${errText}`);
+                xhr.addEventListener('load', () => {
+                  if (xhr.status >= 200 && xhr.status < 300) {
+                    try { resolve(JSON.parse(xhr.responseText)); }
+                    catch { reject(new Error('Invalid server response')); }
+                  } else {
+                    reject(new Error(`Chunk ${chunkIdx + 1}/${totalChunks} failed (${xhr.status}): ${xhr.responseText}`));
                   }
-                  console.log(`Chunk ${chunkIdx + 1} attempt ${attempt + 1} failed, retrying...`);
-                  await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
-                  continue;
-                }
+                });
 
-                lastResponse = await chunkRes.json();
-                chunkSuccess = true;
-                setUploadProgress(((chunkIdx + 1) / totalChunks) * 100);
-                console.log(`Chunk ${chunkIdx + 1}/${totalChunks} uploaded`);
-              } catch (fetchErr) {
-                if (attempt === maxChunkRetries - 1) throw fetchErr;
-                console.log(`Chunk ${chunkIdx + 1} network error, retrying...`);
-                await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
-              }
+                xhr.addEventListener('error', () => reject(new Error(`Chunk ${chunkIdx + 1} network error`)));
+                xhr.addEventListener('timeout', () => reject(new Error(`Chunk ${chunkIdx + 1} timeout`)));
+
+                // Last chunk needs longer timeout — server combines + uploads to Cloudinary
+                xhr.timeout = chunkIdx === totalChunks - 1 ? 60 * 60 * 1000 : 5 * 60 * 1000;
+
+                xhr.open('POST', '/api/admin/upload-chunk');
+                Object.keys(authHeaders).forEach(key => {
+                  xhr.setRequestHeader(key, authHeaders[key]);
+                });
+                xhr.send(chunkForm);
+              });
+
+              chunkSuccess = true;
+              console.log(`Chunk ${chunkIdx + 1}/${totalChunks} uploaded`);
+            } catch (chunkErr: any) {
+              if (attempt === maxChunkRetries - 1) throw chunkErr;
+              console.log(`Chunk ${chunkIdx + 1} attempt ${attempt + 1} failed, retrying...`);
+              await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
             }
           }
 
-          if (lastResponse?.secure_url || lastResponse?.url) {
-            return lastResponse.secure_url || lastResponse.url;
+          if (chunkIdx === totalChunks - 1 && lastResponse?.done && lastResponse?.url) {
+            setUploadProgress(100);
+            return lastResponse.url;
           }
-          throw new Error('Chunked upload completed but no URL returned');
-        } catch (chunkedError: any) {
-          console.error('Chunked upload failed, falling back to server proxy:', chunkedError);
         }
+
+        throw new Error('Chunked upload completed but no URL returned');
       }
 
-      // Last resort: server proxy (may hit hosting body size limits for files >100MB)
-      if (!useDirectUpload) {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('folder', 'unendingpraise/trainings');
-        formData.append('resourceType', resourceType);
-
-        return new Promise((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-        let timeoutId: ReturnType<typeof setTimeout> | null = null;
-        let isAborted = false;
-        
-        // Set timeout for the upload (60 minutes for very large files)
-        timeoutId = setTimeout(() => {
-          if (!isAborted) {
-            isAborted = true;
-            xhr.abort();
-            reject(new Error('Upload timeout: The upload took too long. Please try again or use a smaller file.'));
-          }
-        }, UPLOAD_TIMEOUT);
-        
-        xhr.upload.addEventListener('progress', (e) => {
-          if (e.lengthComputable && !isAborted) {
-            const percentComplete = (e.loaded / e.total) * 100;
-            setUploadProgress(percentComplete);
-          }
-        });
-
-        xhr.addEventListener('load', () => {
-          if (timeoutId) clearTimeout(timeoutId);
-          if (isAborted) return;
-          
-          if (xhr.status === 200 || xhr.status === 201) {
-            try {
-              const response = JSON.parse(xhr.responseText);
-              resolve(response.url || response.secure_url);
-            } catch (e) {
-              reject(new Error('Invalid response from server'));
-            }
-          } else {
-            // Retry on server errors (5xx) or HTTP/2 protocol errors (status 0) if we haven't exceeded max retries
-            if ((xhr.status >= 500 || xhr.status === 0) && retryCount < MAX_RETRIES) {
-              console.log(`Retrying upload (attempt ${retryCount + 1}/${MAX_RETRIES})... Status: ${xhr.status}`);
-              setTimeout(() => {
-                uploadLargeFile(file, resourceType, retryCount + 1)
-                  .then(resolve)
-                  .catch(reject);
-              }, 5000 * (retryCount + 1)); // Longer delay for retries
-            } else {
-              const errorText = xhr.responseText || xhr.statusText || 'Unknown error';
-              reject(new Error(`Upload failed: ${errorText} (Status: ${xhr.status})`));
-            }
-          }
-        });
-
-        xhr.addEventListener('error', () => {
-          if (timeoutId) clearTimeout(timeoutId);
-          if (isAborted) return;
-          
-          // HTTP/2 protocol errors and network errors - retry with longer delay
-          if (retryCount < MAX_RETRIES) {
-            console.log(`Retrying upload after network/HTTP2 error (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
-            setTimeout(() => {
-              uploadLargeFile(file, resourceType, retryCount + 1)
-                .then(resolve)
-                .catch(reject);
-            }, 5000 * (retryCount + 1)); // Longer delay for network errors
-          } else {
-            reject(new Error('Upload failed: Network or HTTP/2 protocol error. The file may be too large or the connection was interrupted. Please try again or use a smaller file.'));
-          }
-        });
-
-        xhr.addEventListener('abort', () => {
-          if (timeoutId) clearTimeout(timeoutId);
-          if (!isAborted) {
-            isAborted = true;
-            reject(new Error('Upload was cancelled or aborted'));
-          }
-        });
-
-        xhr.addEventListener('timeout', () => {
-          if (timeoutId) clearTimeout(timeoutId);
-          if (!isAborted) {
-            isAborted = true;
-            xhr.abort();
-            // Retry on timeout if we haven't exceeded max retries
-            if (retryCount < MAX_RETRIES) {
-              console.log(`Retrying upload after timeout (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
-              setTimeout(() => {
-                uploadLargeFile(file, resourceType, retryCount + 1)
-                  .then(resolve)
-                  .catch(reject);
-              }, 2000 * (retryCount + 1));
-            } else {
-              reject(new Error('Upload timeout: The connection timed out. Please try again.'));
-            }
-          }
-        });
-
-        // Set a timeout on the XHR object itself
-        xhr.timeout = UPLOAD_TIMEOUT;
-        
-        // Upload to our server endpoint
-        xhr.open('POST', `/api/admin/upload-large?folder=unendingpraise/trainings&resourceType=${resourceType}`);
-        
-          // Add auth headers
-          Object.keys(authHeaders).forEach(key => {
-            xhr.setRequestHeader(key, authHeaders[key]);
-          });
-          
-          xhr.send(formData);
-        });
-      }
-      
-      // If we reach here without returning, throw an error
       throw new Error('Upload method not determined');
     } catch (error: any) {
       // Retry on errors if we haven't exceeded max retries
