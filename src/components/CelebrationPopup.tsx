@@ -9,8 +9,8 @@ const DAY_IMAGES: Record<number, string> = {
   23: "/EWCA zone 3 & EWCA ZONE 4 (23).jpg",
   24: "/Lagos zone 1  & M.C Warri (24).jpg",
   25: "/Capetown Z 2 & Ce Nig North central z 1 (25).jpg",
-  26: "/USA REGION 1 ZONE 2 (26).jpg",
-  27: "/USA REGION 1 ZONE 2 (27).jpg",
+  26: "/INDIA ZONE & CE SA zone 5 (26).jpg",
+  27: "/3_YEARS_Celebrating_Design.png",
   28: "/BLW UK Z A & BLW USA R1 (28).jpg",
 };
 

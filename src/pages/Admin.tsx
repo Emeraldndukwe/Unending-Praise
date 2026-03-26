@@ -4028,42 +4028,38 @@ function MeetingForm({
     }
 
     try {
-      // Cloudinary has file size limits for direct uploads and CORS restrictions
-      // For safety, use server proxy for files larger than 100MB to avoid CORS and size issues
       const fileSizeMB = file.size / (1024 * 1024);
-      const MAX_DIRECT_UPLOAD_SIZE_MB = 100; // Use server proxy for files larger than 100MB to avoid CORS issues
+      const MAX_DIRECT_UPLOAD_SIZE_MB = 100; // Files above this use chunked upload to Cloudinary
       
-      // First, try to get upload signature/preset for direct Cloudinary upload
+      // Get upload config for Cloudinary (needed for both direct and chunked uploads)
       let useDirectUpload = false;
       let uploadConfig: any = null;
       
-      // Only attempt direct upload for files under the size limit
-      if (fileSizeMB < MAX_DIRECT_UPLOAD_SIZE_MB) {
-        try {
-          const sigRes = await fetch('/api/admin/upload-signature', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...authHeaders,
-            },
-            body: JSON.stringify({
-              folder: 'unendingpraise/trainings',
-              resourceType: resourceType === 'video' ? 'video' : 'image',
-            }),
-          });
-          
-          if (sigRes.ok) {
-            uploadConfig = await sigRes.json();
-            // If we have an uploadPreset, we can use direct upload
-            if (uploadConfig.uploadPreset) {
-              useDirectUpload = true;
-            }
+      try {
+        const sigRes = await fetch('/api/admin/upload-signature', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...authHeaders,
+          },
+          body: JSON.stringify({
+            folder: 'unendingpraise/trainings',
+            resourceType: resourceType === 'video' ? 'video' : 'image',
+          }),
+        });
+        
+        if (sigRes.ok) {
+          uploadConfig = await sigRes.json();
+          if (uploadConfig.uploadPreset && fileSizeMB < MAX_DIRECT_UPLOAD_SIZE_MB) {
+            useDirectUpload = true;
           }
-        } catch (e) {
-          console.log('Could not get upload signature, falling back to server proxy:', e);
         }
-      } else {
-        console.log(`File size (${fileSizeMB.toFixed(2)}MB) exceeds direct upload limit (${MAX_DIRECT_UPLOAD_SIZE_MB}MB), using server proxy for chunked upload`);
+      } catch (e) {
+        console.log('Could not get upload config:', e);
+      }
+      
+      if (fileSizeMB >= MAX_DIRECT_UPLOAD_SIZE_MB) {
+        console.log(`File size (${fileSizeMB.toFixed(2)}MB) exceeds direct upload limit (${MAX_DIRECT_UPLOAD_SIZE_MB}MB), will use chunked upload`);
       }
 
       // Use direct Cloudinary upload if preset is available and file is under size limit
@@ -4172,8 +4168,86 @@ function MeetingForm({
         }
       }
 
-      // If direct upload failed or wasn't available, use server proxy
-      if (!useDirectUpload || fileSizeMB >= MAX_DIRECT_UPLOAD_SIZE_MB) {
+      // For large files or when direct upload failed, try chunked upload to Cloudinary
+      if (!useDirectUpload && uploadConfig?.cloudName) {
+        try {
+          const CHUNK_SIZE = 20 * 1024 * 1024; // 20MB per chunk
+          const totalSize = file.size;
+          const totalChunks = Math.ceil(totalSize / CHUNK_SIZE);
+          const uniqueUploadId = `uqid-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+          const cloudResType = resourceType === 'video' ? 'video' : 'image';
+          const chunkUploadUrl = uploadConfig.uploadUrl ||
+            `https://api.cloudinary.com/v1_1/${uploadConfig.cloudName}/${cloudResType}/upload`;
+
+          console.log(`Starting chunked upload: ${totalChunks} chunks of ~20MB for ${fileSizeMB.toFixed(2)}MB file`);
+
+          let lastResponse: any = null;
+
+          for (let chunkIdx = 0; chunkIdx < totalChunks; chunkIdx++) {
+            const start = chunkIdx * CHUNK_SIZE;
+            const end = Math.min(start + CHUNK_SIZE, totalSize);
+            const chunk = file.slice(start, end);
+
+            const chunkForm = new FormData();
+            chunkForm.append('file', chunk, file.name);
+            if (uploadConfig.uploadPreset) {
+              chunkForm.append('upload_preset', uploadConfig.uploadPreset);
+            }
+            chunkForm.append('folder', uploadConfig.folder || 'unendingpraise/trainings');
+
+            if (!uploadConfig.uploadPreset && uploadConfig.signature) {
+              chunkForm.append('signature', uploadConfig.signature);
+              chunkForm.append('timestamp', String(uploadConfig.timestamp));
+              chunkForm.append('api_key', uploadConfig.apiKey);
+            }
+
+            const maxChunkRetries = 3;
+            let chunkSuccess = false;
+
+            for (let attempt = 0; attempt < maxChunkRetries && !chunkSuccess; attempt++) {
+              try {
+                const chunkRes = await fetch(chunkUploadUrl, {
+                  method: 'POST',
+                  headers: {
+                    'X-Unique-Upload-Id': uniqueUploadId,
+                    'Content-Range': `bytes ${start}-${end - 1}/${totalSize}`,
+                  },
+                  body: chunkForm,
+                });
+
+                if (!chunkRes.ok) {
+                  const errText = await chunkRes.text();
+                  if (attempt === maxChunkRetries - 1) {
+                    throw new Error(`Chunk ${chunkIdx + 1}/${totalChunks} failed (${chunkRes.status}): ${errText}`);
+                  }
+                  console.log(`Chunk ${chunkIdx + 1} attempt ${attempt + 1} failed, retrying...`);
+                  await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+                  continue;
+                }
+
+                lastResponse = await chunkRes.json();
+                chunkSuccess = true;
+                setUploadProgress(((chunkIdx + 1) / totalChunks) * 100);
+                console.log(`Chunk ${chunkIdx + 1}/${totalChunks} uploaded`);
+              } catch (fetchErr) {
+                if (attempt === maxChunkRetries - 1) throw fetchErr;
+                console.log(`Chunk ${chunkIdx + 1} network error, retrying...`);
+                await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+              }
+            }
+          }
+
+          if (lastResponse?.secure_url || lastResponse?.url) {
+            return lastResponse.secure_url || lastResponse.url;
+          }
+          throw new Error('Chunked upload completed but no URL returned');
+        } catch (chunkedError: any) {
+          console.error('Chunked upload failed, falling back to server proxy:', chunkedError);
+        }
+      }
+
+      // Last resort: server proxy (may hit hosting body size limits for files >100MB)
+      if (!useDirectUpload) {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('folder', 'unendingpraise/trainings');
