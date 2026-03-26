@@ -911,24 +911,12 @@ app.post('/api/admin/upload-chunk', requireAuth, requireRole('crusade', 'testimo
     const combinedSize = fs.statSync(combinedPath).size;
     console.log(`Combined file size: ${(combinedSize / (1024 * 1024)).toFixed(2)}MB — uploading to Cloudinary`);
 
-    // Step 2: Stream the combined file to Cloudinary
-    const result = await new Promise((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        {
-          folder: String(folder || 'unendingpraise/trainings'),
-          resource_type: finalResourceType,
-          chunk_size: 20000000,
-          timeout: 60 * 60 * 1000,
-        },
-        (error, uploadResult) => {
-          if (error) reject(error);
-          else resolve(uploadResult);
-        }
-      );
-
-      const fileStream = fs.createReadStream(combinedPath, { highWaterMark: 2 * 1024 * 1024 });
-      fileStream.pipe(uploadStream);
-      fileStream.on('error', reject);
+    // Step 2: Upload combined file to Cloudinary using upload_large (handles >100MB with chunked upload)
+    const result = await cloudinary.uploader.upload_large(combinedPath, {
+      folder: String(folder || 'unendingpraise/trainings'),
+      resource_type: finalResourceType,
+      chunk_size: 20000000,
+      timeout: 60 * 60 * 1000,
     });
 
     // Clean up only on success
