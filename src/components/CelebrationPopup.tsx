@@ -16,15 +16,19 @@ const DAY_IMAGES: Record<number, string> = {
 
 const AVATAR_URL = "https://lmmsdp.org/avatar/";
 
+const ANNIVERSARY_DAY = 27;
+
 export default function CelebrationPopup() {
   const [open, setOpen] = useState(false);
   const [imgSrc, setImgSrc] = useState<string | null>(null);
+  const [isAnniversary, setIsAnniversary] = useState(false);
 
   useEffect(() => {
     const dismissed = sessionStorage.getItem("celebration_popup_dismissed");
     if (dismissed) return;
 
     const day = new Date().getDate();
+    setIsAnniversary(day === ANNIVERSARY_DAY);
     const src = DAY_IMAGES[day];
     if (src) {
       setImgSrc(src);
@@ -87,14 +91,28 @@ export default function CelebrationPopup() {
               />
             </div>
 
-            <a
+            {isAnniversary && (
+              <motion.p
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5, duration: 0.6, ease: "easeOut" }}
+                className="text-white text-center text-lg sm:text-xl font-bold drop-shadow-lg"
+              >
+                It's Today! 3 Years of Unending Praise!
+              </motion.p>
+            )}
+
+            <motion.a
               href={AVATAR_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="px-8 py-3 rounded-full bg-[#54037C] hover:bg-[#6B1A9E] text-white font-semibold text-sm sm:text-base transition shadow-lg"
+              initial={isAnniversary ? { opacity: 0, scale: 0.8, y: 10 } : {}}
+              animate={isAnniversary ? { opacity: 1, scale: [1, 1.08, 1], y: 0 } : {}}
+              transition={isAnniversary ? { delay: 1.1, duration: 0.6, ease: "easeOut", scale: { delay: 1.5, duration: 0.8, repeat: Infinity, repeatType: "reverse" } } : {}}
             >
               Create your avatar today
-            </a>
+            </motion.a>
           </motion.div>
         </motion.div>
       )}
