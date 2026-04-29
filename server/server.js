@@ -1987,8 +1987,12 @@ app.get('/api/analytics/stats', requireAuth, requireAdmin, async (req, res) => {
     const currentYear = now.getUTCFullYear();
 
     // Query params
+    const yearParam = String(req.query.year || '').toLowerCase();
+    const isAllTime = yearParam === 'all' || yearParam === 'alltime' || yearParam === 'all-time';
     const requestedYearRaw = parseInt(req.query.year, 10);
-    const requestedYear = Number.isFinite(requestedYearRaw) ? requestedYearRaw : currentYear;
+    const requestedYear = isAllTime
+      ? null
+      : (Number.isFinite(requestedYearRaw) ? requestedYearRaw : currentYear);
     const dailyRangeRaw = parseInt(req.query.dailyRange, 10);
     const dailyRange = Math.min(Math.max(Number.isFinite(dailyRangeRaw) ? dailyRangeRaw : 7, 1), 365);
 
@@ -2031,14 +2035,29 @@ app.get('/api/analytics/stats', requireAuth, requireAdmin, async (req, res) => {
       } catch (e) { console.error('Unique visitor count error:', e); }
     }
 
-    // Most visited pages (limit raised to 15)
-    const pageRankings = await pool.query(
-      `SELECT page_path, COUNT(*) as views
-       FROM page_views
-       GROUP BY page_path
-       ORDER BY views DESC
-       LIMIT 15`
-    );
+    // Most visited pages — scoped to the selected year (or all-time)
+    let pageRankings;
+    if (isAllTime || requestedYear === null) {
+      pageRankings = await pool.query(
+        `SELECT page_path, COUNT(*) as views
+         FROM page_views
+         GROUP BY page_path
+         ORDER BY views DESC
+         LIMIT 15`
+      );
+    } else {
+      const prStart = new Date(Date.UTC(requestedYear, 0, 1, 0, 0, 0));
+      const prEnd = new Date(Date.UTC(requestedYear + 1, 0, 1, 0, 0, 0));
+      pageRankings = await pool.query(
+        `SELECT page_path, COUNT(*) as views
+         FROM page_views
+         WHERE created_at >= $1 AND created_at < $2
+         GROUP BY page_path
+         ORDER BY views DESC
+         LIMIT 15`,
+        [prStart.toISOString(), prEnd.toISOString()]
+      );
+    }
 
     // Daily views over the configurable range
     const dailyViews = await pool.query(
@@ -2066,76 +2085,152 @@ app.get('/api/analytics/stats', requireAuth, requireAdmin, async (req, res) => {
       console.error('Available years error:', e);
     }
 
-    // --- Year-specific data (uses requestedYear) ---
-    const yearStart = new Date(Date.UTC(requestedYear, 0, 1, 0, 0, 0));
-    const yearEnd = new Date(Date.UTC(requestedYear + 1, 0, 1, 0, 0, 0));
-    const prevYearStart = new Date(Date.UTC(requestedYear - 1, 0, 1, 0, 0, 0));
-    const prevYearEnd = new Date(Date.UTC(requestedYear, 0, 1, 0, 0, 0));
+    // --- Selected period data (specific year OR all-time) ---
+    let yearlyPageViews = 0;
+    let yearlyUniqueVisitors = 0;
+    let prevYearPageViews = 0;
+    let prevYearUniqueVisitors = 0;
+    let breakdownMode = 'monthly'; // 'monthly' for a year, 'yearly' for all-time
+    let breakdown = []; // [{ label, key, pageViews, uniqueVisitors }]
 
-    const pageViewsYear = await pool.query(
-      `SELECT COUNT(*) as total_views FROM page_views WHERE created_at >= $1 AND created_at < $2`,
-      [yearStart.toISOString(), yearEnd.toISOString()]
-    );
-    const pageViewsPrevYear = await pool.query(
-      `SELECT COUNT(*) as total_views FROM page_views WHERE created_at >= $1 AND created_at < $2`,
-      [prevYearStart.toISOString(), prevYearEnd.toISOString()]
-    );
+    if (isAllTime || requestedYear === null) {
+      // All-time totals
+      yearlyPageViews = parseInt(allTimePageViews.rows[0]?.total_views || '0');
+      yearlyUniqueVisitors = parseInt(allTimeUniqueVisitors.rows[0]?.unique_visitors || '0');
+      prevYearPageViews = 0;
+      prevYearUniqueVisitors = 0;
 
-    let uniqueVisitorsYear = { rows: [{ unique_visitors: '0' }] };
-    let uniqueVisitorsPrevYear = { rows: [{ unique_visitors: '0' }] };
-    if (hasVisitorIp) {
-      try {
-        uniqueVisitorsYear = await pool.query(
-          `SELECT COUNT(DISTINCT visitor_ip) as unique_visitors
+      // Breakdown by year
+      breakdownMode = 'yearly';
+      let yearlyBreakdown;
+      if (hasVisitorIp) {
+        yearlyBreakdown = await pool.query(
+          `SELECT
+             EXTRACT(YEAR FROM created_at)::int AS year,
+             COUNT(*) AS views,
+             COUNT(DISTINCT visitor_ip) FILTER (
+               WHERE visitor_ip IS NOT NULL AND visitor_ip != 'unknown'
+             ) AS unique_visitors
            FROM page_views
-           WHERE created_at >= $1 AND created_at < $2 AND visitor_ip IS NOT NULL AND visitor_ip != 'unknown'`,
+           WHERE created_at IS NOT NULL
+           GROUP BY EXTRACT(YEAR FROM created_at)
+           ORDER BY year ASC`
+        );
+      } else {
+        yearlyBreakdown = await pool.query(
+          `SELECT
+             EXTRACT(YEAR FROM created_at)::int AS year,
+             COUNT(*) AS views
+           FROM page_views
+           WHERE created_at IS NOT NULL
+           GROUP BY EXTRACT(YEAR FROM created_at)
+           ORDER BY year ASC`
+        );
+      }
+      breakdown = yearlyBreakdown.rows.map(row => ({
+        label: String(row.year),
+        key: String(row.year),
+        pageViews: parseInt(row.views || '0'),
+        uniqueVisitors: hasVisitorIp ? parseInt(row.unique_visitors || '0') : 0,
+      }));
+    } else {
+      // Specific year
+      const yearStart = new Date(Date.UTC(requestedYear, 0, 1, 0, 0, 0));
+      const yearEnd = new Date(Date.UTC(requestedYear + 1, 0, 1, 0, 0, 0));
+      const prevYearStart = new Date(Date.UTC(requestedYear - 1, 0, 1, 0, 0, 0));
+      const prevYearEnd = new Date(Date.UTC(requestedYear, 0, 1, 0, 0, 0));
+
+      const pageViewsYear = await pool.query(
+        `SELECT COUNT(*) as total_views FROM page_views WHERE created_at >= $1 AND created_at < $2`,
+        [yearStart.toISOString(), yearEnd.toISOString()]
+      );
+      const pageViewsPrevYear = await pool.query(
+        `SELECT COUNT(*) as total_views FROM page_views WHERE created_at >= $1 AND created_at < $2`,
+        [prevYearStart.toISOString(), prevYearEnd.toISOString()]
+      );
+      yearlyPageViews = parseInt(pageViewsYear.rows[0]?.total_views || '0');
+      prevYearPageViews = parseInt(pageViewsPrevYear.rows[0]?.total_views || '0');
+
+      if (hasVisitorIp) {
+        try {
+          const uvY = await pool.query(
+            `SELECT COUNT(DISTINCT visitor_ip) as unique_visitors
+             FROM page_views
+             WHERE created_at >= $1 AND created_at < $2 AND visitor_ip IS NOT NULL AND visitor_ip != 'unknown'`,
+            [yearStart.toISOString(), yearEnd.toISOString()]
+          );
+          yearlyUniqueVisitors = parseInt(uvY.rows[0]?.unique_visitors || '0');
+          const uvPY = await pool.query(
+            `SELECT COUNT(DISTINCT visitor_ip) as unique_visitors
+             FROM page_views
+             WHERE created_at >= $1 AND created_at < $2 AND visitor_ip IS NOT NULL AND visitor_ip != 'unknown'`,
+            [prevYearStart.toISOString(), prevYearEnd.toISOString()]
+          );
+          prevYearUniqueVisitors = parseInt(uvPY.rows[0]?.unique_visitors || '0');
+        } catch (e) { console.error('Year unique visitor error:', e); }
+      }
+
+      breakdownMode = 'monthly';
+      let monthlyYear;
+      if (hasVisitorIp) {
+        monthlyYear = await pool.query(
+          `SELECT
+             DATE_TRUNC('month', created_at) AS month,
+             COUNT(*) AS views,
+             COUNT(DISTINCT visitor_ip) FILTER (
+               WHERE visitor_ip IS NOT NULL AND visitor_ip != 'unknown'
+             ) AS unique_visitors
+           FROM page_views
+           WHERE created_at >= $1 AND created_at < $2
+           GROUP BY DATE_TRUNC('month', created_at)
+           ORDER BY month ASC`,
           [yearStart.toISOString(), yearEnd.toISOString()]
         );
-        uniqueVisitorsPrevYear = await pool.query(
-          `SELECT COUNT(DISTINCT visitor_ip) as unique_visitors
+      } else {
+        monthlyYear = await pool.query(
+          `SELECT
+             DATE_TRUNC('month', created_at) AS month,
+             COUNT(*) AS views
            FROM page_views
-           WHERE created_at >= $1 AND created_at < $2 AND visitor_ip IS NOT NULL AND visitor_ip != 'unknown'`,
-          [prevYearStart.toISOString(), prevYearEnd.toISOString()]
+           WHERE created_at >= $1 AND created_at < $2
+           GROUP BY DATE_TRUNC('month', created_at)
+           ORDER BY month ASC`,
+          [yearStart.toISOString(), yearEnd.toISOString()]
         );
-      } catch (e) { console.error('Year unique visitor error:', e); }
-    }
+      }
 
-    // Monthly breakdown for the requested year
-    let monthlyYear;
-    if (hasVisitorIp) {
-      monthlyYear = await pool.query(
-        `SELECT
-           DATE_TRUNC('month', created_at) AS month,
-           COUNT(*) AS views,
-           COUNT(DISTINCT visitor_ip) FILTER (
-             WHERE visitor_ip IS NOT NULL AND visitor_ip != 'unknown'
-           ) AS unique_visitors
-         FROM page_views
-         WHERE created_at >= $1 AND created_at < $2
-         GROUP BY DATE_TRUNC('month', created_at)
-         ORDER BY month ASC`,
-        [yearStart.toISOString(), yearEnd.toISOString()]
-      );
-    } else {
-      monthlyYear = await pool.query(
-        `SELECT
-           DATE_TRUNC('month', created_at) AS month,
-           COUNT(*) AS views
-         FROM page_views
-         WHERE created_at >= $1 AND created_at < $2
-         GROUP BY DATE_TRUNC('month', created_at)
-         ORDER BY month ASC`,
-        [yearStart.toISOString(), yearEnd.toISOString()]
-      );
+      // Pre-fill all 12 months
+      const monthMap = new Map();
+      monthlyYear.rows.forEach(row => {
+        const d = new Date(row.month);
+        const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+        monthMap.set(key, {
+          pageViews: parseInt(row.views || '0'),
+          uniqueVisitors: hasVisitorIp ? parseInt(row.unique_visitors || '0') : 0,
+        });
+      });
+      const monthLabels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      for (let m = 0; m < 12; m++) {
+        const key = `${requestedYear}-${String(m + 1).padStart(2, '0')}`;
+        const found = monthMap.get(key) || { pageViews: 0, uniqueVisitors: 0 };
+        breakdown.push({
+          label: monthLabels[m],
+          key,
+          pageViews: found.pageViews,
+          uniqueVisitors: found.uniqueVisitors,
+        });
+      }
     }
 
     res.json({
       meta: {
-        requestedYear,
+        requestedYear: isAllTime ? 'all' : requestedYear,
+        isAllTime,
         currentYear,
         dailyRange,
         availableYears,
         hasVisitorIp,
+        breakdownMode,
       },
       pageViews: {
         last7Days: parseInt(pageViews7Days.rows[0]?.total_views || '0'),
@@ -2156,20 +2251,15 @@ app.get('/api/analytics/stats', requireAuth, requireAdmin, async (req, res) => {
         views: parseInt(row.views)
       })),
       yearly: {
-        year: requestedYear,
-        pageViews: parseInt(pageViewsYear.rows[0]?.total_views || '0'),
-        uniqueVisitors: parseInt(uniqueVisitorsYear.rows[0]?.unique_visitors || '0'),
-        previousYear: requestedYear - 1,
-        previousYearPageViews: parseInt(pageViewsPrevYear.rows[0]?.total_views || '0'),
-        previousYearUniqueVisitors: parseInt(uniqueVisitorsPrevYear.rows[0]?.unique_visitors || '0'),
+        year: isAllTime ? 'all' : requestedYear,
+        label: isAllTime ? 'All Time' : String(requestedYear),
+        pageViews: yearlyPageViews,
+        uniqueVisitors: yearlyUniqueVisitors,
+        previousYear: isAllTime ? null : (requestedYear - 1),
+        previousYearPageViews: isAllTime ? 0 : prevYearPageViews,
+        previousYearUniqueVisitors: isAllTime ? 0 : prevYearUniqueVisitors,
       },
-      monthly: monthlyYear.rows.map(row => ({
-        month: row.month,
-        pageViews: parseInt(row.views),
-        uniqueVisitors: hasVisitorIp
-          ? parseInt(row.unique_visitors || '0')
-          : 0
-      }))
+      breakdown,
     });
   } catch (e) {
     console.error('Analytics stats error:', e);
