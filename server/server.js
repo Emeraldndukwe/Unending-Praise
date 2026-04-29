@@ -1974,145 +1974,135 @@ app.post('/api/analytics/track', async (req, res) => {
 
 app.get('/api/analytics/stats', requireAuth, requireAdmin, async (req, res) => {
   try {
-    // Ensure columns exist before querying
     await ensureAnalyticsColumns();
-    
-    // Check if visitor_ip column exists
+
     const columnCheck = await pool.query(`
       SELECT column_name 
       FROM information_schema.columns 
       WHERE table_name='page_views' AND column_name='visitor_ip'
     `);
     const hasVisitorIp = columnCheck.rows.length > 0;
-    
-    // Get visitor counts for different time periods
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
-    // Count total page views for 7 days
+
+    const now = new Date();
+    const currentYear = now.getUTCFullYear();
+
+    // Query params
+    const requestedYearRaw = parseInt(req.query.year, 10);
+    const requestedYear = Number.isFinite(requestedYearRaw) ? requestedYearRaw : currentYear;
+    const dailyRangeRaw = parseInt(req.query.dailyRange, 10);
+    const dailyRange = Math.min(Math.max(Number.isFinite(dailyRangeRaw) ? dailyRangeRaw : 7, 1), 365);
+
+    // --- Recent rolling windows ---
+    const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const dailyRangeAgo = new Date(); dailyRangeAgo.setDate(dailyRangeAgo.getDate() - dailyRange);
+
     const pageViews7Days = await pool.query(
-      `SELECT COUNT(*) as total_views
-       FROM page_views 
-       WHERE created_at >= $1`,
+      `SELECT COUNT(*) as total_views FROM page_views WHERE created_at >= $1`,
       [sevenDaysAgo.toISOString()]
     );
-    
-    // Count unique visitors for 7 days (distinct IP addresses) - only if column exists
+    const pageViews30Days = await pool.query(
+      `SELECT COUNT(*) as total_views FROM page_views WHERE created_at >= $1`,
+      [thirtyDaysAgo.toISOString()]
+    );
+    const allTimePageViews = await pool.query(
+      `SELECT COUNT(*) as total_views FROM page_views`
+    );
+
     let uniqueVisitors7Days = { rows: [{ unique_visitors: '0' }] };
+    let uniqueVisitors30Days = { rows: [{ unique_visitors: '0' }] };
+    let allTimeUniqueVisitors = { rows: [{ unique_visitors: '0' }] };
     if (hasVisitorIp) {
       try {
         uniqueVisitors7Days = await pool.query(
           `SELECT COUNT(DISTINCT visitor_ip) as unique_visitors
-           FROM page_views 
-           WHERE created_at >= $1 AND visitor_ip IS NOT NULL AND visitor_ip != 'unknown'`,
+           FROM page_views WHERE created_at >= $1 AND visitor_ip IS NOT NULL AND visitor_ip != 'unknown'`,
           [sevenDaysAgo.toISOString()]
         );
-      } catch (e) {
-        console.error('Error counting unique visitors 7 days:', e);
-      }
-    }
-    
-    // Count total page views for 30 days
-    const pageViews30Days = await pool.query(
-      `SELECT COUNT(*) as total_views
-       FROM page_views 
-       WHERE created_at >= $1`,
-      [thirtyDaysAgo.toISOString()]
-    );
-    
-    // Count unique visitors for 30 days
-    let uniqueVisitors30Days = { rows: [{ unique_visitors: '0' }] };
-    if (hasVisitorIp) {
-      try {
         uniqueVisitors30Days = await pool.query(
           `SELECT COUNT(DISTINCT visitor_ip) as unique_visitors
-           FROM page_views 
-           WHERE created_at >= $1 AND visitor_ip IS NOT NULL AND visitor_ip != 'unknown'`,
+           FROM page_views WHERE created_at >= $1 AND visitor_ip IS NOT NULL AND visitor_ip != 'unknown'`,
           [thirtyDaysAgo.toISOString()]
         );
-      } catch (e) {
-        console.error('Error counting unique visitors 30 days:', e);
-      }
-    }
-    
-    // Count all time page views
-    const allTimePageViews = await pool.query(
-      `SELECT COUNT(*) as total_views
-       FROM page_views`
-    );
-    
-    // Count all time unique visitors
-    let allTimeUniqueVisitors = { rows: [{ unique_visitors: '0' }] };
-    if (hasVisitorIp) {
-      try {
         allTimeUniqueVisitors = await pool.query(
           `SELECT COUNT(DISTINCT visitor_ip) as unique_visitors
-           FROM page_views 
-           WHERE visitor_ip IS NOT NULL AND visitor_ip != 'unknown'`
+           FROM page_views WHERE visitor_ip IS NOT NULL AND visitor_ip != 'unknown'`
         );
-      } catch (e) {
-        console.error('Error counting all time unique visitors:', e);
-      }
+      } catch (e) { console.error('Unique visitor count error:', e); }
     }
-    
-    // Get page rankings (most visited pages)
+
+    // Most visited pages (limit raised to 15)
     const pageRankings = await pool.query(
       `SELECT page_path, COUNT(*) as views
        FROM page_views
        GROUP BY page_path
        ORDER BY views DESC
-       LIMIT 10`
+       LIMIT 15`
     );
-    
-    // Get daily views for the last 7 days for chart
+
+    // Daily views over the configurable range
     const dailyViews = await pool.query(
       `SELECT DATE(created_at) as date, COUNT(*) as views
        FROM page_views
        WHERE created_at >= $1
        GROUP BY DATE(created_at)
        ORDER BY date ASC`,
-      [sevenDaysAgo.toISOString()]
+      [dailyRangeAgo.toISOString()]
     );
 
-    // --- Current-year analytics (auto-updates each new year) ---
-    const now = new Date();
-    const currentYear = now.getUTCFullYear();
-    const yearStart = new Date(Date.UTC(currentYear, 0, 1, 0, 0, 0));
-    const yearEnd = new Date(Date.UTC(currentYear + 1, 0, 1, 0, 0, 0));
+    // Available years (years that have at least one page view)
+    let availableYears = [currentYear];
+    try {
+      const yearsResult = await pool.query(
+        `SELECT DISTINCT EXTRACT(YEAR FROM created_at)::int AS year
+         FROM page_views
+         WHERE created_at IS NOT NULL
+         ORDER BY year DESC`
+      );
+      const fromDb = yearsResult.rows.map(r => r.year).filter(Boolean);
+      const merged = Array.from(new Set([currentYear, ...fromDb])).sort((a, b) => b - a);
+      if (merged.length) availableYears = merged;
+    } catch (e) {
+      console.error('Available years error:', e);
+    }
 
-    // Total page views in current year
+    // --- Year-specific data (uses requestedYear) ---
+    const yearStart = new Date(Date.UTC(requestedYear, 0, 1, 0, 0, 0));
+    const yearEnd = new Date(Date.UTC(requestedYear + 1, 0, 1, 0, 0, 0));
+    const prevYearStart = new Date(Date.UTC(requestedYear - 1, 0, 1, 0, 0, 0));
+    const prevYearEnd = new Date(Date.UTC(requestedYear, 0, 1, 0, 0, 0));
+
     const pageViewsYear = await pool.query(
-      `SELECT COUNT(*) as total_views
-       FROM page_views
-       WHERE created_at >= $1 AND created_at < $2`,
+      `SELECT COUNT(*) as total_views FROM page_views WHERE created_at >= $1 AND created_at < $2`,
       [yearStart.toISOString(), yearEnd.toISOString()]
     );
+    const pageViewsPrevYear = await pool.query(
+      `SELECT COUNT(*) as total_views FROM page_views WHERE created_at >= $1 AND created_at < $2`,
+      [prevYearStart.toISOString(), prevYearEnd.toISOString()]
+    );
 
-    // Total unique visitors in current year (if we have visitor_ip)
     let uniqueVisitorsYear = { rows: [{ unique_visitors: '0' }] };
+    let uniqueVisitorsPrevYear = { rows: [{ unique_visitors: '0' }] };
     if (hasVisitorIp) {
       try {
         uniqueVisitorsYear = await pool.query(
           `SELECT COUNT(DISTINCT visitor_ip) as unique_visitors
            FROM page_views
-           WHERE created_at >= $1
-             AND created_at < $2
-             AND visitor_ip IS NOT NULL
-             AND visitor_ip != 'unknown'`,
+           WHERE created_at >= $1 AND created_at < $2 AND visitor_ip IS NOT NULL AND visitor_ip != 'unknown'`,
           [yearStart.toISOString(), yearEnd.toISOString()]
         );
-      } catch (e) {
-        console.error('Error counting unique visitors 2025:', e);
-      }
+        uniqueVisitorsPrevYear = await pool.query(
+          `SELECT COUNT(DISTINCT visitor_ip) as unique_visitors
+           FROM page_views
+           WHERE created_at >= $1 AND created_at < $2 AND visitor_ip IS NOT NULL AND visitor_ip != 'unknown'`,
+          [prevYearStart.toISOString(), prevYearEnd.toISOString()]
+        );
+      } catch (e) { console.error('Year unique visitor error:', e); }
     }
 
-    // Monthly stats for current year
+    // Monthly breakdown for the requested year
     let monthlyYear;
     if (hasVisitorIp) {
-      // With unique visitors per month
       monthlyYear = await pool.query(
         `SELECT
            DATE_TRUNC('month', created_at) AS month,
@@ -2127,7 +2117,6 @@ app.get('/api/analytics/stats', requireAuth, requireAdmin, async (req, res) => {
         [yearStart.toISOString(), yearEnd.toISOString()]
       );
     } else {
-      // Fallback if visitor_ip column is missing
       monthlyYear = await pool.query(
         `SELECT
            DATE_TRUNC('month', created_at) AS month,
@@ -2139,8 +2128,15 @@ app.get('/api/analytics/stats', requireAuth, requireAdmin, async (req, res) => {
         [yearStart.toISOString(), yearEnd.toISOString()]
       );
     }
-    
+
     res.json({
+      meta: {
+        requestedYear,
+        currentYear,
+        dailyRange,
+        availableYears,
+        hasVisitorIp,
+      },
       pageViews: {
         last7Days: parseInt(pageViews7Days.rows[0]?.total_views || '0'),
         last30Days: parseInt(pageViews30Days.rows[0]?.total_views || '0'),
@@ -2159,11 +2155,13 @@ app.get('/api/analytics/stats', requireAuth, requireAdmin, async (req, res) => {
         date: row.date,
         views: parseInt(row.views)
       })),
-      // Current-year aggregates (auto-rollover)
       yearly: {
-        year: currentYear,
+        year: requestedYear,
         pageViews: parseInt(pageViewsYear.rows[0]?.total_views || '0'),
-        uniqueVisitors: parseInt(uniqueVisitorsYear.rows[0]?.unique_visitors || '0')
+        uniqueVisitors: parseInt(uniqueVisitorsYear.rows[0]?.unique_visitors || '0'),
+        previousYear: requestedYear - 1,
+        previousYearPageViews: parseInt(pageViewsPrevYear.rows[0]?.total_views || '0'),
+        previousYearUniqueVisitors: parseInt(uniqueVisitorsPrevYear.rows[0]?.unique_visitors || '0'),
       },
       monthly: monthlyYear.rows.map(row => ({
         month: row.month,
