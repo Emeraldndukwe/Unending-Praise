@@ -675,7 +675,6 @@ function DailyLineChart({
   const svgRef = useRef<SVGSVGElement>(null);
   const linePathRef = useRef<SVGPathElement>(null);
   const areaPathRef = useRef<SVGPathElement>(null);
-  const dotsLayerRef = useRef<SVGGElement>(null);
   const [width, setWidth] = useState(800);
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
 
@@ -757,13 +756,6 @@ function DailyLineChart({
         areaPathRef.current,
         { opacity: 0 },
         { opacity: 1, duration: 0.8, ease: "power2.out", delay: 0.2 }
-      );
-    }
-    if (dotsLayerRef.current) {
-      gsap.fromTo(
-        dotsLayerRef.current.querySelectorAll("circle.data-dot"),
-        { scale: 0, transformOrigin: "center" },
-        { scale: 1, duration: 0.4, ease: "back.out(2)", stagger: 0.04, delay: 0.5 }
       );
     }
   }, [seriesKey]);
@@ -870,19 +862,6 @@ function DailyLineChart({
                 <circle cx={hover.x} cy={hover.y} r={6} fill="white" stroke="#54037C" strokeWidth="2" />
               </g>
             )}
-
-            <g ref={dotsLayerRef}>
-              {points.map((p, i) => (
-                <circle
-                  key={i}
-                  className="data-dot"
-                  cx={p.x}
-                  cy={p.y}
-                  r={3.5}
-                  fill="#54037C"
-                />
-              ))}
-            </g>
           </>
         )}
 
