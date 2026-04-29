@@ -2086,62 +2086,19 @@ export default function AdminPage() {
                 <h3 className="font-semibold">Existing Documents ({documents.length})</h3>
                 {documents.length === 0 && <div className="text-sm text-gray-500 text-center py-8">No documents yet</div>}
                 {documents.map((doc) => (
-                  <div key={doc.id} className="p-4 border border-gray-200 rounded-xl bg-white hover:shadow-md transition">
-                    <div className="flex flex-col md:flex-row justify-between gap-4">
-                      <div className="flex-1">
-                        <h3 className="font-bold text-lg mb-2">{doc.title}</h3>
-                        <div className="text-xs text-gray-500">
-                          {doc.document_type && <span className="mr-2">Type: {doc.document_type}</span>}
-                          {doc.downloadable === false && <span className="mr-2 text-orange-600 font-semibold">⚠️ Not Downloadable</span>}
-                          {doc.created_at && `Created: ${new Date(doc.created_at).toLocaleString()}`}
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <button 
-                          className="px-3 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-xl text-sm" 
-                          onClick={async () => {
-                            const title = prompt('New title:', doc.title);
-                            if (!title || title === doc.title) return;
-                            try {
-                              await fetch(`/api/documents/${doc.id}`, {
-                                method: 'PUT',
-                                headers: Object.assign({}, headers as Record<string, string>, { 'content-type': 'application/json' }),
-                                body: JSON.stringify({ 
-                                  title, 
-                                  document_url: doc.document_url, 
-                                  document_type: doc.document_type || null, 
-                                  section: doc.section || null,
-                                  downloadable: doc.downloadable !== false
-                                }),
-                              });
-                              await refreshDocuments();
-                            } catch (e: any) {
-                              alert('Failed to update document: ' + (e?.message || 'Unknown error'));
-                            }
-                          }}
-                        >
-                          Edit
-                        </button>
-                        <button 
-                          className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm" 
-                          onClick={async () => {
-                            if (!confirm('Are you sure you want to delete this document?')) return;
-                            try {
-                              await fetch(`/api/documents/${doc.id}`, {
-                                method: 'DELETE',
-                                headers: headers as HeadersInit,
-                              });
-                              await refreshDocuments();
-                            } catch (e: any) {
-                              alert('Failed to delete document: ' + (e?.message || 'Unknown error'));
-                            }
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                  <DocumentItem
+                    key={doc.id}
+                    doc={doc}
+                    headers={headers as HeadersInit}
+                    onUploadMedia={uploadDocumentMedia}
+                    existingSections={Array.from(
+                      new Set([
+                        ...meetings.map((m) => m.section).filter((s): s is string => Boolean(s)),
+                        ...documents.map((d) => d.section).filter((s): s is string => Boolean(s)),
+                      ])
+                    )}
+                    onRefresh={refreshDocuments}
+                  />
                 ))}
               </div>
             </div>
@@ -4662,6 +4619,281 @@ function DocumentForm({
         Add Document
       </button>
     </form>
+  );
+}
+
+function DocumentItem({
+  doc,
+  headers,
+  onUploadMedia,
+  existingSections = [],
+  onRefresh,
+}: {
+  doc: {
+    id: string;
+    title: string;
+    document_url: string;
+    document_type?: string;
+    section?: string;
+    downloadable?: boolean;
+    created_at?: string;
+    updated_at?: string;
+  };
+  headers: HeadersInit;
+  onUploadMedia: (dataUrl: string) => Promise<string>;
+  existingSections?: string[];
+  onRefresh: () => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState(doc.title);
+  const [documentUrl, setDocumentUrl] = useState(doc.document_url);
+  const [documentType, setDocumentType] = useState(doc.document_type || "");
+  const [section, setSection] = useState(doc.section || "");
+  const [useExistingSection, setUseExistingSection] = useState(false);
+  const [downloadable, setDownloadable] = useState(doc.downloadable !== false);
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!editing) return;
+    setTitle(doc.title);
+    setDocumentUrl(doc.document_url);
+    setDocumentType(doc.document_type || "");
+    setSection(doc.section || "");
+    setDownloadable(doc.downloadable !== false);
+  }, [editing, doc]);
+
+  const handleReplaceFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const dataUrl = event.target?.result as string;
+        if (dataUrl) {
+          const url = await onUploadMedia(dataUrl);
+          setDocumentUrl(url);
+          const fileName = file.name.toLowerCase();
+          if (fileName.endsWith(".pdf")) setDocumentType("PDF");
+          else if (fileName.endsWith(".doc") || fileName.endsWith(".docx")) setDocumentType("DOC");
+          else if (fileName.endsWith(".txt")) setDocumentType("TXT");
+          else if (fileName.endsWith(".xls") || fileName.endsWith(".xlsx")) setDocumentType("XLS");
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      alert("Upload failed: " + (err?.message || "Unknown error"));
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  const save = async () => {
+    if (!title || !documentUrl) {
+      alert("Please provide both title and document URL");
+      return;
+    }
+    setSaving(true);
+    try {
+      await fetch(`/api/documents/${doc.id}`, {
+        method: "PUT",
+        headers: Object.assign({}, headers as Record<string, string>, { "content-type": "application/json" }),
+        body: JSON.stringify({
+          title,
+          document_url: documentUrl,
+          document_type: documentType || null,
+          section: section || null,
+          downloadable,
+        }),
+      });
+      await onRefresh();
+      setEditing(false);
+    } catch (e: any) {
+      alert("Failed to update document: " + (e?.message || "Unknown error"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async () => {
+    if (!confirm("Are you sure you want to delete this document?")) return;
+    try {
+      await fetch(`/api/documents/${doc.id}`, { method: "DELETE", headers });
+      await onRefresh();
+    } catch (e: any) {
+      alert("Failed to delete document: " + (e?.message || "Unknown error"));
+    }
+  };
+
+  return (
+    <div className="p-4 border border-gray-200 rounded-xl bg-white hover:shadow-md transition">
+      <div className="flex flex-col md:flex-row justify-between gap-4">
+        <div className="flex-1">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="font-bold text-lg">{doc.title}</h3>
+              <div className="text-xs text-gray-500 mt-1">
+                {doc.document_type && <span className="mr-2">Type: {doc.document_type}</span>}
+                {doc.downloadable === false && (
+                  <span className="mr-2 text-orange-600 font-semibold">⚠️ Not Downloadable</span>
+                )}
+                {doc.created_at && `Created: ${new Date(doc.created_at).toLocaleString()}`}
+                {doc.updated_at && (
+                  <span className="ml-2">• Updated: {new Date(doc.updated_at).toLocaleString()}</span>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                className="px-3 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-xl text-sm"
+                onClick={() => setEditing((v) => !v)}
+              >
+                {editing ? "Close" : "Edit"}
+              </button>
+              <button
+                className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm"
+                onClick={remove}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+
+          {!editing ? (
+            <div className="mt-3 text-sm text-gray-700">
+              <a
+                href={doc.document_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#54037C] font-semibold hover:underline break-all"
+              >
+                Open document
+              </a>
+            </div>
+          ) : (
+            <div className="mt-4 space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-gray-600">Title</label>
+                  <input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="w-full mt-1 px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-600">Document type</label>
+                  <input
+                    value={documentType}
+                    onChange={(e) => setDocumentType(e.target.value)}
+                    placeholder="PDF, DOC, XLS..."
+                    className="w-full mt-1 px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-600">Section</label>
+                {existingSections.length > 0 && (
+                  <div className="mt-1">
+                    <label className="flex items-center gap-2 text-sm text-gray-600">
+                      <input
+                        type="checkbox"
+                        checked={useExistingSection}
+                        onChange={(e) => {
+                          setUseExistingSection(e.target.checked);
+                          if (e.target.checked && existingSections.length > 0) {
+                            setSection(existingSections[0]);
+                          } else {
+                            setSection("");
+                          }
+                        }}
+                        className="rounded"
+                      />
+                      <span>Use existing section</span>
+                    </label>
+                  </div>
+                )}
+                {useExistingSection && existingSections.length > 0 ? (
+                  <select
+                    value={section}
+                    onChange={(e) => setSection(e.target.value)}
+                    className="w-full mt-2 border border-gray-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
+                  >
+                    <option value="">Select a section...</option>
+                    {existingSections.map((sec) => (
+                      <option key={sec} value={sec}>
+                        {sec}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    value={section}
+                    onChange={(e) => setSection(e.target.value)}
+                    placeholder="e.g., 1000 Days Crusade"
+                    className="w-full mt-2 border border-gray-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
+                  />
+                )}
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-600">Document URL</label>
+                <div className="mt-1 flex gap-2">
+                  <input
+                    value={documentUrl}
+                    onChange={(e) => setDocumentUrl(e.target.value)}
+                    className="flex-1 border border-gray-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#54037C] focus:border-transparent"
+                  />
+                  <label className="px-4 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-xl cursor-pointer text-sm whitespace-nowrap">
+                    {uploading ? "Uploading..." : "Replace file"}
+                    <input
+                      type="file"
+                      accept=".pdf,.doc,.docx,.txt,.xls,.xlsx"
+                      className="hidden"
+                      onChange={handleReplaceFile}
+                      disabled={uploading}
+                    />
+                  </label>
+                </div>
+                <p className="text-[11px] text-gray-500 mt-1">
+                  Use “Replace file” if you uploaded the wrong document — it will upload a new file and update the URL.
+                </p>
+              </div>
+
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={downloadable}
+                  onChange={(e) => setDownloadable(e.target.checked)}
+                  className="w-4 h-4 text-[#54037C] border-gray-300 rounded focus:ring-[#54037C]"
+                />
+                Allow users to download this document
+              </label>
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  className="px-4 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-xl text-sm font-semibold disabled:opacity-50"
+                  onClick={save}
+                  disabled={saving || uploading}
+                >
+                  {saving ? "Saving..." : "Save changes"}
+                </button>
+                <button
+                  className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl text-sm font-semibold"
+                  onClick={() => setEditing(false)}
+                  disabled={saving || uploading}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
