@@ -518,19 +518,31 @@ export default function AdminPage() {
       }
     }
     
-    // Helper function to normalize date
+    // Helper function to normalize date — defaults to DD/MM/YYYY (this app's
+    // convention) but auto-disambiguates when one number is clearly a day.
     const normalizeDate = (dateValue: string): string | null => {
       if (!dateValue) return null;
-      const datePattern = /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/;
-      const match = dateValue.match(datePattern);
-      if (match) {
-        let month = match[1].padStart(2, '0');
-        let day = match[2].padStart(2, '0');
-        let year = match[3];
-        if (year.length === 2) year = '20' + year;
-        return `${year}-${month}-${day}`;
+      const iso = dateValue.match(/^(\d{4})[\-/](\d{1,2})[\-/](\d{1,2})/);
+      if (iso) {
+        return `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`;
       }
-      return null;
+      const match = dateValue.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
+      if (!match) return null;
+      const first = parseInt(match[1], 10);
+      const second = parseInt(match[2], 10);
+      let year = match[3];
+      if (year.length === 2) year = '20' + year;
+      let day: number;
+      let month: number;
+      if (first > 12 && second <= 12) {
+        day = first; month = second;
+      } else if (second > 12 && first <= 12) {
+        day = second; month = first;
+      } else {
+        day = first; month = second;
+      }
+      if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     };
     
     // Helper function to extract title and lyrics
@@ -692,13 +704,44 @@ export default function AdminPage() {
 
     const str = String(val).trim();
     if (!str) return null;
-    const m = str.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+
+    // ISO format: 2026-03-27 (already correct, just normalise padding)
+    const iso = str.match(/^(\d{4})[\-/](\d{1,2})[\-/](\d{1,2})/);
+    if (iso) {
+      const y = iso[1];
+      const mo = iso[2].padStart(2, '0');
+      const d = iso[3].padStart(2, '0');
+      return `${y}-${mo}-${d}`;
+    }
+
+    // DD/MM/YYYY (the format used in this app). We default to day-first but
+    // smartly disambiguate when one of the numbers is clearly a day (>12) or
+    // clearly a month (<=12), so US-style M/D/YYYY copies still work.
+    const m = str.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
     if (!m) return null;
-    const month = m[1].padStart(2, '0');
-    const day = m[2].padStart(2, '0');
+    const first = parseInt(m[1], 10);
+    const second = parseInt(m[2], 10);
     let year = m[3];
     if (year.length === 2) year = '20' + year;
-    return `${year}-${month}-${day}`;
+
+    let day: number;
+    let month: number;
+    if (first > 12 && second <= 12) {
+      // first must be the day (e.g. 27/3/2026)
+      day = first;
+      month = second;
+    } else if (second > 12 && first <= 12) {
+      // second must be the day (US-style M/D/YYYY, e.g. 3/27/2026)
+      day = second;
+      month = first;
+    } else {
+      // Both <= 12 (ambiguous) — fall back to the app's convention: DD/MM/YYYY.
+      day = first;
+      month = second;
+    }
+
+    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   };
 
   // Pulls a clean { title, lyrics } pair out of a single cell's text. Strips
