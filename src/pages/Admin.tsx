@@ -650,9 +650,9 @@ export default function AdminPage() {
       .replace(/[ ]+/g, ' ')
       .trim();
 
-  // Lines that should never be treated as a song title — these are credit
-  // lines, position labels, copyright, key/tempo, etc. that often appear at
-  // the top of a song cell.
+  // Lines that should never be treated as a song title and that we drop
+  // from the lyrics body — credit lines, position labels, copyright,
+  // key/tempo, "All:" performance markers, etc.
   const META_LINE_PATTERNS: RegExp[] = [
     /^song\s*#?\s*\d+\s*[:.\-–—]?\s*$/i,            // "SONG 3" / "Song #3:" on its own
     /^written\s+(and\s+\w+\s+)?by\b.*$/i,            // "Written by ..."
@@ -670,6 +670,7 @@ export default function AdminPage() {
     /^tempo\s*[:\-].*$/i,
     /^artist\s*[:\-].*$/i,
     /^bpm\s*[:\-].*$/i,
+    /^all\s*:?\s*$/i,                                // "All:" — performance marker, not a real section
   ];
 
   const isMetaLine = (line: string): boolean => {
@@ -678,10 +679,10 @@ export default function AdminPage() {
     return META_LINE_PATTERNS.some((re) => re.test(trimmed));
   };
 
-  // Section labels that mark the start of lyrics inside a song cell. These
-  // are matched on a line-by-line basis so we don't misfire on lyrics that
-  // happen to mention these words.
-  const SECTION_PATTERN = /^(verse|chorus|bridge|intro|outro|solo|pre-?chorus|interlude|tag|all)\s*:?\s*\d*\s*$/i;
+  // Section labels that mark the start / next part of a song. We keep these
+  // in the lyrics output and surround them with blank lines so the imported
+  // song reads like the formatted version in Word.
+  const SECTION_PATTERN = /^(verse|chorus|bridge|intro|outro|solo|pre-?chorus|interlude|tag|refrain)[\s:]*\d*[\s:]*$/i;
 
   // Detects "SONG 3:" / "SONG 3 -" style position prefix at the start of the
   // first line so the rest of the line (the real title) can be recovered.
@@ -746,84 +747,106 @@ export default function AdminPage() {
 
   // Pulls a clean { title, lyrics } pair out of a single cell's text. Strips
   // "SONG N" position labels, "Written by …" credits, and other meta lines
-  // before picking the title, and collapses messy whitespace everywhere.
+  // before picking the title. The lyrics keep blank-line spacing from the
+  // source and we add a blank line above and below every section label
+  // (Verse 1, Chorus, Bridge…) so the imported song reads like the
+  // formatted version in Word.
   const extractSongFromCell = (cellValue: any): { title: string; lyrics: string } => {
     if (cellValue === null || cellValue === undefined) return { title: '', lyrics: '' };
     const text = String(cellValue).replace(/\u00A0/g, ' ').trim();
     if (!text) return { title: '', lyrics: '' };
 
-    const lines = text.split(/\r?\n/).map((l) => cleanWhitespace(l)).filter(Boolean);
-    if (!lines.length) return { title: '', lyrics: '' };
+    // Keep blank lines as empty strings so paragraph breaks survive.
+    const rawLines = text.split(/\r?\n/).map((l) => cleanWhitespace(l));
 
-    // Skip leading meta / position-label lines so the title detection
-    // starts at the first piece of real content.
+    // Skip leading blank / meta lines so the title detection starts at the
+    // first piece of real content.
     let startIdx = 0;
-    while (startIdx < lines.length && isMetaLine(lines[startIdx])) {
+    while (
+      startIdx < rawLines.length &&
+      (!rawLines[startIdx] || isMetaLine(rawLines[startIdx]))
+    ) {
       startIdx++;
     }
+    if (startIdx >= rawLines.length) return { title: '', lyrics: '' };
 
-    // Special case: "SONG 3 - Real Title" on a single line — keep the title
-    // portion and treat that as the start.
-    if (startIdx < lines.length) {
-      const inlineMatch = lines[startIdx].match(SONG_LABEL_INLINE);
-      if (inlineMatch && inlineMatch[1].trim()) {
-        lines[startIdx] = cleanWhitespace(inlineMatch[1]);
-      }
+    // Special case: "SONG 3 - Real Title" inline prefix.
+    const inlineMatch = rawLines[startIdx].match(SONG_LABEL_INLINE);
+    if (inlineMatch && inlineMatch[1].trim()) {
+      rawLines[startIdx] = cleanWhitespace(inlineMatch[1]);
     }
 
-    // Find the first section label (Verse 1, Chorus, Intro, …) at or after
-    // our start index. Everything before it is title/credit, everything
-    // after is lyrics.
+    // Find the first section label at or after startIdx. Everything before
+    // is title/credit metadata; everything from the section label onwards
+    // (inclusive) is lyrics.
     let firstSectionIdx = -1;
-    for (let i = startIdx; i < lines.length; i++) {
-      if (SECTION_PATTERN.test(lines[i].toLowerCase().trim())) {
+    for (let i = startIdx; i < rawLines.length; i++) {
+      const v = rawLines[i];
+      if (v && SECTION_PATTERN.test(v.toLowerCase().trim())) {
         firstSectionIdx = i;
         break;
       }
     }
 
     let title = '';
-    let lyricsStartIdx = -1;
+    let lyricsStart: number;
 
     if (firstSectionIdx > startIdx) {
-      // Walk backwards from the section label, skipping any meta/credit
-      // lines, to find the real title.
+      // Walk back past blank/meta lines to find the real title above the
+      // first section label.
       let titleIdx = firstSectionIdx - 1;
-      while (titleIdx >= startIdx && (isMetaLine(lines[titleIdx]) || !lines[titleIdx].trim())) {
+      while (
+        titleIdx >= startIdx &&
+        (!rawLines[titleIdx] || isMetaLine(rawLines[titleIdx]))
+      ) {
         titleIdx--;
       }
-      title = titleIdx >= startIdx ? lines[titleIdx] : '';
-      lyricsStartIdx = firstSectionIdx + 1;
-
-      // If the next line is also a section label (e.g. "All:" right after
-      // "Verse 1"), skip it too.
-      if (lyricsStartIdx < lines.length) {
-        const next = lines[lyricsStartIdx].toLowerCase().trim();
-        if (SECTION_PATTERN.test(next) || next === 'all:' || next === 'all') {
-          lyricsStartIdx = firstSectionIdx + 2;
-        }
-      }
+      title = titleIdx >= startIdx ? rawLines[titleIdx] : '';
+      lyricsStart = firstSectionIdx; // include the section label itself
     } else if (firstSectionIdx === startIdx) {
-      // Cell starts with a section label and has no title at all.
+      // Cell starts with a section label and has no title.
       title = '';
-      lyricsStartIdx = startIdx + 1;
+      lyricsStart = startIdx;
     } else {
       // No section label anywhere — first non-meta line is the title.
-      title = startIdx < lines.length ? lines[startIdx] : '';
-      lyricsStartIdx = startIdx + 1;
+      title = rawLines[startIdx];
+      lyricsStart = startIdx + 1;
     }
 
-    const lyrics =
-      lyricsStartIdx >= 0 && lyricsStartIdx < lines.length
-        ? lines
-            .slice(lyricsStartIdx)
-            .map((l) => cleanWhitespace(l))
-            .filter(Boolean)
-            .join('\n')
-            .trim()
-        : '';
+    // Build the lyrics block:
+    //   • collapse runs of blank lines to a single blank line
+    //   • drop meta lines that appear inside the body
+    //   • ensure exactly one blank line above and below each section label
+    const out: string[] = [];
+    const pushBlankIfNeeded = () => {
+      if (out.length > 0 && out[out.length - 1] !== '') out.push('');
+    };
 
-    return { title: cleanWhitespace(title), lyrics };
+    for (let i = lyricsStart; i < rawLines.length; i++) {
+      const line = rawLines[i];
+
+      if (!line) {
+        pushBlankIfNeeded();
+        continue;
+      }
+
+      if (isMetaLine(line)) continue;
+
+      const isSection = SECTION_PATTERN.test(line.toLowerCase().trim());
+      if (isSection) {
+        pushBlankIfNeeded();
+        out.push(line);
+        out.push('');
+      } else {
+        out.push(line);
+      }
+    }
+
+    // Trim trailing blank lines but keep internal spacing intact.
+    while (out.length && out[out.length - 1] === '') out.pop();
+    while (out.length && out[0] === '') out.shift();
+
+    return { title: cleanWhitespace(title), lyrics: out.join('\n') };
   };
 
   // Finds the header row, then the DATE and SONG columns within it, with a
@@ -912,8 +935,9 @@ export default function AdminPage() {
     return out;
   };
 
-  // Convert an HTML <table> element into a 2D array of cell strings, preserving
-  // line breaks inside cells so the section/lyric parser still works.
+  // Convert an HTML <table> element into a 2D array of cell strings,
+  // preserving newlines and blank paragraph breaks inside cells. Long runs
+  // of newlines are clamped to a single blank line so spacing stays clean.
   const htmlTableToRows = (table: Element): string[][] => {
     const cellText = (cell: Element): string => {
       const clone = cell.cloneNode(true) as HTMLElement;
@@ -921,7 +945,7 @@ export default function AdminPage() {
       clone.querySelectorAll('p,div,li').forEach((p) => p.append(document.createTextNode('\n')));
       return (clone.textContent || '')
         .replace(/\r/g, '')
-        .replace(/\n{2,}/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
         .replace(/\u00A0/g, ' ')
         .trim();
     };
