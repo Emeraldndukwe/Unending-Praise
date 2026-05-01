@@ -3,7 +3,7 @@ import { compressImage, compressVideo } from "../utils/mediaOptimizer";
 import Analytics from "../components/Analytics";
 import * as XLSX from "xlsx";
 import mammoth from "mammoth";
-import { Download } from "lucide-react";
+import { Download, UploadCloud, FileSpreadsheet, FileText, X, CheckCircle2, AlertCircle, Loader2, Sparkles } from "lucide-react";
 
 type Testimony = { 
   id: string; 
@@ -74,6 +74,12 @@ export default function AdminPage() {
   const [songEditLoading, setSongEditLoading] = useState(false);
   const [bulkImportLoading, setBulkImportLoading] = useState(false);
   const [bulkImportError, setBulkImportError] = useState<string | null>(null);
+  const [bulkImportFile, setBulkImportFile] = useState<File | null>(null);
+  const [bulkParsedSongs, setBulkParsedSongs] = useState<Partial<Song>[] | null>(null);
+  const [bulkParsing, setBulkParsing] = useState(false);
+  const [bulkImportProgress, setBulkImportProgress] = useState<{ current: number; total: number } | null>(null);
+  const [bulkImportSummary, setBulkImportSummary] = useState<{ success: number; failed: number } | null>(null);
+  const [bulkDragActive, setBulkDragActive] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [users, setUsers] = useState<Array<{id:string; name:string; email:string; role:string; status:string; created_at?: string;}>>([]);
@@ -620,26 +626,197 @@ export default function AdminPage() {
     return songs;
   };
 
+  // Shared row → songs converter. Used by both the Excel path and the new
+  // Word-document table path so they behave identically.
+  const parseRowsToSongs = (rows: string[][]): Partial<Song>[] => {
+    const out: Partial<Song>[] = [];
+    if (!rows.length) return out;
+
+    let headerRow = -1;
+    for (let i = 0; i < Math.min(10, rows.length); i++) {
+      const rowStr = (rows[i] || []).map((c) => String(c).toLowerCase()).join(' ');
+      if (rowStr.includes('date') && (rowStr.includes('song') || rowStr.includes('s/n'))) {
+        headerRow = i;
+        break;
+      }
+    }
+    if (headerRow === -1) headerRow = 0;
+
+    const headerCells = (rows[headerRow] || []).map((c) => String(c));
+    let dateCol = -1;
+    const songCols: number[] = [];
+    headerCells.forEach((cell, idx) => {
+      const v = cell.toLowerCase().trim();
+      if (v.includes('date') && !v.includes('song')) dateCol = idx;
+      else if (v.includes('song')) songCols.push(idx);
+    });
+
+    if (songCols.length === 0 && dateCol >= 0) {
+      for (let i = dateCol + 1; i < Math.min(dateCol + 7, headerCells.length); i++) {
+        const v = (headerCells[i] || '').toLowerCase();
+        if (!v.includes('date') && !v.includes('s/n') && !v.includes('serial') && !v.includes('s.n')) {
+          songCols.push(i);
+        }
+      }
+    }
+    if (songCols.length === 0) {
+      for (let i = 0; i < headerCells.length; i++) {
+        const v = (headerCells[i] || '').toLowerCase().trim();
+        if (v && !v.includes('date') && !v.includes('s/n') && !v.includes('serial') && !v.includes('s.n')) {
+          songCols.push(i);
+        }
+      }
+    }
+    songCols.sort((a, b) => a - b);
+
+    const normalizeDate = (val: string): string | null => {
+      if (!val) return null;
+      const m = String(val).match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+      if (!m) return null;
+      const month = m[1].padStart(2, '0');
+      const day = m[2].padStart(2, '0');
+      let year = m[3];
+      if (year.length === 2) year = '20' + year;
+      return `${year}-${month}-${day}`;
+    };
+
+    const sectionPattern = /^(verse|chorus|bridge|intro|outro|solo|pre-?chorus|interlude|tag|all)\s*:?\s*\d*\s*$/i;
+
+    const extractSongFromCell = (cellValue: string): { title: string; lyrics: string } => {
+      if (!cellValue) return { title: '', lyrics: '' };
+      const text = String(cellValue).trim();
+      if (!text) return { title: '', lyrics: '' };
+      const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      if (!lines.length) return { title: '', lyrics: '' };
+
+      let firstSectionIdx = -1;
+      for (let i = 0; i < lines.length; i++) {
+        if (sectionPattern.test(lines[i].toLowerCase())) {
+          firstSectionIdx = i;
+          break;
+        }
+      }
+
+      let title = '';
+      let lyricsStartIdx = -1;
+      if (firstSectionIdx > 0) {
+        title = lines[firstSectionIdx - 1];
+        lyricsStartIdx = firstSectionIdx + 1;
+        if (lyricsStartIdx < lines.length) {
+          const next = lines[lyricsStartIdx].toLowerCase().trim();
+          if (sectionPattern.test(next) || next === 'all:' || next === 'all') {
+            lyricsStartIdx = firstSectionIdx + 2;
+          }
+        }
+      } else {
+        title = lines[0];
+        lyricsStartIdx = 1;
+      }
+
+      const lyrics =
+        lyricsStartIdx >= 0 && lyricsStartIdx < lines.length
+          ? lines.slice(lyricsStartIdx).join('\n').trim()
+          : '';
+      return { title: title.trim(), lyrics };
+    };
+
+    for (let i = headerRow + 1; i < rows.length; i++) {
+      const row = rows[i] || [];
+      if (row.every((c) => !c || !String(c).trim())) continue;
+
+      let rowDate: string | null = null;
+      if (dateCol >= 0 && row[dateCol]) rowDate = normalizeDate(String(row[dateCol]));
+
+      for (const c of songCols) {
+        if (c >= row.length) continue;
+        const songData = extractSongFromCell(String(row[c] || ''));
+        if (songData.title || songData.lyrics) {
+          out.push({
+            title: songData.title || 'Untitled',
+            lyrics: songData.lyrics,
+            date: rowDate || undefined,
+            artist: undefined,
+          });
+        }
+      }
+    }
+
+    return out;
+  };
+
+  // Convert an HTML <table> element into a 2D array of cell strings, preserving
+  // line breaks inside cells so the section/lyric parser still works.
+  const htmlTableToRows = (table: Element): string[][] => {
+    const cellText = (cell: Element): string => {
+      const clone = cell.cloneNode(true) as HTMLElement;
+      clone.querySelectorAll('br').forEach((br) => br.replaceWith(document.createTextNode('\n')));
+      clone.querySelectorAll('p,div,li').forEach((p) => p.append(document.createTextNode('\n')));
+      return (clone.textContent || '')
+        .replace(/\r/g, '')
+        .replace(/\n{2,}/g, '\n')
+        .replace(/\u00A0/g, ' ')
+        .trim();
+    };
+    return Array.from(table.querySelectorAll('tr')).map((tr) =>
+      Array.from(tr.querySelectorAll('td,th')).map(cellText)
+    );
+  };
+
   const parseSongsFromFile = async (file: File): Promise<Partial<Song>[]> => {
     return new Promise((resolve, reject) => {
       const fileName = file.name.toLowerCase();
-      
-      // For .docx files, we need to read as ArrayBuffer
+
+      if (fileName.endsWith('.doc') && !fileName.endsWith('.docx')) {
+        reject(new Error('Old .doc files are not supported. Please save the document as .docx (Word) or export to .xlsx / .csv and try again.'));
+        return;
+      }
+
+      // For .docx files we read as ArrayBuffer and parse the embedded HTML
+      // tables — extractRawText loses table structure which is why the old
+      // parser failed on real Word documents.
       if (fileName.endsWith('.docx')) {
         const reader = new FileReader();
         reader.onload = (e) => {
           try {
             const data = e.target?.result;
             if (!data || !(data instanceof ArrayBuffer)) {
-              reject(new Error("Failed to read Word document. Please ensure the file is a valid .docx file and not corrupted."));
+              reject(new Error('Failed to read Word document. Please ensure the file is a valid .docx file and not corrupted.'));
               return;
             }
-            
-            mammoth.extractRawText({ arrayBuffer: data })
+
+            mammoth
+              .convertToHtml({ arrayBuffer: data })
               .then((result) => {
                 try {
-                  const songs = parseWordDocumentText(result.value);
-                  resolve(songs);
+                  const html = result.value || '';
+                  const dom = new DOMParser().parseFromString(html, 'text/html');
+                  const tables = Array.from(dom.querySelectorAll('table'));
+
+                  let collected: Partial<Song>[] = [];
+                  for (const t of tables) {
+                    const rows = htmlTableToRows(t);
+                    collected = collected.concat(parseRowsToSongs(rows));
+                  }
+
+                  if (collected.length > 0) {
+                    resolve(collected);
+                    return;
+                  }
+
+                  // Fall back to plain-text parsing if no tables produced songs
+                  mammoth
+                    .extractRawText({ arrayBuffer: data })
+                    .then((textResult) => {
+                      try {
+                        const songs = parseWordDocumentText(textResult.value);
+                        resolve(songs);
+                      } catch (error: any) {
+                        reject(new Error(`Failed to parse Word document: ${error.message}`));
+                      }
+                    })
+                    .catch((error: any) => {
+                      reject(new Error(`Failed to parse Word document: ${error.message || 'Unknown error'}`));
+                    });
                 } catch (error: any) {
                   reject(new Error(`Failed to parse Word document: ${error.message}`));
                 }
@@ -647,7 +824,7 @@ export default function AdminPage() {
               .catch((error: any) => {
                 const errorMsg = error.message || 'Unknown error';
                 if (errorMsg.includes('Corrupted zip') || errorMsg.includes('missing')) {
-                  reject(new Error("The Word document appears to be corrupted or incomplete. Please try:\n1. Opening and re-saving the file in Word\n2. Converting to Excel (.xlsx) or CSV format\n3. Ensuring the file is not password protected"));
+                  reject(new Error('The Word document appears to be corrupted or incomplete. Please try:\n1. Opening and re-saving the file in Word\n2. Converting to Excel (.xlsx) or CSV format\n3. Ensuring the file is not password protected'));
                 } else {
                   reject(new Error(`Failed to parse Word document: ${errorMsg}. If the file is a .doc file (old format), please convert it to .docx or use Excel/CSV format instead.`));
                 }
@@ -657,7 +834,7 @@ export default function AdminPage() {
           }
         };
         reader.onerror = () => {
-          reject(new Error("Failed to read Word document file."));
+          reject(new Error('Failed to read Word document file.'));
         };
         reader.readAsArrayBuffer(file);
         return;
@@ -1181,46 +1358,80 @@ export default function AdminPage() {
     });
   };
 
-  const handleBulkImport = async (file: File) => {
+  // Resets every piece of bulk-import state so the user can start over.
+  const resetBulkImport = () => {
+    setBulkImportFile(null);
+    setBulkParsedSongs(null);
+    setBulkImportProgress(null);
+    setBulkImportSummary(null);
+    setBulkImportError(null);
+    setBulkParsing(false);
+    setBulkImportLoading(false);
+  };
+
+  // Step 1: parse the chosen file into a list of songs and surface a preview.
+  // The user then confirms the import (step 2). This makes parsing failures
+  // obvious *before* anything is written to the database.
+  const handleBulkFileSelect = async (file: File) => {
+    setBulkImportError(null);
+    setBulkImportSummary(null);
+    setBulkImportProgress(null);
+    setBulkParsedSongs(null);
+    setBulkImportFile(file);
+    setBulkParsing(true);
+
+    try {
+      const songs = await parseSongsFromFile(file);
+      setBulkParsedSongs(songs);
+      if (songs.length === 0) {
+        setBulkImportError(
+          "We couldn't find any songs in this file.\n\n" +
+            "Make sure the file has a header row with DATE and SONG 1, SONG 2… columns, and that each song cell contains the title above a Verse 1 label."
+        );
+      }
+    } catch (err: any) {
+      setBulkImportError(err?.message || 'Failed to parse the file.');
+      setBulkParsedSongs([]);
+    } finally {
+      setBulkParsing(false);
+    }
+  };
+
+  // Step 2: actually create each song. We hit the API directly (bypassing
+  // createSong's per-call refresh) and only reload the songs list once at the
+  // end so importing 100+ songs doesn't trigger 100 refresh round-trips.
+  const handleConfirmBulkImport = async () => {
+    if (!bulkParsedSongs || bulkParsedSongs.length === 0) return;
     setBulkImportLoading(true);
     setBulkImportError(null);
-    
+    setBulkImportSummary(null);
+
+    let success = 0;
+    let failed = 0;
+    setBulkImportProgress({ current: 0, total: bulkParsedSongs.length });
+
+    for (let i = 0; i < bulkParsedSongs.length; i++) {
+      try {
+        await api<Song>(`/api/songs`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(bulkParsedSongs[i]),
+        });
+        success++;
+      } catch (err) {
+        console.error('Error creating song:', err);
+        failed++;
+      }
+      setBulkImportProgress({ current: i + 1, total: bulkParsedSongs.length });
+    }
+
+    setBulkImportSummary({ success, failed });
+    setBulkImportLoading(false);
+
     try {
-      const songsToImport = await parseSongsFromFile(file);
-      
-      console.log('Parsed songs:', songsToImport);
-      console.log('Number of songs found:', songsToImport.length);
-      
-      if (songsToImport.length === 0) {
-        setBulkImportError("No songs found in the file. Please check:\n1. The file has a header row with 'DATE' and 'SONG' columns\n2. Song titles appear BEFORE 'Verse 1' labels\n3. The file format matches the expected structure (S/N, DATE, SONG 1, SONG 2, etc.)\n4. Make sure the file is not empty and contains data rows");
-        setBulkImportLoading(false);
-        return;
-      }
-      
-      // Create songs one by one
-      let successCount = 0;
-      let errorCount = 0;
-      
-      for (const song of songsToImport) {
-        try {
-          await createSong(song);
-          successCount++;
-        } catch (err: any) {
-          console.error("Error creating song:", err);
-          errorCount++;
-        }
-      }
-      
-      if (errorCount > 0) {
-        setBulkImportError(`Imported ${successCount} songs successfully. ${errorCount} songs failed to import.`);
-      } else {
-        setBulkImportError(null);
-        alert(`Successfully imported ${successCount} song${successCount === 1 ? '' : 's'}!`);
-      }
-    } catch (error: any) {
-      setBulkImportError(error.message || "Failed to import songs");
-    } finally {
-      setBulkImportLoading(false);
+      await refresh();
+    } catch (err) {
+      console.error('Failed to refresh songs list:', err);
     }
   };
 
@@ -1544,42 +1755,253 @@ export default function AdminPage() {
 
       {tab === "songs" && (
         <section className="space-y-6">
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
-            <h3 className="text-lg font-bold text-[#54037C] mb-4">Bulk Import Songs</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Upload an Excel (.xlsx, .xls), Word (.docx), or CSV file with your song schedule. Expected format:
-            </p>
-            <ul className="text-sm text-gray-600 mb-4 list-disc list-inside space-y-1">
-              <li><strong>Columns:</strong> S/N, DATE, SONG 1, SONG 2, SONG 3, SONG 4, SONG 5, SONG 6 (and more if needed)</li>
-              <li><strong>Date format:</strong> M/D/YYYY (e.g., 4/12/2025)</li>
-              <li><strong>Each SONG column:</strong> Title at the top, then "Verse 1" label, followed by lyrics</li>
-              <li><strong>Multiple songs per row:</strong> One row can contain up to 6 songs (SONG 1-6) or more</li>
-              <li>No artist field needed - titles are extracted automatically</li>
-              <li><strong>Supported formats:</strong> Excel (.xlsx, .xls), Word (.docx), CSV (.csv), Text (.txt)</li>
-            </ul>
-            <div className="mb-4">
-              <input
-                type="file"
-                accept=".csv,.xlsx,.xls,.docx,.txt"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    handleBulkImport(file);
-                    e.target.value = ''; // Reset input
-                  }
-                }}
-                disabled={bulkImportLoading}
-                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-[#54037C] file:text-white hover:file:bg-[#54037C]/90 file:cursor-pointer disabled:opacity-50"
-              />
-            </div>
-            {bulkImportLoading && (
-              <div className="text-sm text-blue-600">Importing songs...</div>
-            )}
-            {bulkImportError && (
-              <div className={`text-sm ${bulkImportError.includes('Successfully') ? 'text-green-600' : 'text-red-600'}`}>
-                {bulkImportError}
+          <div className="relative bg-white/90 backdrop-blur-sm rounded-3xl shadow-xl border border-[#54037C]/10 overflow-hidden">
+            {/* Decorative gradient header */}
+            <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-br from-[#54037C] via-[#7a1eb3] to-[#a855f7] opacity-[0.06] pointer-events-none" />
+
+            <div className="relative p-6 md:p-7">
+              <div className="flex items-start gap-4 mb-5">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#54037C] to-[#a855f7] text-white flex items-center justify-center shadow-lg shadow-[#54037C]/20 shrink-0">
+                  <UploadCloud size={22} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-xl font-bold text-[#54037C]">Bulk Import Songs</h3>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#54037C]/10 text-[#54037C] text-[11px] font-semibold uppercase tracking-wide">
+                      <Sparkles size={12} /> Auto-detect
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Drop a Word, Excel or CSV schedule and we'll pull out every song, date and lyric for you.
+                  </p>
+                </div>
               </div>
-            )}
+
+              {/* Drop zone — visible until a file has been selected */}
+              {!bulkImportFile && (
+                <label
+                  htmlFor="bulk-songs-file"
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    if (!bulkDragActive) setBulkDragActive(true);
+                  }}
+                  onDragEnter={(e) => {
+                    e.preventDefault();
+                    setBulkDragActive(true);
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    setBulkDragActive(false);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setBulkDragActive(false);
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) handleBulkFileSelect(file);
+                  }}
+                  className={`group flex flex-col items-center justify-center text-center cursor-pointer rounded-2xl border-2 border-dashed transition-all duration-200 px-6 py-10 ${
+                    bulkDragActive
+                      ? 'border-[#54037C] bg-[#54037C]/5 scale-[1.01]'
+                      : 'border-[#54037C]/25 bg-gradient-to-br from-white to-[#f8f4fc] hover:border-[#54037C]/50 hover:bg-[#54037C]/[0.03]'
+                  }`}
+                >
+                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-4 transition-all ${bulkDragActive ? 'bg-[#54037C] text-white scale-110' : 'bg-[#54037C]/10 text-[#54037C] group-hover:scale-105'}`}>
+                    <UploadCloud size={28} />
+                  </div>
+                  <div className="text-base font-semibold text-gray-800 mb-1">
+                    {bulkDragActive ? 'Drop your file to start' : 'Drag & drop your song schedule'}
+                  </div>
+                  <div className="text-sm text-gray-500 mb-4">
+                    or <span className="text-[#54037C] font-semibold underline-offset-2 group-hover:underline">browse from your computer</span>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-center gap-2 text-[11px] font-medium">
+                    <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">.docx</span>
+                    <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">.xlsx / .xls</span>
+                    <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">.csv</span>
+                    <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">.txt</span>
+                  </div>
+                  <input
+                    id="bulk-songs-file"
+                    type="file"
+                    accept=".csv,.xlsx,.xls,.docx,.txt"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        handleBulkFileSelect(file);
+                        e.target.value = '';
+                      }
+                    }}
+                    className="hidden"
+                  />
+                </label>
+              )}
+
+              {/* File chip + parsing / preview state */}
+              {bulkImportFile && (
+                <div className="rounded-2xl border border-[#54037C]/15 bg-gradient-to-br from-white to-[#faf7fd] p-4 md:p-5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-[#54037C]/10 text-[#54037C] flex items-center justify-center shrink-0">
+                      {bulkImportFile.name.toLowerCase().endsWith('.docx') ? (
+                        <FileText size={20} />
+                      ) : (
+                        <FileSpreadsheet size={20} />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-gray-800 truncate">{bulkImportFile.name}</div>
+                      <div className="text-xs text-gray-500 flex items-center gap-2">
+                        <span>{(bulkImportFile.size / 1024).toFixed(1)} KB</span>
+                        {bulkParsing && (
+                          <span className="inline-flex items-center gap-1 text-[#54037C] font-medium">
+                            <Loader2 size={12} className="animate-spin" /> Reading file…
+                          </span>
+                        )}
+                        {!bulkParsing && bulkParsedSongs && bulkParsedSongs.length > 0 && (
+                          <span className="inline-flex items-center gap-1 text-emerald-700 font-medium">
+                            <CheckCircle2 size={12} /> {bulkParsedSongs.length} song{bulkParsedSongs.length === 1 ? '' : 's'} detected
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {!bulkImportLoading && (
+                      <button
+                        type="button"
+                        onClick={resetBulkImport}
+                        className="w-8 h-8 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 flex items-center justify-center transition"
+                        title="Remove file"
+                      >
+                        <X size={16} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Preview list (first few parsed songs) */}
+                  {!bulkParsing && bulkParsedSongs && bulkParsedSongs.length > 0 && !bulkImportSummary && (
+                    <div className="mt-4 border-t border-[#54037C]/10 pt-4">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Preview</div>
+                      <ul className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                        {bulkParsedSongs.slice(0, 8).map((s, idx) => (
+                          <li key={idx} className="flex items-start gap-2 text-sm">
+                            <span className="text-[10px] font-bold text-[#54037C] bg-[#54037C]/10 rounded-md px-1.5 py-0.5 mt-0.5 min-w-[24px] text-center">
+                              {idx + 1}
+                            </span>
+                            <span className="text-gray-800 font-medium truncate">{s.title || 'Untitled'}</span>
+                            {s.date && (
+                              <span className="text-xs text-gray-500 shrink-0">· {s.date}</span>
+                            )}
+                          </li>
+                        ))}
+                        {bulkParsedSongs.length > 8 && (
+                          <li className="text-xs text-gray-500 italic pl-7">
+                            …and {bulkParsedSongs.length - 8} more
+                          </li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Action buttons */}
+                  {!bulkParsing && bulkParsedSongs && bulkParsedSongs.length > 0 && !bulkImportLoading && !bulkImportSummary && (
+                    <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                      <button
+                        type="button"
+                        onClick={handleConfirmBulkImport}
+                        className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#54037C] to-[#a855f7] text-white font-semibold shadow-lg shadow-[#54037C]/20 hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] transition-all"
+                      >
+                        <CheckCircle2 size={16} />
+                        Import {bulkParsedSongs.length} song{bulkParsedSongs.length === 1 ? '' : 's'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={resetBulkImport}
+                        className="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-semibold hover:bg-gray-50 transition"
+                      >
+                        Choose another file
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Progress bar while importing */}
+                  {bulkImportLoading && bulkImportProgress && (
+                    <div className="mt-4 border-t border-[#54037C]/10 pt-4">
+                      <div className="flex items-center justify-between text-sm mb-2">
+                        <span className="font-medium text-gray-700 inline-flex items-center gap-1.5">
+                          <Loader2 size={14} className="animate-spin text-[#54037C]" />
+                          Importing songs…
+                        </span>
+                        <span className="font-semibold text-[#54037C] tabular-nums">
+                          {bulkImportProgress.current} / {bulkImportProgress.total}
+                        </span>
+                      </div>
+                      <div className="h-2 rounded-full bg-[#54037C]/10 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-[#54037C] to-[#a855f7] transition-all duration-200"
+                          style={{
+                            width: `${bulkImportProgress.total > 0 ? (bulkImportProgress.current / bulkImportProgress.total) * 100 : 0}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Final summary */}
+                  {bulkImportSummary && (
+                    <div className="mt-4 border-t border-[#54037C]/10 pt-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3">
+                          <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700 flex items-center gap-1">
+                            <CheckCircle2 size={12} /> Imported
+                          </div>
+                          <div className="text-2xl font-bold text-emerald-700 tabular-nums">
+                            {bulkImportSummary.success}
+                          </div>
+                        </div>
+                        <div className={`rounded-xl border p-3 ${bulkImportSummary.failed > 0 ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'}`}>
+                          <div className={`text-[11px] font-semibold uppercase tracking-wide flex items-center gap-1 ${bulkImportSummary.failed > 0 ? 'text-red-700' : 'text-gray-500'}`}>
+                            <AlertCircle size={12} /> Failed
+                          </div>
+                          <div className={`text-2xl font-bold tabular-nums ${bulkImportSummary.failed > 0 ? 'text-red-700' : 'text-gray-400'}`}>
+                            {bulkImportSummary.failed}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={resetBulkImport}
+                        className="mt-3 w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-[#54037C]/20 text-[#54037C] font-semibold hover:bg-[#54037C]/5 transition"
+                      >
+                        Import another file
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Error banner */}
+              {bulkImportError && (
+                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 flex items-start gap-2.5">
+                  <AlertCircle size={18} className="text-red-500 shrink-0 mt-0.5" />
+                  <div className="text-sm text-red-700 whitespace-pre-line leading-relaxed">
+                    {bulkImportError}
+                  </div>
+                </div>
+              )}
+
+              {/* Format help (collapsible) */}
+              <details className="mt-5 group">
+                <summary className="cursor-pointer text-sm font-semibold text-[#54037C] flex items-center gap-2 select-none">
+                  <span className="w-5 h-5 rounded-full bg-[#54037C]/10 flex items-center justify-center text-xs group-open:rotate-90 transition-transform">›</span>
+                  Expected file format
+                </summary>
+                <div className="mt-3 ml-7 text-sm text-gray-600 space-y-1.5">
+                  <div><strong>Columns:</strong> S/N, DATE, SONG 1, SONG 2, SONG 3, SONG 4, SONG 5, SONG 6 (more is fine)</div>
+                  <div><strong>Date format:</strong> M/D/YYYY (e.g. 4/12/2025)</div>
+                  <div><strong>Each SONG cell:</strong> Title on the first line, then a "Verse 1" label, then the lyrics</div>
+                  <div><strong>Word documents:</strong> Use a real Word table (Insert › Table). We read each cell directly.</div>
+                  <div><strong>Tip:</strong> If parsing fails on .docx, save a copy as .xlsx — both are supported.</div>
+                </div>
+              </details>
+            </div>
           </div>
           <SongForm onSubmit={createSong} />
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
