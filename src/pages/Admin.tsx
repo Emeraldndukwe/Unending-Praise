@@ -626,12 +626,166 @@ export default function AdminPage() {
     return songs;
   };
 
-  // Shared row → songs converter. Used by both the Excel path and the new
-  // Word-document table path so they behave identically.
-  const parseRowsToSongs = (rows: string[][]): Partial<Song>[] => {
-    const out: Partial<Song>[] = [];
-    if (!rows.length) return out;
+  // ---------- Shared parsing helpers (used by Word/Excel/CSV paths) ----------
 
+  // Collapses tabs, non-breaking spaces, zero-width chars and runs of regular
+  // spaces into a single space, then trims. Used to clean up titles and
+  // individual lyric lines so weird Word/Excel whitespace doesn't leak through.
+  const cleanWhitespace = (s: string): string =>
+    String(s)
+      .replace(/[\u00A0\u200B\u200C\u200D\uFEFF]/g, ' ')
+      .replace(/\t/g, ' ')
+      .replace(/[ ]+/g, ' ')
+      .trim();
+
+  // Lines that should never be treated as a song title — these are credit
+  // lines, position labels, copyright, key/tempo, etc. that often appear at
+  // the top of a song cell.
+  const META_LINE_PATTERNS: RegExp[] = [
+    /^song\s*#?\s*\d+\s*[:.\-–—]?\s*$/i,            // "SONG 3" / "Song #3:" on its own
+    /^written\s+(and\s+\w+\s+)?by\b.*$/i,            // "Written by ..."
+    /^words?\s+(and\s+(music|lyrics)\s+)?by\b.*$/i,  // "Words and music by ..."
+    /^music\s+(and\s+(lyrics|words)\s+)?by\b.*$/i,   // "Music and lyrics by ..."
+    /^lyrics?\s+(and\s+(music|words)\s+)?by\b.*$/i,  // "Lyrics by ..."
+    /^composed\s+by\b.*$/i,
+    /^arranged\s+by\b.*$/i,
+    /^performed\s+by\b.*$/i,
+    /^by\s+[A-Z][\w'.\s\-&]+$/,                      // "By John Doe"
+    /^©.*$/,
+    /^\(c\)\s+.*$/i,
+    /^copyright\b.*$/i,
+    /^key\s*[:\-].*$/i,
+    /^tempo\s*[:\-].*$/i,
+    /^artist\s*[:\-].*$/i,
+    /^bpm\s*[:\-].*$/i,
+  ];
+
+  const isMetaLine = (line: string): boolean => {
+    const trimmed = line.trim();
+    if (!trimmed) return false;
+    return META_LINE_PATTERNS.some((re) => re.test(trimmed));
+  };
+
+  // Section labels that mark the start of lyrics inside a song cell. These
+  // are matched on a line-by-line basis so we don't misfire on lyrics that
+  // happen to mention these words.
+  const SECTION_PATTERN = /^(verse|chorus|bridge|intro|outro|solo|pre-?chorus|interlude|tag|all)\s*:?\s*\d*\s*$/i;
+
+  // Detects "SONG 3:" / "SONG 3 -" style position prefix at the start of the
+  // first line so the rest of the line (the real title) can be recovered.
+  const SONG_LABEL_INLINE = /^song\s*#?\s*\d+\s*[:.\-–—]\s*(.+)$/i;
+
+  const normalizeDate = (val: any): string | null => {
+    if (val === null || val === undefined) return null;
+
+    // Excel serial date number (days since 1899-12-30)
+    if (typeof val === 'number' && Number.isFinite(val) && val > 1000 && val < 80000) {
+      try {
+        const excelDate = (XLSX as any).SSF?.parse_date_code?.(val);
+        if (excelDate && excelDate.y) {
+          return `${excelDate.y}-${String(excelDate.m).padStart(2, '0')}-${String(excelDate.d).padStart(2, '0')}`;
+        }
+      } catch {
+        // fall through to string parsing
+      }
+    }
+
+    const str = String(val).trim();
+    if (!str) return null;
+    const m = str.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+    if (!m) return null;
+    const month = m[1].padStart(2, '0');
+    const day = m[2].padStart(2, '0');
+    let year = m[3];
+    if (year.length === 2) year = '20' + year;
+    return `${year}-${month}-${day}`;
+  };
+
+  // Pulls a clean { title, lyrics } pair out of a single cell's text. Strips
+  // "SONG N" position labels, "Written by …" credits, and other meta lines
+  // before picking the title, and collapses messy whitespace everywhere.
+  const extractSongFromCell = (cellValue: any): { title: string; lyrics: string } => {
+    if (cellValue === null || cellValue === undefined) return { title: '', lyrics: '' };
+    const text = String(cellValue).replace(/\u00A0/g, ' ').trim();
+    if (!text) return { title: '', lyrics: '' };
+
+    const lines = text.split(/\r?\n/).map((l) => cleanWhitespace(l)).filter(Boolean);
+    if (!lines.length) return { title: '', lyrics: '' };
+
+    // Skip leading meta / position-label lines so the title detection
+    // starts at the first piece of real content.
+    let startIdx = 0;
+    while (startIdx < lines.length && isMetaLine(lines[startIdx])) {
+      startIdx++;
+    }
+
+    // Special case: "SONG 3 - Real Title" on a single line — keep the title
+    // portion and treat that as the start.
+    if (startIdx < lines.length) {
+      const inlineMatch = lines[startIdx].match(SONG_LABEL_INLINE);
+      if (inlineMatch && inlineMatch[1].trim()) {
+        lines[startIdx] = cleanWhitespace(inlineMatch[1]);
+      }
+    }
+
+    // Find the first section label (Verse 1, Chorus, Intro, …) at or after
+    // our start index. Everything before it is title/credit, everything
+    // after is lyrics.
+    let firstSectionIdx = -1;
+    for (let i = startIdx; i < lines.length; i++) {
+      if (SECTION_PATTERN.test(lines[i].toLowerCase().trim())) {
+        firstSectionIdx = i;
+        break;
+      }
+    }
+
+    let title = '';
+    let lyricsStartIdx = -1;
+
+    if (firstSectionIdx > startIdx) {
+      // Walk backwards from the section label, skipping any meta/credit
+      // lines, to find the real title.
+      let titleIdx = firstSectionIdx - 1;
+      while (titleIdx >= startIdx && (isMetaLine(lines[titleIdx]) || !lines[titleIdx].trim())) {
+        titleIdx--;
+      }
+      title = titleIdx >= startIdx ? lines[titleIdx] : '';
+      lyricsStartIdx = firstSectionIdx + 1;
+
+      // If the next line is also a section label (e.g. "All:" right after
+      // "Verse 1"), skip it too.
+      if (lyricsStartIdx < lines.length) {
+        const next = lines[lyricsStartIdx].toLowerCase().trim();
+        if (SECTION_PATTERN.test(next) || next === 'all:' || next === 'all') {
+          lyricsStartIdx = firstSectionIdx + 2;
+        }
+      }
+    } else if (firstSectionIdx === startIdx) {
+      // Cell starts with a section label and has no title at all.
+      title = '';
+      lyricsStartIdx = startIdx + 1;
+    } else {
+      // No section label anywhere — first non-meta line is the title.
+      title = startIdx < lines.length ? lines[startIdx] : '';
+      lyricsStartIdx = startIdx + 1;
+    }
+
+    const lyrics =
+      lyricsStartIdx >= 0 && lyricsStartIdx < lines.length
+        ? lines
+            .slice(lyricsStartIdx)
+            .map((l) => cleanWhitespace(l))
+            .filter(Boolean)
+            .join('\n')
+            .trim()
+        : '';
+
+    return { title: cleanWhitespace(title), lyrics };
+  };
+
+  // Finds the header row, then the DATE and SONG columns within it, with a
+  // few graceful fallbacks if labels are missing.
+  const findColumnLayout = (rows: any[][]) => {
     let headerRow = -1;
     for (let i = 0; i < Math.min(10, rows.length); i++) {
       const rowStr = (rows[i] || []).map((c) => String(c).toLowerCase()).join(' ');
@@ -668,68 +822,39 @@ export default function AdminPage() {
       }
     }
     songCols.sort((a, b) => a - b);
+    return { headerRow, dateCol, songCols };
+  };
 
-    const normalizeDate = (val: string): string | null => {
-      if (!val) return null;
-      const m = String(val).match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
-      if (!m) return null;
-      const month = m[1].padStart(2, '0');
-      const day = m[2].padStart(2, '0');
-      let year = m[3];
-      if (year.length === 2) year = '20' + year;
-      return `${year}-${month}-${day}`;
-    };
+  // Shared row → songs converter. Used by the Word, Excel and CSV paths so
+  // they all benefit from the same title/whitespace cleanup and date
+  // forward-fill behaviour. Cells may be strings or numbers (Excel serial
+  // dates) — normalizeDate and extractSongFromCell handle both.
+  const parseRowsToSongs = (rows: any[][]): Partial<Song>[] => {
+    const out: Partial<Song>[] = [];
+    if (!rows.length) return out;
 
-    const sectionPattern = /^(verse|chorus|bridge|intro|outro|solo|pre-?chorus|interlude|tag|all)\s*:?\s*\d*\s*$/i;
+    const { headerRow, dateCol, songCols } = findColumnLayout(rows);
 
-    const extractSongFromCell = (cellValue: string): { title: string; lyrics: string } => {
-      if (!cellValue) return { title: '', lyrics: '' };
-      const text = String(cellValue).trim();
-      if (!text) return { title: '', lyrics: '' };
-      const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-      if (!lines.length) return { title: '', lyrics: '' };
-
-      let firstSectionIdx = -1;
-      for (let i = 0; i < lines.length; i++) {
-        if (sectionPattern.test(lines[i].toLowerCase())) {
-          firstSectionIdx = i;
-          break;
-        }
-      }
-
-      let title = '';
-      let lyricsStartIdx = -1;
-      if (firstSectionIdx > 0) {
-        title = lines[firstSectionIdx - 1];
-        lyricsStartIdx = firstSectionIdx + 1;
-        if (lyricsStartIdx < lines.length) {
-          const next = lines[lyricsStartIdx].toLowerCase().trim();
-          if (sectionPattern.test(next) || next === 'all:' || next === 'all') {
-            lyricsStartIdx = firstSectionIdx + 2;
-          }
-        }
-      } else {
-        title = lines[0];
-        lyricsStartIdx = 1;
-      }
-
-      const lyrics =
-        lyricsStartIdx >= 0 && lyricsStartIdx < lines.length
-          ? lines.slice(lyricsStartIdx).join('\n').trim()
-          : '';
-      return { title: title.trim(), lyrics };
-    };
+    // "every day is 6 songs" — when a row has no date in the DATE column we
+    // assume it belongs to the previous date, so all songs of one day inherit
+    // the right date even if it's only spelled out once.
+    let lastDate: string | null = null;
 
     for (let i = headerRow + 1; i < rows.length; i++) {
       const row = rows[i] || [];
       if (row.every((c) => !c || !String(c).trim())) continue;
 
       let rowDate: string | null = null;
-      if (dateCol >= 0 && row[dateCol]) rowDate = normalizeDate(String(row[dateCol]));
+      if (dateCol >= 0 && row[dateCol]) rowDate = normalizeDate(row[dateCol]);
+      if (rowDate) {
+        lastDate = rowDate;
+      } else {
+        rowDate = lastDate;
+      }
 
       for (const c of songCols) {
         if (c >= row.length) continue;
-        const songData = extractSongFromCell(String(row[c] || ''));
+        const songData = extractSongFromCell(row[c]);
         if (songData.title || songData.lyrics) {
           out.push({
             title: songData.title || 'Untitled',
@@ -853,490 +978,53 @@ export default function AdminPage() {
           let songs: Partial<Song>[] = [];
 
           if (fileName.endsWith('.csv') || fileName.endsWith('.txt')) {
-            // Parse CSV or text file - handle format with S/N, DATE, SONG 1-6 columns
+            // Detect a separator from the first non-empty line, then split each
+            // line into cells and let the shared parser do the rest. This way
+            // CSV files get the same SONG-N stripping, "Written by …" filtering,
+            // whitespace cleanup and date forward-fill as Word and Excel.
             const text = typeof data === 'string' ? data : new TextDecoder().decode(data as ArrayBuffer);
-            const lines = text.split('\n').filter(line => line.trim());
-            
-            console.log('CSV File read - Total lines:', lines.length);
-            console.log('First 10 lines:', lines.slice(0, 10));
-            
-            if (lines.length === 0) {
-              console.log('CSV: No lines found in file');
+            const rawLines = text.split(/\r?\n/).filter((line) => line.trim());
+            if (rawLines.length === 0) {
               resolve([]);
               return;
             }
-            
-            // Find header row - be more flexible
-            let headerRow = -1;
-            for (let i = 0; i < Math.min(10, lines.length); i++) {
-              const line = lines[i].toLowerCase();
-              // Look for DATE and SONG keywords (case insensitive, flexible matching)
-              const hasDate = line.includes('date');
-              const hasSong = line.includes('song');
-              const hasSerial = line.includes('s/n') || line.includes('serial') || line.includes('s.n');
-              
-              if (hasDate && (hasSong || hasSerial)) {
-                headerRow = i;
-                break;
-              }
-            }
-            
-            // If no header found, try first row
-            if (headerRow === -1) {
-              headerRow = 0;
-            }
-            
-            console.log('CSV Header row:', headerRow, 'Line:', lines[headerRow]);
-            
-            // Parse header to find column indices
-            const headerLine = lines[headerRow];
-            console.log('CSV Header line raw:', JSON.stringify(headerLine));
-            
+
+            const sample = rawLines.slice(0, Math.min(10, rawLines.length)).join('\n');
             let separator: string | RegExp = ',';
-            if (headerLine.includes('\t')) {
-              separator = '\t';
-              console.log('CSV: Using tab separator');
-            } else if (headerLine.includes(',')) {
-              separator = ',';
-              console.log('CSV: Using comma separator');
-            } else if (headerLine.includes('|')) {
-              separator = '|';
-              console.log('CSV: Using pipe separator');
-            } else if (headerLine.match(/\s{2,}/)) {
-              // Multiple spaces as separator
-              separator = /\s{2,}/;
-              console.log('CSV: Using multiple spaces separator');
-            }
-            
-            const headerParts = typeof separator === 'string' 
-              ? headerLine.split(separator).map(p => p.trim().replace(/^"|"$/g, ''))
-              : headerLine.split(separator).map(p => p.trim().replace(/^"|"$/g, ''));
-            
-            console.log('CSV Header parts:', headerParts);
-            console.log('CSV Header parts count:', headerParts.length);
-            
-            let dateCol = -1;
-            const songCols: number[] = [];
-            
-            headerParts.forEach((cell, idx) => {
-              const cellStr = cell.toLowerCase().trim();
-              if (cellStr.includes('date') && !cellStr.includes('song')) {
-                dateCol = idx;
-              } else if (cellStr.includes('song')) {
-                songCols.push(idx);
-              }
-            });
-            
-            // If no SONG columns found but we have DATE, look for columns after DATE
-            if (songCols.length === 0 && dateCol >= 0) {
-              // Assume next 6 columns after DATE are songs (SONG 1-6)
-              for (let i = dateCol + 1; i < Math.min(dateCol + 7, headerParts.length); i++) {
-                const cellStr = headerParts[i].toLowerCase();
-                if (!cellStr.includes('date') && !cellStr.includes('s/n') && !cellStr.includes('serial') && !cellStr.includes('s.n')) {
-                  songCols.push(i);
-                }
-              }
-            }
-            
-            // If still no song columns, try to find any columns that might be songs
-            if (songCols.length === 0) {
-              // Look for columns that don't look like S/N or DATE
-              for (let i = 0; i < headerParts.length; i++) {
-                const cellStr = headerParts[i].toLowerCase();
-                if (!cellStr.includes('date') && !cellStr.includes('s/n') && !cellStr.includes('serial') && !cellStr.includes('s.n') && cellStr.trim() !== '') {
-                  songCols.push(i);
-                }
-              }
-            }
-            
-            console.log('CSV Date column:', dateCol, 'Song columns:', songCols);
-            
-            if (songCols.length === 0) {
-              console.warn('CSV: No song columns found! Header parts:', headerParts);
-            }
-            if (dateCol === -1) {
-              console.warn('CSV: No date column found! Header parts:', headerParts);
-            }
-            
-            // Helper function to normalize date
-            const normalizeDate = (dateValue: string): string | null => {
-              if (!dateValue) return null;
-              const datePattern = /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/;
-              const match = dateValue.match(datePattern);
-              if (match) {
-                let month = match[1].padStart(2, '0');
-                let day = match[2].padStart(2, '0');
-                let year = match[3];
-                if (year.length === 2) year = '20' + year;
-                return `${year}-${month}-${day}`;
-              }
-              return null;
+            if (sample.includes('\t')) separator = '\t';
+            else if (sample.includes(',')) separator = ',';
+            else if (sample.includes('|')) separator = '|';
+            else if (sample.match(/\s{2,}/)) separator = /\s{2,}/;
+
+            const splitLine = (line: string): string[] => {
+              const parts =
+                typeof separator === 'string' ? line.split(separator) : line.split(separator);
+              return parts.map((p) => p.trim().replace(/^"|"$/g, ''));
             };
-            
-            // Helper function to extract title and lyrics
-            // Title appears BEFORE "Verse 1" or other section labels
-            const extractSongFromCell = (cellValue: string): { title: string; lyrics: string } => {
-              if (!cellValue) return { title: '', lyrics: '' };
-              const cellText = cellValue.trim();
-              if (!cellText) return { title: '', lyrics: '' };
-              
-              const lines = cellText.split(/\r?\n/).map(l => l.trim()).filter(l => l);
-              if (lines.length === 0) return { title: '', lyrics: '' };
-              
-              // Section labels include: Verse, Chorus, Bridge, Intro, Outro, Solo, Pre-chorus, All:, etc.
-              // Also handle variations like "Verse 1", "Verse1", "All:", "All :", etc.
-              const sectionPattern = /^(verse|chorus|bridge|intro|outro|solo|pre-chorus|prechorus|interlude|tag|all)\s*:?\s*\d*/i;
-              
-              // Find the first section label
-              let firstSectionIdx = -1;
-              for (let i = 0; i < lines.length; i++) {
-                const lineLower = lines[i].toLowerCase().trim();
-                if (sectionPattern.test(lineLower)) {
-                  firstSectionIdx = i;
-                  break;
-                }
-              }
-              
-              let title = '';
-              let lyricsStartIdx = -1;
-              
-              if (firstSectionIdx >= 0) {
-                // Title is the line BEFORE the first section label
-                if (firstSectionIdx > 0) {
-                  title = lines[firstSectionIdx - 1].trim();
-                }
-                // Lyrics start after the section label (skip "All:" if it comes right after "Verse 1")
-                lyricsStartIdx = firstSectionIdx + 1;
-                
-                // If the next line is also a section label (like "All:"), skip it too
-                if (lyricsStartIdx < lines.length) {
-                  const nextLine = lines[lyricsStartIdx].toLowerCase().trim();
-                  if (sectionPattern.test(nextLine) || nextLine === 'all:' || nextLine === 'all') {
-                    lyricsStartIdx = firstSectionIdx + 2;
-                  }
-                }
-              } else {
-                // No section label found - first line is title, rest are lyrics
-                if (lines.length > 0) {
-                  title = lines[0].trim();
-                  lyricsStartIdx = 1;
-                }
-              }
-              
-              // Extract lyrics (everything after the section label(s))
-              const lyrics = lyricsStartIdx >= 0 && lyricsStartIdx < lines.length 
-                ? lines.slice(lyricsStartIdx).join('\n').trim()
-                : '';
-              
-              return { title: title.trim(), lyrics };
-            };
-            
-            // Parse data rows
-            console.log('CSV: Starting to parse data rows from line', headerRow + 1, 'to', lines.length);
-            let rowsProcessed = 0;
-            for (let i = headerRow + 1; i < lines.length; i++) {
-              const line = lines[i].trim();
-              if (!line) {
-                console.log(`CSV Row ${i}: Empty line, skipping`);
-                continue;
-              }
-              
-              // Parse the line with the same separator
-              let parts: string[] = [];
-              if (typeof separator === 'string') {
-                if (separator === '\t') {
-                  parts = line.split('\t').map(p => p.trim().replace(/^"|"$/g, ''));
-                } else if (separator === ',') {
-                  // Handle quoted CSV values
-                  parts = line.split(',').map(p => p.trim().replace(/^"|"$/g, ''));
-                } else {
-                  parts = line.split(separator).map(p => p.trim());
-                }
-              } else {
-                // RegExp separator
-                parts = line.split(separator).map(p => p.trim());
-              }
-              
-              console.log(`CSV Row ${i}: Parsed into ${parts.length} parts`);
-              
-              // Skip if row has too few parts
-              if (parts.length < 2) {
-                console.log(`CSV Row ${i}: Too few parts (${parts.length}), skipping`);
-                continue;
-              }
-              
-              rowsProcessed++;
-              
-              // Get date for this row
-              let rowDate: string | null = null;
-              if (dateCol >= 0 && dateCol < parts.length && parts[dateCol]) {
-                rowDate = normalizeDate(parts[dateCol]);
-              }
-              
-              // Extract songs from SONG columns
-              for (const songCol of songCols) {
-                if (songCol >= parts.length) continue;
-                
-                const cellContent = parts[songCol];
-                if (!cellContent || cellContent.trim() === '') continue;
-                
-                const songData = extractSongFromCell(cellContent);
-                
-                console.log(`CSV Row ${i}, Song Col ${songCol}:`, { title: songData.title, hasLyrics: !!songData.lyrics });
-                
-                // Accept songs with either title or lyrics (or both)
-                if (songData.title || songData.lyrics) {
-                  const song: Partial<Song> = {
-                    title: songData.title || 'Untitled',
-                    lyrics: songData.lyrics,
-                    date: rowDate || undefined,
-                    artist: undefined,
-                  };
-                  songs.push(song);
-                }
-              }
-            }
-            
-            console.log('CSV: Processed', rowsProcessed, 'data rows');
-            console.log('CSV Total songs found:', songs.length);
-            
-            if (songs.length === 0) {
-              console.error('CSV: No songs extracted! Debug info:');
-              console.error('- Header row:', headerRow);
-              console.error('- Date column:', dateCol);
-              console.error('- Song columns:', songCols);
-              console.error('- Rows processed:', rowsProcessed);
-              console.error('- Sample row data:', lines.slice(headerRow + 1, headerRow + 4));
-            }
+
+            const rows = rawLines.map(splitLine);
+            songs = parseRowsToSongs(rows);
           } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
-            // Parse Excel file - handle format with S/N, DATE, SONG 1, SONG 2, SONG 3 columns
+            // Convert each sheet to a 2D array (numbers preserved for date
+            // serial columns) and let the shared parser do the rest.
             const workbook = XLSX.read(data, { type: 'array' });
-            const sheetNames = workbook.SheetNames;
-            
-            console.log('Excel file opened. Total sheets:', sheetNames.length);
-            console.log('Sheet names:', sheetNames);
-            
-            // Helper function to normalize date
-            const normalizeDate = (dateValue: any): string | null => {
-              if (!dateValue) return null;
-              
-              let dateStr = '';
-              if (typeof dateValue === 'number') {
-                // Excel date serial number
-                const excelDate = XLSX.SSF.parse_date_code(dateValue);
-                if (excelDate) {
-                  return `${excelDate.y}-${String(excelDate.m).padStart(2, '0')}-${String(excelDate.d).padStart(2, '0')}`;
-                }
-                return null;
-              } else {
-                dateStr = String(dateValue).trim();
-              }
-              
-              // Parse M/D/YYYY or other formats
-              const datePattern = /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/;
-              const match = dateStr.match(datePattern);
-              if (match) {
-                let month = match[1].padStart(2, '0');
-                let day = match[2].padStart(2, '0');
-                let year = match[3];
-                if (year.length === 2) year = '20' + year;
-                return `${year}-${month}-${day}`;
-              }
-              
-              return null;
-            };
-            
-            // Helper function to extract title and lyrics from a cell
-            // Title appears BEFORE "Verse 1" or other section labels
-            const extractSongFromCell = (cellValue: any): { title: string; lyrics: string } => {
-              if (!cellValue) return { title: '', lyrics: '' };
-              
-              const cellText = String(cellValue).trim();
-              if (!cellText) return { title: '', lyrics: '' };
-              
-              // Split by newlines
-              const lines = cellText.split(/\r?\n/).map(l => l.trim()).filter(l => l);
-              
-              if (lines.length === 0) return { title: '', lyrics: '' };
-              
-              // Section labels include: Verse, Chorus, Bridge, Intro, Outro, Solo, Pre-chorus, All:, etc.
-              // Also handle variations like "Verse 1", "Verse1", "All:", "All :", etc.
-              const sectionPattern = /^(verse|chorus|bridge|intro|outro|solo|pre-chorus|prechorus|interlude|tag|all)\s*:?\s*\d*/i;
-              
-              // Find the first section label
-              let firstSectionIdx = -1;
-              for (let i = 0; i < lines.length; i++) {
-                const lineLower = lines[i].toLowerCase().trim();
-                if (sectionPattern.test(lineLower)) {
-                  firstSectionIdx = i;
-                  break;
-                }
-              }
-              
-              let title = '';
-              let lyricsStartIdx = -1;
-              
-              if (firstSectionIdx >= 0) {
-                // Title is the line BEFORE the first section label
-                if (firstSectionIdx > 0) {
-                  title = lines[firstSectionIdx - 1].trim();
-                }
-                // Lyrics start after the section label (skip "All:" if it comes right after "Verse 1")
-                lyricsStartIdx = firstSectionIdx + 1;
-                
-                // If the next line is also a section label (like "All:"), skip it too
-                if (lyricsStartIdx < lines.length) {
-                  const nextLine = lines[lyricsStartIdx].toLowerCase().trim();
-                  if (sectionPattern.test(nextLine) || nextLine === 'all:' || nextLine === 'all') {
-                    lyricsStartIdx = firstSectionIdx + 2;
-                  }
-                }
-              } else {
-                // No section label found - first line is title, rest are lyrics
-                if (lines.length > 0) {
-                  title = lines[0].trim();
-                  lyricsStartIdx = 1;
-                }
-              }
-              
-              // Extract lyrics (everything after the section label(s))
-              const lyrics = lyricsStartIdx >= 0 && lyricsStartIdx < lines.length 
-                ? lines.slice(lyricsStartIdx).join('\n').trim()
-                : '';
-              
-              return { title: title.trim(), lyrics };
-            };
-            
-            // Process ALL sheets in the workbook
-            for (let sheetIndex = 0; sheetIndex < sheetNames.length; sheetIndex++) {
-              const sheetName = sheetNames[sheetIndex];
+            for (const sheetName of workbook.SheetNames) {
               const worksheet = workbook.Sheets[sheetName];
-              const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' }) as any[][];
-              
-              console.log(`\n=== Processing Sheet ${sheetIndex + 1}/${sheetNames.length}: "${sheetName}" ===`);
-              console.log(`Total rows in sheet: ${jsonData.length}`);
-              
-              if (jsonData.length === 0) {
-                console.log(`Sheet "${sheetName}": No rows found, skipping`);
-                continue;
-              }
-              
-              // Find header row (look for DATE, SONG 1, SONG 2, etc.)
-              let headerRow = -1;
-              for (let i = 0; i < Math.min(10, jsonData.length); i++) {
-                const row = jsonData[i] || [];
-                const rowStr = row.map((cell: any) => String(cell).toLowerCase()).join(' ');
-                const hasDate = rowStr.includes('date');
-                const hasSong = rowStr.includes('song');
-                const hasSerial = rowStr.includes('s/n') || rowStr.includes('serial') || rowStr.includes('s.n');
-                
-                if (hasDate && (hasSong || hasSerial)) {
-                  headerRow = i;
-                  break;
-                }
-              }
-              
-              // If no header found, use first row
-              if (headerRow === -1) {
-                headerRow = 0;
-                console.log(`Sheet "${sheetName}": No header row found with DATE and SONG, using first row`);
-              } else {
-                console.log(`Sheet "${sheetName}": Header row found at index ${headerRow}`);
-              }
-              
-              const headerRowData = jsonData[headerRow] || [];
-              console.log(`Sheet "${sheetName}": Header row data:`, headerRowData.map((c: any) => String(c)));
-              console.log(`Sheet "${sheetName}": Total columns in header: ${headerRowData.length}`);
-              
-              // Find DATE column
-              let dateCol = -1;
-              const songCols: number[] = [];
-              
-              headerRowData.forEach((cell: any, idx: number) => {
-                const cellStr = String(cell).toLowerCase().trim();
-                if (cellStr.includes('date') && !cellStr.includes('song')) {
-                  dateCol = idx;
-                } else if (cellStr.includes('song')) {
-                  songCols.push(idx);
-                }
-              });
-              
-              // If no SONG columns found but we have DATE, look for columns after DATE
-              if (songCols.length === 0 && dateCol >= 0) {
-                // Assume next 6 columns after DATE are songs (SONG 1-6)
-                for (let i = dateCol + 1; i < Math.min(dateCol + 7, headerRowData.length); i++) {
-                  const cellStr = String(headerRowData[i] || '').toLowerCase();
-                  if (!cellStr.includes('date') && !cellStr.includes('s/n') && !cellStr.includes('serial') && !cellStr.includes('s.n')) {
-                    songCols.push(i);
-                  }
-                }
-                console.log(`Sheet "${sheetName}": No explicit SONG columns found, assuming columns after DATE are songs:`, songCols);
-              }
-              
-              // If still no song columns, try to find any columns that might be songs
-              if (songCols.length === 0) {
-                for (let i = 0; i < headerRowData.length; i++) {
-                  const cellStr = String(headerRowData[i] || '').toLowerCase();
-                  if (!cellStr.includes('date') && !cellStr.includes('s/n') && !cellStr.includes('serial') && !cellStr.includes('s.n') && cellStr.trim() !== '') {
-                    songCols.push(i);
-                  }
-                }
-                console.log(`Sheet "${sheetName}": Still no song columns, using all non-date/serial columns:`, songCols);
-              }
-              
-              // Sort song columns to ensure proper order
-              songCols.sort((a, b) => a - b);
-              
-              console.log(`Sheet "${sheetName}": Date column: ${dateCol}, Song columns:`, songCols);
-              
-              if (songCols.length === 0) {
-                console.warn(`Sheet "${sheetName}": WARNING - No song columns detected!`);
-                console.warn(`Sheet "${sheetName}": Available columns:`, headerRowData.map((c: any, i: number) => `[${i}] "${String(c)}"`));
-              }
-              
-              // Parse data rows
-              let rowsProcessed = 0;
-              let songsFromThisSheet = 0;
-              for (let i = headerRow + 1; i < jsonData.length; i++) {
-                const row = jsonData[i] || [];
-                
-                // Skip empty rows
-                if (row.every((cell: any) => !cell || String(cell).trim() === '')) continue;
-                
-                rowsProcessed++;
-                
-                // Get date for this row
-                let rowDate: string | null = null;
-                if (dateCol >= 0 && row[dateCol]) {
-                  rowDate = normalizeDate(row[dateCol]);
-                }
-                
-                // Extract songs from SONG columns
-                for (const songCol of songCols) {
-                  if (songCol >= row.length) continue;
-                  
-                  const songData = extractSongFromCell(row[songCol]);
-                  
-                  // Accept songs with either title or lyrics (or both)
-                  if (songData.title || songData.lyrics) {
-                    const song: Partial<Song> = {
-                      title: songData.title || 'Untitled',
-                      lyrics: songData.lyrics,
-                      date: rowDate || undefined,
-                      artist: undefined, // No artist in this format
-                    };
-                    songs.push(song);
-                    songsFromThisSheet++;
-                  }
-                }
-              }
-              
-              console.log(`Sheet "${sheetName}": Processed ${rowsProcessed} data rows, extracted ${songsFromThisSheet} songs`);
+              const sheetRows = XLSX.utils.sheet_to_json(worksheet, {
+                header: 1,
+                defval: '',
+                raw: true,
+              }) as any[][];
+              if (!sheetRows.length) continue;
+              const normalizedRows: any[][] = sheetRows.map((row) =>
+                (row || []).map((cell) => {
+                  if (cell === null || cell === undefined) return '';
+                  if (typeof cell === 'number') return cell;
+                  return String(cell);
+                })
+              );
+              songs = songs.concat(parseRowsToSongs(normalizedRows));
             }
-            
-            console.log(`\n=== Excel Parsing Complete ===`);
-            console.log(`Total sheets processed: ${sheetNames.length}`);
-            console.log(`Total songs found across all sheets: ${songs.length}`);
           } else {
             // This should not be reached for .docx files as they're handled separately
             reject(new Error("Unsupported file format. Please use CSV, Excel (.xlsx, .xls), Word (.docx), or text files."));
