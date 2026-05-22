@@ -1,4 +1,13 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  animateSidebar,
+  headerSwap,
+  initSidebarLayout,
+  pageEnter,
+  reducedMotion,
+  staggerReveal,
+  tapPulse,
+} from "./adminMotion";
 import { Link } from "react-router-dom";
 import {
   ChevronLeft,
@@ -46,9 +55,28 @@ export default function AdminLayout({
   children,
 }: AdminLayoutProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const asideRef = useRef<HTMLElement>(null);
+  const mainRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const headerTitleRef = useRef<HTMLHeadingElement>(null);
+  const navRef = useRef<HTMLElement>(null);
   const visibleTabs = getVisibleTabs(role);
   const navItems = NAV_ITEMS.filter((item) => visibleTabs.includes(item.id));
   const activeItem = getNavItem(activeTab);
+
+  useEffect(() => {
+    initSidebarLayout(asideRef.current, mainRef.current, collapsed);
+    if (navRef.current) staggerReveal(navRef.current, { selector: "[data-admin-nav]" });
+  }, []);
+
+  useEffect(() => {
+    animateSidebar(asideRef.current, mainRef.current, collapsed);
+  }, [collapsed]);
+
+  useEffect(() => {
+    pageEnter(contentRef.current);
+    headerSwap(headerTitleRef.current);
+  }, [activeTab]);
 
   const initials = (currentUser?.name || currentUser?.email || "A")
     .split(" ")
@@ -61,9 +89,9 @@ export default function AdminLayout({
     <div className="min-h-screen bg-[#F4F2F7] flex">
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex flex-col bg-white border-r border-[#54037C]/8 transition-all duration-300 ${
-          collapsed ? "w-[76px]" : "w-[260px]"
-        }`}
+        ref={asideRef}
+        className="fixed inset-y-0 left-0 z-40 flex flex-col bg-white border-r border-[#54037C]/8 overflow-hidden"
+        style={{ width: collapsed ? 76 : 260 }}
       >
         {/* Logo */}
         <div className={`flex items-center gap-3 px-4 h-16 border-b border-[#54037C]/8 shrink-0 ${collapsed ? "justify-center" : ""}`}>
@@ -77,7 +105,7 @@ export default function AdminLayout({
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto py-4 px-3 admin-sidebar-scroll">
+        <nav ref={navRef} className="flex-1 overflow-y-auto py-4 px-3 admin-sidebar-scroll">
           {!collapsed && (
             <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
               Menu
@@ -91,9 +119,13 @@ export default function AdminLayout({
                 <li key={item.id}>
                   <button
                     type="button"
-                    onClick={() => onTabChange(item.id)}
+                    data-admin-nav
+                    onClick={(e) => {
+                      tapPulse(e.currentTarget);
+                      onTabChange(item.id);
+                    }}
                     title={collapsed ? item.label : undefined}
-                    className={`group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+                    className={`group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors duration-200 ${
                       active
                         ? "bg-[#54037C] text-white shadow-md shadow-[#54037C]/20"
                         : "text-gray-600 hover:bg-[#54037C]/8 hover:text-[#54037C]"
@@ -164,14 +196,16 @@ export default function AdminLayout({
 
       {/* Main content */}
       <div
-        className={`flex-1 flex flex-col min-h-screen transition-all duration-300 ${
-          collapsed ? "ml-[76px]" : "ml-[260px]"
-        }`}
+        ref={mainRef}
+        className="flex-1 flex flex-col min-h-screen"
+        style={{ marginLeft: collapsed ? 76 : 260 }}
       >
         {/* Top bar */}
         <header className="sticky top-0 z-30 bg-[#F4F2F7]/90 backdrop-blur-md border-b border-[#54037C]/8 px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           <div className="min-w-0">
-            <h2 className="text-lg font-bold text-[#54037C] truncate">{activeItem.label}</h2>
+            <h2 ref={headerTitleRef} className="text-lg font-bold text-[#54037C] truncate">
+              {activeItem.label}
+            </h2>
             <p className="text-xs text-gray-500 truncate hidden sm:block">{activeItem.description}</p>
           </div>
 
@@ -217,7 +251,9 @@ export default function AdminLayout({
 
         {/* Page content */}
         <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
-          {children}
+          <div ref={contentRef} className={reducedMotion() ? "" : "will-change-transform"}>
+            {children}
+          </div>
         </main>
       </div>
     </div>

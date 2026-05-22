@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Search, ArrowRight } from "lucide-react";
 import type { AdminTab } from "./adminNav";
+import { slideDropdown } from "./adminMotion";
 
 export type AdminSearchResult = {
   id: string;
@@ -27,6 +28,7 @@ export default function AdminSearch({
   const [highlightIndex, setHighlightIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setHighlightIndex(0);
@@ -62,6 +64,10 @@ export default function AdminSearch({
 
   const trimmed = query.trim();
   const showDropdown = open && trimmed.length > 0;
+
+  useLayoutEffect(() => {
+    slideDropdown(dropdownRef.current, showDropdown);
+  }, [showDropdown, results.length]);
 
   const selectResult = (result: AdminSearchResult) => {
     onSelect(result);
@@ -117,7 +123,10 @@ export default function AdminSearch({
       </div>
 
       {showDropdown && (
-        <div className="absolute top-full left-0 right-0 mt-2 rounded-2xl bg-white border border-[#54037C]/10 shadow-xl overflow-hidden z-50">
+        <div
+          ref={dropdownRef}
+          className="absolute top-full left-0 right-0 mt-2 rounded-2xl bg-white border border-[#54037C]/10 shadow-xl overflow-hidden z-50"
+        >
           {results.length === 0 ? (
             <div className="px-4 py-6 text-sm text-gray-500 text-center">
               No results for &ldquo;{trimmed}&rdquo;

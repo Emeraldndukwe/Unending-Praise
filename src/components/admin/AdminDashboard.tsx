@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import {
   MessageSquareQuote,
   Map,
@@ -12,6 +13,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { AdminTab } from "./adminNav";
+import { staggerReveal } from "./adminMotion";
 
 type DashboardStats = {
   pendingTestimonies: number;
@@ -53,7 +55,8 @@ function StatCard({
     <button
       type="button"
       onClick={() => onNavigate(card.tab)}
-      className={`group text-left rounded-2xl p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${
+      data-admin-reveal
+      className={`group text-left rounded-2xl p-5 transition-shadow duration-200 hover:shadow-lg ${
         card.accent
           ? "bg-gradient-to-br from-[#54037C] via-[#7a1eb3] to-[#8A4EBF] text-white shadow-md"
           : "bg-white border border-[#54037C]/8 shadow-sm hover:border-[#54037C]/20"
@@ -164,9 +167,18 @@ export default function AdminDashboard({
     ] satisfies StatCard[]
   ).filter((card) => visibleTabs.includes(card.tab));
 
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    staggerReveal(rootRef.current);
+  }, [statCards.length, quickActions.length]);
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <div ref={rootRef} className="space-y-6">
+      <div
+        data-admin-reveal
+        className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
+      >
         <div>
           <p className="text-sm font-medium text-[#8A4EBF]">Welcome back</p>
           <h2 className="text-2xl md:text-3xl font-bold text-[#54037C] mt-1">
@@ -194,7 +206,10 @@ export default function AdminDashboard({
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div className="xl:col-span-2 rounded-2xl bg-white border border-[#54037C]/8 shadow-sm p-6">
+        <div
+          data-admin-reveal
+          className="xl:col-span-2 rounded-2xl bg-white border border-[#54037C]/8 shadow-sm p-6"
+        >
           <div className="flex items-center justify-between mb-5">
             <div>
               <h3 className="text-lg font-bold text-[#54037C]">Quick Actions</h3>
@@ -207,7 +222,8 @@ export default function AdminDashboard({
                 key={action.label}
                 type="button"
                 onClick={() => onNavigate(action.tab)}
-                className="group flex items-center justify-between rounded-xl border border-gray-100 bg-[#FAF9F6] px-4 py-4 text-left hover:border-[#54037C]/20 hover:bg-[#54037C]/5 transition"
+                data-admin-reveal
+                className="group flex items-center justify-between rounded-xl border border-gray-100 bg-[#FAF9F6] px-4 py-4 text-left hover:border-[#54037C]/20 hover:bg-[#54037C]/5 transition-colors duration-200"
               >
                 <div>
                   <p className="font-semibold text-gray-800 group-hover:text-[#54037C]">
@@ -224,7 +240,10 @@ export default function AdminDashboard({
           </div>
         </div>
 
-        <div className="rounded-2xl bg-gradient-to-br from-[#54037C] to-[#8A4EBF] p-6 text-white shadow-md">
+        <div
+          data-admin-reveal
+          className="rounded-2xl bg-gradient-to-br from-[#54037C] to-[#8A4EBF] p-6 text-white shadow-md"
+        >
           <h3 className="text-lg font-bold">Content Summary</h3>
           <p className="text-sm text-white/75 mt-1 mb-5">At a glance across your admin areas</p>
           <div className="space-y-3">

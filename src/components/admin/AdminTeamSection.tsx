@@ -1,4 +1,6 @@
+import { useEffect, useRef } from "react";
 import { Clock, Shield, UserCheck, Users, Trash2, Loader2, Mail, RefreshCw } from "lucide-react";
+import { staggerReveal } from "./adminMotion";
 
 type TeamUser = {
   id: string;
@@ -69,7 +71,10 @@ function UserCard({
   const joined = formatJoined(user.created_at);
 
   return (
-    <article className="group relative overflow-hidden rounded-2xl border border-[#54037C]/10 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-[#54037C]/25 hover:shadow-lg">
+    <article
+      data-admin-reveal
+      className="group relative overflow-hidden rounded-2xl border border-[#54037C]/10 bg-white p-5 shadow-sm transition-[border-color,box-shadow] duration-300 hover:border-[#54037C]/25 hover:shadow-lg"
+    >
       <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#54037C]/0 via-[#8A4EBF]/40 to-[#54037C]/0 opacity-0 transition group-hover:opacity-100" />
 
       <div className="flex items-start gap-4">
@@ -165,9 +170,14 @@ export default function AdminTeamSection({
 }: AdminTeamSectionProps) {
   const pendingUsers = users.filter((user) => user.status !== "active");
   const activeUsers = users.filter((user) => user.status === "active");
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!loading) staggerReveal(rootRef.current);
+  }, [loading, users.length]);
 
   return (
-    <div className="space-y-8">
+    <div ref={rootRef} className="space-y-8">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label="Total members" value={users.length} icon={Users} accent />
         <StatCard label="Active" value={activeUsers.length} icon={UserCheck} />
@@ -258,7 +268,8 @@ function StatCard({
 }) {
   return (
     <div
-      className={`rounded-2xl p-5 transition ${
+      data-admin-reveal
+      className={`rounded-2xl p-5 transition-shadow duration-300 ${
         accent
           ? "bg-gradient-to-br from-[#54037C] via-[#6b1899] to-[#8A4EBF] text-white shadow-lg shadow-[#54037C]/20"
           : warn
