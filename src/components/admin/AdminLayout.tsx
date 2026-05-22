@@ -5,6 +5,7 @@ import {
   initSidebarLayout,
   pageEnter,
   reducedMotion,
+  sidebarToggleLeft,
   staggerReveal,
   tapPulse,
 } from "./adminMotion";
@@ -60,17 +61,18 @@ export default function AdminLayout({
   const contentRef = useRef<HTMLDivElement>(null);
   const headerTitleRef = useRef<HTMLHeadingElement>(null);
   const navRef = useRef<HTMLElement>(null);
+  const collapseToggleRef = useRef<HTMLButtonElement>(null);
   const visibleTabs = getVisibleTabs(role);
   const navItems = NAV_ITEMS.filter((item) => visibleTabs.includes(item.id));
   const activeItem = getNavItem(activeTab);
 
   useEffect(() => {
-    initSidebarLayout(asideRef.current, mainRef.current, collapsed);
+    initSidebarLayout(asideRef.current, mainRef.current, collapsed, collapseToggleRef.current);
     if (navRef.current) staggerReveal(navRef.current, { selector: "[data-admin-nav]" });
   }, []);
 
   useEffect(() => {
-    animateSidebar(asideRef.current, mainRef.current, collapsed);
+    animateSidebar(asideRef.current, mainRef.current, collapsed, collapseToggleRef.current);
   }, [collapsed]);
 
   useEffect(() => {
@@ -90,7 +92,7 @@ export default function AdminLayout({
       {/* Sidebar */}
       <aside
         ref={asideRef}
-        className="fixed inset-y-0 left-0 z-40 flex flex-col bg-white border-r border-[#54037C]/8 overflow-hidden"
+        className="fixed inset-y-0 left-0 z-50 flex flex-col bg-white border-r border-[#54037C]/8"
         style={{ width: collapsed ? 76 : 260 }}
       >
         {/* Logo */}
@@ -183,21 +185,24 @@ export default function AdminLayout({
           </button>
         </div>
 
-        {/* Collapse toggle */}
-        <button
-          type="button"
-          onClick={() => setCollapsed((c) => !c)}
-          className="absolute -right-3 top-20 flex h-6 w-6 items-center justify-center rounded-full bg-white border border-[#54037C]/15 shadow-md text-gray-500 hover:text-[#54037C] transition z-50"
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-        </button>
       </aside>
+
+      {/* Collapse toggle — fixed above main content so it is never clipped or covered */}
+      <button
+        ref={collapseToggleRef}
+        type="button"
+        onClick={() => setCollapsed((c) => !c)}
+        className="fixed top-20 z-[60] flex h-6 w-6 items-center justify-center rounded-full bg-white border border-[#54037C]/15 shadow-md text-gray-500 hover:text-[#54037C] transition pointer-events-auto"
+        style={{ left: sidebarToggleLeft(collapsed) }}
+        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+      >
+        {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+      </button>
 
       {/* Main content */}
       <div
         ref={mainRef}
-        className="flex-1 flex flex-col min-h-screen"
+        className="relative z-0 flex-1 flex flex-col min-h-screen"
         style={{ marginLeft: collapsed ? 76 : 260 }}
       >
         {/* Top bar */}

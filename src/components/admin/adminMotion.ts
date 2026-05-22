@@ -3,8 +3,14 @@ import gsap from "gsap";
 export const ADMIN_EASE_OUT = "power3.out";
 export const ADMIN_EASE_IN_OUT = "power3.inOut";
 
-const SIDEBAR_EXPANDED = 260;
-const SIDEBAR_COLLAPSED = 76;
+export const SIDEBAR_EXPANDED = 260;
+export const SIDEBAR_COLLAPSED = 76;
+const TOGGLE_OFFSET = 12; // half of 24px btn, matches -right-3
+
+export function sidebarToggleLeft(collapsed: boolean) {
+  const width = collapsed ? SIDEBAR_COLLAPSED : SIDEBAR_EXPANDED;
+  return width - TOGGLE_OFFSET;
+}
 
 export function reducedMotion(): boolean {
   return (
@@ -59,17 +65,21 @@ export function headerSwap(el: HTMLElement | null) {
 export function animateSidebar(
   aside: HTMLElement | null,
   main: HTMLElement | null,
-  collapsed: boolean
+  collapsed: boolean,
+  toggle?: HTMLElement | null
 ) {
   if (!aside || !main) return;
   const width = collapsed ? SIDEBAR_COLLAPSED : SIDEBAR_EXPANDED;
+  const toggleLeft = width - TOGGLE_OFFSET;
   if (reducedMotion()) {
     gsap.set(aside, { width });
     gsap.set(main, { marginLeft: width });
+    if (toggle) gsap.set(toggle, { left: toggleLeft });
     return;
   }
   gsap.to(aside, { width, duration: 0.48, ease: ADMIN_EASE_IN_OUT, overwrite: "auto" });
   gsap.to(main, { marginLeft: width, duration: 0.48, ease: ADMIN_EASE_IN_OUT, overwrite: "auto" });
+  if (toggle) gsap.to(toggle, { left: toggleLeft, duration: 0.48, ease: ADMIN_EASE_IN_OUT, overwrite: "auto" });
 }
 
 export function slideDropdown(el: HTMLElement | null, show: boolean) {
@@ -107,8 +117,14 @@ export function tapPulse(el: HTMLElement) {
   );
 }
 
-export function initSidebarLayout(aside: HTMLElement | null, main: HTMLElement | null, collapsed: boolean) {
+export function initSidebarLayout(
+  aside: HTMLElement | null,
+  main: HTMLElement | null,
+  collapsed: boolean,
+  toggle?: HTMLElement | null
+) {
   const width = collapsed ? SIDEBAR_COLLAPSED : SIDEBAR_EXPANDED;
   if (aside) gsap.set(aside, { width });
   if (main) gsap.set(main, { marginLeft: width });
+  if (toggle) gsap.set(toggle, { left: width - TOGGLE_OFFSET });
 }
