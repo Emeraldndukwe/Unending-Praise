@@ -37,3 +37,15 @@
 .animate-pulse-zoom {
   animation: pulse-zoom 2s ease-in-out infinite;
 }
+
+.admin-sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(84, 3, 124, 0.15) transparent;
+}
+.admin-sidebar-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.admin-sidebar-scroll::-webkit-scrollbar-thumb {
+  background: rgba(84, 3, 124, 0.15);
+  border-radius: 9999px;
+}

@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { compressImage, compressVideo } from "../utils/mediaOptimizer";
 import Analytics from "../components/Analytics";
+import AdminLayout from "../components/admin/AdminLayout";
+import AdminDashboard from "../components/admin/AdminDashboard";
+import AdminPageHeader from "../components/admin/AdminPageHeader";
+import { type AdminTab, getNavItem, getVisibleTabs } from "../components/admin/adminNav";
 import * as XLSX from "xlsx";
 import mammoth from "mammoth";
 import { Download, UploadCloud, FileSpreadsheet, FileText, X, CheckCircle2, AlertCircle, Loader2, Sparkles } from "lucide-react";
@@ -61,7 +65,7 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 
 export default function AdminPage() {
   const { token, setToken, headers } = useAuthToken();
-  const [tab, setTab] = useState<"testimonies" | "crusades" | "messages" | "songs" | "comments" | "users" | "crusade-types" | "analytics" | "trainings" | "form-submissions" | "events">("testimonies");
+  const [tab, setTab] = useState<AdminTab>("dashboard");
   const [role, setRole] = useState<string>("");
   const [currentUser, setCurrentUser] = useState<{id:string; name:string; email:string; role:string; status:string} | null>(null);
   const [testimonies, setTestimonies] = useState<Testimony[]>([]);
@@ -359,6 +363,13 @@ export default function AdminPage() {
     loadRole();
     refreshCrusadeTypes();
   }, [token]); // Re-run when token changes
+
+  useEffect(() => {
+    const tabs = getVisibleTabs(role);
+    if (!tabs.includes(tab)) {
+      setTab("dashboard");
+    }
+  }, [role, tab]);
 
   useEffect(() => {
     if (role === 'superadmin' && tab === 'trainings') {
@@ -1267,72 +1278,57 @@ export default function AdminPage() {
     );
   }
 
+  const visibleTabs = getVisibleTabs(role);
+  const activeNav = getNavItem(tab);
+  const dashboardStats = {
+    pendingTestimonies: testimonies.filter((t) => !t.approved).length,
+    approvedTestimonies: testimonies.filter((t) => t.approved).length,
+    crusades: crusades.length,
+    messages: messages.length,
+    songs: songs.length,
+    pendingSubmissions: formSubmissions.filter((s) => s.status !== "approved" && s.status !== "rejected").length,
+    crusadeTypes: crusadeTypes.length,
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#FAF9F6] to-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 mb-6 border border-[#54037C]/10">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-[#54037C] mb-2">Admin Dashboard</h1>
-              <p className="text-gray-600 text-sm">Manage content for Unending Praise</p>
-            </div>
-            <div className="flex gap-2">
-              <button 
-                className="px-4 py-2 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium transition text-sm" 
-                onClick={() => { setToken(""); }}
-              >
-          Logout
-        </button>
-              <button 
-                className="px-4 py-2 rounded-xl bg-[#54037C] hover:bg-[#54037C]/90 text-white font-medium transition text-sm shadow-md" 
-                onClick={refresh}
-              >
-                Refresh
-              </button>
-            </div>
-          </div>
-      </div>
-
-        {/* Tabs */}
-        <div className="flex flex-wrap gap-2 mb-6 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-2 border border-[#54037C]/10">
-          {((() => {
-            const base = ["testimonies", "crusades", "messages", "songs", "comments"] as const;
-            if (role === 'superadmin') return ([...base, 'crusade-types', 'users', 'analytics', 'trainings', 'form-submissions', 'events'] as const);
-            if (!role || role === 'admin') return ([...base, 'crusade-types', 'analytics', 'form-submissions', 'events'] as const);
-            if (role === 'testimony') return ["testimonies", "comments"] as const;
-            if (role === 'crusade') return (["crusades", "crusade-types", "form-submissions", "comments"] as const);
-            if (role === 'messages') return ["messages"] as const;
-            if (role === 'songs') return ["songs"] as const;
-            return base;
-          })()).map((k) => (
-          <button
-            key={k}
-              className={`px-4 py-2 rounded-xl font-semibold text-sm transition capitalize ${
-                tab === k 
-                  ? "bg-[#54037C] text-white shadow-md" 
-                  : "bg-transparent text-gray-600 hover:bg-[#54037C]/10"
-              }`}
-              onClick={() => setTab(k as any)}
-          >
-            {k}
-          </button>
-        ))}
-      </div>
-
+    <AdminLayout
+      activeTab={tab}
+      onTabChange={setTab}
+      role={role}
+      currentUser={currentUser}
+      onLogout={() => setToken("")}
+      onRefresh={refresh}
+      loading={loading}
+    >
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4">
           {error}
         </div>
       )}
-      {loading && (
+      {loading && tab !== "dashboard" && (
         <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl mb-4 text-center">
           Loading…
         </div>
       )}
 
+      {tab === "dashboard" && (
+        <AdminDashboard
+          stats={dashboardStats}
+          userName={currentUser?.name}
+          onNavigate={setTab}
+          onRefresh={refresh}
+          visibleTabs={visibleTabs}
+          loading={loading}
+        />
+      )}
+
       {tab === "testimonies" && (
         <section className="space-y-6">
+          <AdminPageHeader
+            title={activeNav.label}
+            description={activeNav.description}
+            icon={activeNav.icon}
+          />
           <TestimonyForm onSubmit={createTestimony} onUploadMedia={uploadTestimonyMedia} />
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
             <h2 className="text-xl font-bold text-[#54037C] mb-4">Pending Approvals ({testimonies.filter(t => !t.approved).length})</h2>
@@ -1386,6 +1382,11 @@ export default function AdminPage() {
 
       {tab === "crusades" && (
         <section className="space-y-6">
+          <AdminPageHeader
+            title={activeNav.label}
+            description={activeNav.description}
+            icon={activeNav.icon}
+          />
           <CrusadeForm onSubmit={createCrusade} crusadeTypes={crusadeTypes} onUploadMedia={uploadCrusadeMedia} />
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
             <h2 className="text-xl font-bold text-[#54037C] mb-4">Crusades ({crusades.length})</h2>
@@ -1415,6 +1416,11 @@ export default function AdminPage() {
 
       {tab === "messages" && (
         <section className="space-y-6">
+          <AdminPageHeader
+            title={activeNav.label}
+            description={activeNav.description}
+            icon={activeNav.icon}
+          />
           <MessageForm onSubmit={createMessage} />
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
             <h2 className="text-xl font-bold text-[#54037C] mb-4">Messages ({messages.length})</h2>
@@ -1445,6 +1451,11 @@ export default function AdminPage() {
 
       {tab === "form-submissions" && (
         <section className="space-y-6">
+          <AdminPageHeader
+            title={activeNav.label}
+            description={activeNav.description}
+            icon={activeNav.icon}
+          />
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
             <h2 className="text-xl font-bold text-[#54037C] mb-4">
               Crusade Form Submissions ({formSubmissions.length})
@@ -1510,6 +1521,11 @@ export default function AdminPage() {
 
       {tab === "songs" && (
         <section className="space-y-6">
+          <AdminPageHeader
+            title={activeNav.label}
+            description={activeNav.description}
+            icon={activeNav.icon}
+          />
           <div className="relative bg-white/90 backdrop-blur-sm rounded-3xl shadow-xl border border-[#54037C]/10 overflow-hidden">
             {/* Decorative gradient header */}
             <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-br from-[#54037C] via-[#7a1eb3] to-[#a855f7] opacity-[0.06] pointer-events-none" />
@@ -1871,8 +1887,13 @@ export default function AdminPage() {
 
       {tab === "comments" && (
         <section className="space-y-6">
+          <AdminPageHeader
+            title={activeNav.label}
+            description={activeNav.description}
+            icon={activeNav.icon}
+          />
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
-            <h2 className="text-xl font-bold text-[#54037C] mb-4">Manage Comments</h2>
+            <h2 className="text-lg font-bold text-[#54037C] mb-4 sr-only">Manage Comments</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div>
@@ -1945,14 +1966,12 @@ export default function AdminPage() {
 
       {tab === "crusade-types" && (
         <section className="space-y-6">
+          <AdminPageHeader
+            title={activeNav.label}
+            description={activeNav.description}
+            icon={activeNav.icon}
+          />
           <div className="bg-gradient-to-br from-[#54037C]/10 to-[#8A4EBF]/10 rounded-2xl shadow-lg p-6 border-2 border-[#54037C]/20">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-1 h-8 bg-[#54037C] rounded-full"></div>
-              <div>
-                <h2 className="text-2xl font-bold text-[#54037C]">Manage Crusade Types</h2>
-                <p className="text-sm text-gray-600">Create and manage different types of crusades (e.g., Prison, Online, Youth, etc.) with their details</p>
-              </div>
-            </div>
             <CrusadeTypeForm onSubmit={async (payload) => {
               await api(`/api/crusade-types`, {
                 method: "POST",
@@ -2009,14 +2028,23 @@ export default function AdminPage() {
 
       {tab === "analytics" && (
         <section className="space-y-6">
+          <AdminPageHeader
+            title={activeNav.label}
+            description={activeNav.description}
+            icon={activeNav.icon}
+          />
           <Analytics headers={headers} />
         </section>
       )}
 
       {tab === "trainings" && role === 'superadmin' && (
         <section className="space-y-6">
+          <AdminPageHeader
+            title={activeNav.label}
+            description={activeNav.description}
+            icon={activeNav.icon}
+          />
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
-            <h2 className="text-xl font-bold text-[#54037C] mb-4">Trainings & Resources</h2>
             
             {/* Password Management */}
             <div className="mb-6 p-4 bg-purple-50 rounded-xl border border-purple-200">
@@ -2316,24 +2344,26 @@ export default function AdminPage() {
       )}
 
       {tab === "events" && (role === 'superadmin' || !role || role === 'admin') && (
-        <EventsManagementSection headers={headers} uploadMedia={uploadCrusadeMedia} />
+        <section className="space-y-6">
+          <AdminPageHeader
+            title={activeNav.label}
+            description={activeNav.description}
+            icon={activeNav.icon}
+          />
+          <EventsManagementSection headers={headers} uploadMedia={uploadCrusadeMedia} />
+        </section>
       )}
 
 
       {tab === "users" && role === 'superadmin' && (
         <section className="space-y-6">
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
-              <div>
-              <h2 className="text-xl font-bold text-[#54037C]">User Management</h2>
-                {currentUser && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Signed in as <span className="font-semibold">{currentUser.name || currentUser.email}</span> ({currentUser.email}) • role: {currentUser.role}
-                  </p>
-                )}
-              </div>
+          <AdminPageHeader
+            title={activeNav.label}
+            description={activeNav.description}
+            icon={activeNav.icon}
+            actions={
               <button
-                className="px-3 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-xl text-sm self-start md:self-auto"
+                className="px-4 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-xl text-sm font-medium shadow-sm"
                 onClick={async () => {
                   try {
                     const list = await api<typeof users>("/api/admin/users", { headers: headers as HeadersInit });
@@ -2343,6 +2373,17 @@ export default function AdminPage() {
               >
                 Load Users
               </button>
+            }
+          />
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+              <div>
+                {currentUser && (
+                  <p className="text-xs text-gray-500">
+                    Signed in as <span className="font-semibold">{currentUser.name || currentUser.email}</span> ({currentUser.email}) • role: {currentUser.role}
+                  </p>
+                )}
+              </div>
             </div>
             <div className="grid md:grid-cols-2 gap-4">
               <div>
@@ -2427,8 +2468,7 @@ export default function AdminPage() {
           </div>
         </section>
       )}
-      </div>
-    </div>
+    </AdminLayout>
   );
 }
 
