@@ -7,8 +7,8 @@ import {
   Globe,
   Bell,
   RefreshCw,
-  Search,
 } from "lucide-react";
+import AdminSearch, { type AdminSearchResult } from "./AdminSearch";
 import {
   type AdminTab,
   getNavItem,
@@ -24,6 +24,10 @@ type AdminLayoutProps = {
   onLogout: () => void;
   onRefresh: () => void;
   loading?: boolean;
+  searchQuery: string;
+  onSearchQueryChange: (query: string) => void;
+  searchResults: AdminSearchResult[];
+  onSearchSelect: (result: AdminSearchResult) => void;
   children: React.ReactNode;
 };
 
@@ -35,6 +39,10 @@ export default function AdminLayout({
   onLogout,
   onRefresh,
   loading,
+  searchQuery,
+  onSearchQueryChange,
+  searchResults,
+  onSearchSelect,
   children,
 }: AdminLayoutProps) {
   const [collapsed, setCollapsed] = useState(false);
@@ -168,16 +176,12 @@ export default function AdminLayout({
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            <div className="hidden md:flex items-center gap-2 rounded-xl bg-white border border-[#54037C]/10 px-3 py-2 w-52 lg:w-64">
-              <Search size={15} className="text-gray-400 shrink-0" />
-              <input
-                type="text"
-                placeholder="Search..."
-                className="bg-transparent text-sm text-gray-600 placeholder:text-gray-400 outline-none w-full"
-                readOnly
-              />
-              <kbd className="hidden lg:inline text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">⌘F</kbd>
-            </div>
+            <AdminSearch
+              query={searchQuery}
+              onQueryChange={onSearchQueryChange}
+              results={searchResults}
+              onSelect={onSearchSelect}
+            />
 
             <button
               type="button"

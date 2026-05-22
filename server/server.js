@@ -1624,7 +1624,8 @@ async function initializeDefaultAdmin() {
   }
 }
 
-const PORT = process.env.PORT || 5000;
+// Default 5001 locally — macOS AirPlay often occupies 5000
+const PORT = process.env.PORT || 5001;
 const server = http.createServer(app);
 // Increase timeout for large file uploads (60 minutes for 1GB+ files)
 server.timeout = 60 * 60 * 1000; // 60 minutes
@@ -1732,6 +1733,14 @@ if (WebSocketServer) {
     }
   });
 }
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`❌ Port ${PORT} is already in use. Stop the other process or set PORT to a free port.`);
+    process.exit(1);
+  }
+  throw err;
+});
 
 server.listen(PORT, async () => {
   console.log(`✅ API server listening on http://localhost:${PORT}`);

@@ -4,7 +4,9 @@ import Analytics from "../components/Analytics";
 import AdminLayout from "../components/admin/AdminLayout";
 import AdminDashboard from "../components/admin/AdminDashboard";
 import AdminPageHeader from "../components/admin/AdminPageHeader";
-import { type AdminTab, getNavItem, getVisibleTabs } from "../components/admin/adminNav";
+import AdminTeamSection from "../components/admin/AdminTeamSection";
+import { type AdminSearchResult } from "../components/admin/AdminSearch";
+import { type AdminTab, getNavItem, getVisibleTabs, NAV_ITEMS } from "../components/admin/adminNav";
 import * as XLSX from "xlsx";
 import mammoth from "mammoth";
 import { Download, UploadCloud, FileSpreadsheet, FileText, X, CheckCircle2, AlertCircle, Loader2, Sparkles } from "lucide-react";
@@ -87,6 +89,8 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [users, setUsers] = useState<Array<{id:string; name:string; email:string; role:string; status:string; created_at?: string;}>>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [crusadeTypes, setCrusadeTypes] = useState<Array<{id:string; name:string; description?:string; created_at?:string;}>>([]);
   const [meetings, setMeetings] = useState<Array<{id:string; title:string; video_url:string; thumbnail_url?:string; section?:string; created_at?:string; updated_at?:string}>>([]);
   const [documents, setDocuments] = useState<Array<{id:string; title:string; document_url:string; document_type?:string; section?:string; downloadable?:boolean; created_at?:string; updated_at?:string}>>([]);
@@ -268,6 +272,19 @@ export default function AdminPage() {
     }
   };
 
+  const refreshUsers = useCallback(async () => {
+    if (role !== "superadmin") return;
+    setUsersLoading(true);
+    try {
+      const list = await api<typeof users>("/api/admin/users", { headers: headers as HeadersInit });
+      setUsers(list);
+    } catch (e: any) {
+      setError(e?.message || "Failed to load users");
+    } finally {
+      setUsersLoading(false);
+    }
+  }, [headers, role]);
+
   const refresh = async () => {
     setLoading(true);
     setError(null);
@@ -350,19 +367,20 @@ export default function AdminPage() {
           setRole("");
           setCurrentUser(null);
         }
-      } catch (err) {
-        // Silently handle network errors - don't log expected auth failures
-        if (token) {
-          // Only clear token if we have one (prevents infinite loops)
-          setToken("");
-          setRole("");
-          setCurrentUser(null);
-        }
+      } catch {
+        // Network/API down — keep session; don't log out on connection errors
+        setError("Cannot reach the API server. Restart dev with npm run dev and ensure port 5001 is free.");
       }
     };
     loadRole();
     refreshCrusadeTypes();
   }, [token]); // Re-run when token changes
+
+  useEffect(() => {
+    if (role === "superadmin") {
+      refreshUsers();
+    }
+  }, [role, refreshUsers]);
 
   useEffect(() => {
     const tabs = getVisibleTabs(role);
@@ -382,7 +400,10 @@ export default function AdminPage() {
     if (tab === "form-submissions" && (role === 'crusade' || role === 'superadmin' || !role || role === 'admin')) {
       refreshFormSubmissions();
     }
-  }, [role, tab]);
+    if (role === "superadmin" && tab === "users") {
+      refreshUsers();
+    }
+  }, [role, tab, refreshUsers]);
 
   const approveTestimony = async (id: string) => {
     await api<Testimony>(`/api/testimonies/${id}/approve`, { method: "POST", headers: headers as HeadersInit });
@@ -1290,6 +1311,108 @@ export default function AdminPage() {
     crusadeTypes: crusadeTypes.length,
   };
 
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [] as AdminSearchResult[];
+
+    const results: AdminSearchResult[] = [];
+
+    NAV_ITEMS.filter((item) => visibleTabs.includes(item.id)).forEach((item) => {
+      if (
+        item.label.toLowerCase().includes(q) ||
+        item.description.toLowerCase().includes(q) ||
+        item.id.toLowerCase().includes(q)
+      ) {
+        results.push({
+          id: `nav-${item.id}`,
+          label: item.label,
+          description: item.description,
+          tab: item.id,
+          group: "Pages",
+        });
+      }
+    });
+
+    users.forEach((user) => {
+      if (
+        user.name.toLowerCase().includes(q) ||
+        user.email.toLowerCase().includes(q) ||
+        user.role.toLowerCase().includes(q)
+      ) {
+        results.push({
+          id: `user-${user.id}`,
+          label: user.name || user.email,
+          description: `${user.email} • ${user.role}`,
+          tab: "users",
+          group: "Team",
+        });
+      }
+    });
+
+    testimonies.forEach((testimony) => {
+      const label = testimony.title || testimony.name || "Untitled testimony";
+      if (
+        label.toLowerCase().includes(q) ||
+        (testimony.name || "").toLowerCase().includes(q) ||
+        (testimony.content || "").toLowerCase().includes(q)
+      ) {
+        results.push({
+          id: `testimony-${testimony.id}`,
+          label,
+          description: testimony.approved ? "Approved testimony" : "Pending testimony",
+          tab: "testimonies",
+          group: "Testimonies",
+        });
+      }
+    });
+
+    crusades.forEach((crusade) => {
+      const label = crusade.title || "Untitled crusade";
+      if (label.toLowerCase().includes(q) || (crusade.zone || "").toLowerCase().includes(q)) {
+        results.push({
+          id: `crusade-${crusade.id}`,
+          label,
+          description: crusade.zone || "Crusade record",
+          tab: "crusades",
+          group: "Crusades",
+        });
+      }
+    });
+
+    messages.forEach((message) => {
+      if (
+        (message.name || "").toLowerCase().includes(q) ||
+        (message.subject || "").toLowerCase().includes(q) ||
+        (message.message || "").toLowerCase().includes(q)
+      ) {
+        results.push({
+          id: `message-${message.id}`,
+          label: message.subject || message.name || "Message",
+          description: message.email || message.name,
+          tab: "messages",
+          group: "Messages",
+        });
+      }
+    });
+
+    songs.forEach((song) => {
+      if (
+        (song.title || "").toLowerCase().includes(q) ||
+        (song.artist || "").toLowerCase().includes(q)
+      ) {
+        results.push({
+          id: `song-${song.id}`,
+          label: song.title || "Untitled song",
+          description: song.artist || "Song",
+          tab: "songs",
+          group: "Songs",
+        });
+      }
+    });
+
+    return results.slice(0, 12);
+  }, [searchQuery, visibleTabs, users, testimonies, crusades, messages, songs]);
+
   return (
     <AdminLayout
       activeTab={tab}
@@ -1299,6 +1422,16 @@ export default function AdminPage() {
       onLogout={() => setToken("")}
       onRefresh={refresh}
       loading={loading}
+      searchQuery={searchQuery}
+      onSearchQueryChange={setSearchQuery}
+      searchResults={searchResults}
+      onSearchSelect={(result) => {
+        setTab(result.tab);
+        setSearchQuery("");
+        if (result.tab === "users" && role === "superadmin") {
+          refreshUsers();
+        }
+      }}
     >
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4">
@@ -2362,110 +2495,45 @@ export default function AdminPage() {
             description={activeNav.description}
             icon={activeNav.icon}
             actions={
-              <button
-                className="px-4 py-2 bg-[#54037C] hover:bg-[#54037C]/90 text-white rounded-xl text-sm font-medium shadow-sm"
-                onClick={async () => {
-                  try {
-                    const list = await api<typeof users>("/api/admin/users", { headers: headers as HeadersInit });
-                    setUsers(list);
-                  } catch (e:any) { setError(e?.message || 'Failed to load users'); }
-                }}
-              >
-                Load Users
-              </button>
+              usersLoading ? (
+                <span className="inline-flex items-center gap-2 text-sm text-gray-500">
+                  <Loader2 size={14} className="animate-spin text-[#54037C]" />
+                  Syncing…
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-xl border border-[#54037C]/15 bg-white px-4 py-2 text-sm font-semibold text-[#54037C] hover:bg-[#54037C]/5 transition"
+                  onClick={refreshUsers}
+                >
+                  Refresh team
+                </button>
+              )
             }
           />
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-[#54037C]/10">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
-              <div>
-                {currentUser && (
-                  <p className="text-xs text-gray-500">
-                    Signed in as <span className="font-semibold">{currentUser.name || currentUser.email}</span> ({currentUser.email}) • role: {currentUser.role}
-                  </p>
-                )}
-              </div>
-            </div>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <h3 className="font-semibold mb-2">Pending</h3>
-                <div className="space-y-3">
-                  {users.filter(u=>u.status!== 'active').map(u => (
-                    <div key={u.id} className="p-3 border rounded-xl flex items-center justify-between gap-3">
-                      <div>
-                        <div className="font-medium">{u.name} <span className="text-gray-500 text-sm">{u.email}</span></div>
-                        <div className="text-xs text-gray-500">role: {u.role} • status: {u.status}</div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <select
-                          className="border rounded px-2 py-1 text-sm"
-                          value={u.role}
-                          onChange={async (e) => {
-                            const roleVal = e.target.value;
-                            await fetch(`/api/admin/users/${u.id}/role`, { method:'PUT', headers: Object.assign({}, headers as Record<string,string>, { 'content-type':'application/json' }), body: JSON.stringify({ role: roleVal }) });
-                            const list = await api<typeof users>("/api/admin/users", { headers: headers as HeadersInit });
-                            setUsers(list);
-                          }}
-                        >
-                          {['admin','testimony','crusade','messages','songs','pending'].map(r => <option key={r} value={r}>{r}</option>)}
-                        </select>
-                        <button
-                          className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm"
-                          onClick={async () => {
-                            await fetch(`/api/admin/users/${u.id}/activate`, { method:'PUT', headers: headers as HeadersInit });
-                            const list = await api<typeof users>("/api/admin/users", { headers: headers as HeadersInit });
-                            setUsers(list);
-                          }}
-                        >Approve</button>
-                      </div>
-                    </div>
-                  ))}
-                  {users.filter(u=>u.status!== 'active').length === 0 && <div className="text-sm text-gray-500">No pending users</div>}
-                </div>
-              </div>
-              <div>
-                <h3 className="font-semibold mb-2">Active</h3>
-                <div className="space-y-3">
-                  {users.filter(u=>u.status=== 'active').map(u => (
-                    <div key={u.id} className="p-3 border rounded-xl flex items-center justify-between gap-3">
-                      <div>
-                        <div className="font-medium">{u.name} <span className="text-gray-500 text-sm">{u.email}</span></div>
-                        <div className="text-xs text-gray-500">role: {u.role} • status: {u.status}</div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <select
-                          className="border rounded px-2 py-1 text-sm"
-                          value={u.role}
-                          disabled={currentUser?.id === u.id}
-                          onChange={async (e) => {
-                            const roleVal = e.target.value;
-                            await fetch(`/api/admin/users/${u.id}/role`, { method:'PUT', headers: Object.assign({}, headers as Record<string,string>, { 'content-type':'application/json' }), body: JSON.stringify({ role: roleVal }) });
-                            const list = await api<typeof users>("/api/admin/users", { headers: headers as HeadersInit });
-                            setUsers(list);
-                          }}
-                        >
-                          {['superadmin','admin','testimony','crusade','messages','songs'].map(r => <option key={r} value={r}>{r}</option>)}
-                        </select>
-                        {currentUser?.id !== u.id && (
-                          <button
-                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm"
-                            onClick={async () => {
-                              if (!window.confirm(`Remove user ${u.email}? This cannot be undone.`)) return;
-                              await fetch(`/api/admin/users/${u.id}`, { method:'DELETE', headers: headers as HeadersInit });
-                              const list = await api<typeof users>("/api/admin/users", { headers: headers as HeadersInit });
-                              setUsers(list);
-                            }}
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {users.filter(u=>u.status=== 'active').length === 0 && <div className="text-sm text-gray-500">No active users</div>}
-                </div>
-              </div>
-            </div>
-          </div>
+          <AdminTeamSection
+            users={users}
+            loading={usersLoading}
+            currentUserId={currentUser?.id}
+            onRefresh={refreshUsers}
+            onRoleChange={async (userId, roleVal) => {
+              await fetch(`/api/admin/users/${userId}/role`, {
+                method: "PUT",
+                headers: Object.assign({}, headers as Record<string, string>, { "content-type": "application/json" }),
+                body: JSON.stringify({ role: roleVal }),
+              });
+              await refreshUsers();
+            }}
+            onActivate={async (userId) => {
+              await fetch(`/api/admin/users/${userId}/activate`, { method: "PUT", headers: headers as HeadersInit });
+              await refreshUsers();
+            }}
+            onRemove={async (userId, email) => {
+              if (!window.confirm(`Remove user ${email}? This cannot be undone.`)) return;
+              await fetch(`/api/admin/users/${userId}`, { method: "DELETE", headers: headers as HeadersInit });
+              await refreshUsers();
+            }}
+          />
         </section>
       )}
     </AdminLayout>
