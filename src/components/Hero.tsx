@@ -1,8 +1,21 @@
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const STREAM_URL = "https://vcpout-ams01.internetmultimediaonline.org/lmampraise/stream1/playlist.m3u8";
-const getShareUrl = () => `${window.location.origin}/api/hls/playlist.m3u8`;
+// Same-origin proxy avoids CORS and plays reliably in Safari
+const STREAM_SRC = "/api/hls/playlist.m3u8";
+const getShareUrl = () => `${window.location.origin}${STREAM_SRC}`;
+
+function isSafariBrowser() {
+  if (typeof navigator === "undefined") return false;
+  return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+}
+
+/** Minimal player API shared by native Safari video and Video.js */
+type LivePlayer = {
+  play: () => Promise<void>;
+  muted: (value?: boolean) => boolean;
+  dispose: () => void;
+};
 
 const SongList = lazy(() => import("./SongList"));
 const LiveChat = lazy(() => import("./LiveChat"));
@@ -18,7 +31,7 @@ export default function HeroSection() {
   const [playerReady, setPlayerReady] = useState(false);
   const [copied, setCopied] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const playerRef = useRef<any>(null);
+  const playerRef = useRef<LivePlayer | null>(null);
   const initStartedRef = useRef(false);
   const videoJsModuleRef = useRef<any>(null);
 
@@ -51,10 +64,10 @@ export default function HeroSection() {
       }
       playerRef.current = null;
     }
-    if (element) {
+    if (element && videoJsModuleRef.current) {
       try {
         const videojs = videoJsModuleRef.current;
-        const existing = videojs?.getPlayer?.(element);
+        const existing = videojs.getPlayer?.(element);
         if (existing && !existing.isDisposed?.()) {
           existing.dispose();
         }
@@ -62,75 +75,105 @@ export default function HeroSection() {
         // ignore stale player lookup errors
       }
     }
+    element?.removeAttribute("src");
+    element?.load();
   }, []);
 
-  // ✅ Initialize Video.js player once when live view opens
   const initializePlayer = useCallback(async (element: HTMLVideoElement) => {
     if (initStartedRef.current || playerRef.current) return;
     initStartedRef.current = true;
 
     try {
-      const videojs = await loadVideoJs();
-      const existing = videojs.getPlayer(element);
-      if (existing && !existing.isDisposed?.()) {
-        playerRef.current = existing;
+      // Safari: native HLS — full height, no Video.js layout bugs
+      if (isSafariBrowser()) {
+        element.className = "w-full h-full bg-black object-contain rounded-3xl";
+        element.controls = true;
+        element.playsInline = true;
+        element.setAttribute("webkit-playsinline", "true");
+        element.preload = "auto";
+        element.muted = isMuted;
+        element.src = STREAM_SRC;
+
+        const nativePlayer: LivePlayer = {
+          play: () => element.play(),
+          muted: (value?: boolean) => {
+            if (typeof value === "boolean") element.muted = value;
+            return element.muted;
+          },
+          dispose: () => {
+            element.pause();
+            element.removeAttribute("src");
+            element.load();
+          },
+        };
+
+        playerRef.current = nativePlayer;
         setPlayerReady(true);
+
+        element.addEventListener("playing", () => setAutoplayBlocked(false), { once: true });
+        element.addEventListener("error", () => {
+          console.error("[HeroSection] Native video error:", element.error);
+        });
+
+        await element.play().catch(() => setAutoplayBlocked(true));
         return;
       }
 
-      const isSafari =
-        typeof navigator !== "undefined" &&
-        /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      const videojs = await loadVideoJs();
+      const existing = videojs.getPlayer(element);
+      if (existing && !existing.isDisposed?.()) {
+        existing.dispose();
+      }
 
-      playerRef.current = videojs(
+      const vjsPlayer = videojs(
         element,
         {
           autoplay: true,
           controls: true,
-          responsive: true,
+          fluid: false,
           fill: true,
           preload: "auto",
           muted: isMuted,
           liveui: true,
+          width: "100%",
+          height: "100%",
           html5: {
             vhs: {
               withCredentials: false,
-              // Safari plays HLS natively — forcing VHS causes init/autoplay issues
-              overrideNative: !isSafari,
+              overrideNative: false,
             },
           },
-          sources: [
-            {
-              src: STREAM_URL,
-              type: "application/x-mpegURL",
-            },
-          ],
+          sources: [{ src: STREAM_SRC, type: "application/x-mpegURL" }],
         },
         () => {
           setPlayerReady(true);
-          const playerEl = playerRef.current?.el();
-          if (playerEl) {
-            playerEl.style.width = "100%";
-            playerEl.style.height = "100%";
-          }
+          const playerEl = vjsPlayer.el() as HTMLElement;
+          playerEl.style.width = "100%";
+          playerEl.style.height = "100%";
 
-          playerRef.current?.play().catch(() => {
-            setAutoplayBlocked(true);
-          });
+          vjsPlayer.play().catch(() => setAutoplayBlocked(true));
         }
       );
 
-      playerRef.current.on("error", () => {
-        const error = playerRef.current?.error();
-        console.error("[HeroSection] Video.js error:", error);
+      vjsPlayer.on("error", () => {
+        console.error("[HeroSection] Video.js error:", vjsPlayer.error());
       });
 
-      playerRef.current.on("playing", () => {
-        setAutoplayBlocked(false);
-      });
+      vjsPlayer.on("playing", () => setAutoplayBlocked(false));
+
+      playerRef.current = {
+        play: () => vjsPlayer.play(),
+        muted: (value?: boolean) => {
+          if (typeof value === "boolean") vjsPlayer.muted(value);
+          return vjsPlayer.muted();
+        },
+        dispose: () => {
+          if (!vjsPlayer.isDisposed()) vjsPlayer.dispose();
+        },
+      };
     } catch (err) {
       initStartedRef.current = false;
-      console.error("[HeroSection] Failed to initialize Video.js:", err);
+      console.error("[HeroSection] Failed to initialize player:", err);
     }
   }, [isMuted, loadVideoJs]);
 
@@ -177,10 +220,10 @@ export default function HeroSection() {
               showLiveVideo
                 ? isMobile
                   ? "h-[240px]"
-                  : "aspect-video"
+                  : "h-[34rem]"
                 : isMobile
-                ? "h-[18rem]"
-                : "h-[34rem]"
+                  ? "h-[18rem]"
+                  : "h-[34rem]"
             }`}
           >
             <AnimatePresence mode="wait">
@@ -238,7 +281,9 @@ export default function HeroSection() {
                         loadVideoJs().catch(() => undefined);
                       }}
                       onClick={() => {
-                        setIsMuted(false);
+                        // Safari allows muted autoplay after click; sound via overlay if needed
+                        const safari = isSafariBrowser();
+                        setIsMuted(safari);
                         setAutoplayBlocked(false);
                         setShowLiveVideo(true);
                       }}
@@ -257,10 +302,14 @@ export default function HeroSection() {
                   transition={{ duration: 0.35 }}
                   className="absolute inset-0 rounded-3xl overflow-hidden bg-black isolate"
                 >
-                  <div className="relative w-full h-full min-h-[200px]">
+                  <div className="absolute inset-0">
                     <video
                       ref={setVideoRef}
-                      className="video-js vjs-default-skin vjs-fill w-full h-full rounded-3xl"
+                      className={
+                        isSafariBrowser()
+                          ? "w-full h-full bg-black object-contain rounded-3xl"
+                          : "video-js vjs-default-skin vjs-fill w-full h-full rounded-3xl"
+                      }
                       playsInline
                     />
 
