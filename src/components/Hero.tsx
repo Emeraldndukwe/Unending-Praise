@@ -1,26 +1,19 @@
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-// Same-origin proxy avoids CORS and plays reliably in Safari
-const STREAM_SRC = "/api/hls/playlist.m3u8";
-const getShareUrl = () => `${window.location.origin}${STREAM_SRC}`;
-
-function isSafariBrowser() {
-  if (typeof navigator === "undefined") return false;
-  return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-}
-
-/** Minimal player API shared by native Safari video and Video.js */
-type LivePlayer = {
-  play: () => Promise<void>;
-  muted: (value?: boolean) => boolean;
-  dispose: () => void;
-};
+const STREAM_URL =
+  "https://vcpout-ams01.internetmultimediaonline.org/lmampraise/stream1/playlist.m3u8";
+const getShareUrl = () => `${window.location.origin}/api/hls/playlist.m3u8`;
 
 const SongList = lazy(() => import("./SongList"));
 const LiveChat = lazy(() => import("./LiveChat"));
 
 const NAV_HEIGHT = 72;
+
+function isSafariBrowser() {
+  if (typeof navigator === "undefined") return false;
+  return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+}
 
 export default function HeroSection() {
   const [showLiveVideo, setShowLiveVideo] = useState(false);
@@ -31,9 +24,10 @@ export default function HeroSection() {
   const [playerReady, setPlayerReady] = useState(false);
   const [copied, setCopied] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const playerRef = useRef<LivePlayer | null>(null);
-  const initStartedRef = useRef(false);
+  const playerRef = useRef<any>(null);
   const videoJsModuleRef = useRef<any>(null);
+  const isMutedRef = useRef(isMuted);
+  isMutedRef.current = isMuted;
 
   const loadVideoJs = useCallback(async () => {
     if (!videoJsModuleRef.current) {
@@ -44,7 +38,6 @@ export default function HeroSection() {
     return videoJsModuleRef.current;
   }, []);
 
-  // ✅ Resize listener
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
     handleResize();
@@ -53,129 +46,87 @@ export default function HeroSection() {
   }, []);
 
   const disposePlayer = useCallback(() => {
-    initStartedRef.current = false;
     setPlayerReady(false);
-    const element = videoRef.current;
     if (playerRef.current) {
       try {
-        playerRef.current.dispose();
+        if (!playerRef.current.isDisposed()) {
+          playerRef.current.dispose();
+        }
       } catch (err) {
         console.error("[HeroSection] Error disposing player:", err);
       }
       playerRef.current = null;
     }
+    const element = videoRef.current;
     if (element && videoJsModuleRef.current) {
       try {
-        const videojs = videoJsModuleRef.current;
-        const existing = videojs.getPlayer?.(element);
-        if (existing && !existing.isDisposed?.()) {
+        const existing = videoJsModuleRef.current.getPlayer(element);
+        if (existing && !existing.isDisposed()) {
           existing.dispose();
         }
       } catch {
-        // ignore stale player lookup errors
+        // ignore
       }
     }
-    element?.removeAttribute("src");
-    element?.load();
   }, []);
 
   const initializePlayer = useCallback(async (element: HTMLVideoElement) => {
-    if (initStartedRef.current || playerRef.current) return;
-    initStartedRef.current = true;
+    if (playerRef.current) return;
 
     try {
-      // Safari: native HLS — full height, no Video.js layout bugs
-      if (isSafariBrowser()) {
-        element.className = "w-full h-full bg-black object-contain rounded-3xl";
-        element.controls = true;
-        element.playsInline = true;
-        element.setAttribute("webkit-playsinline", "true");
-        element.preload = "auto";
-        element.muted = isMuted;
-        element.src = STREAM_SRC;
-
-        const nativePlayer: LivePlayer = {
-          play: () => element.play(),
-          muted: (value?: boolean) => {
-            if (typeof value === "boolean") element.muted = value;
-            return element.muted;
-          },
-          dispose: () => {
-            element.pause();
-            element.removeAttribute("src");
-            element.load();
-          },
-        };
-
-        playerRef.current = nativePlayer;
-        setPlayerReady(true);
-
-        element.addEventListener("playing", () => setAutoplayBlocked(false), { once: true });
-        element.addEventListener("error", () => {
-          console.error("[HeroSection] Native video error:", element.error);
-        });
-
-        await element.play().catch(() => setAutoplayBlocked(true));
-        return;
-      }
-
       const videojs = await loadVideoJs();
       const existing = videojs.getPlayer(element);
-      if (existing && !existing.isDisposed?.()) {
+      if (existing && !existing.isDisposed()) {
         existing.dispose();
       }
 
-      const vjsPlayer = videojs(
+      const isSafari = isSafariBrowser();
+
+      const player = videojs(
         element,
         {
           autoplay: true,
           controls: true,
-          fluid: false,
-          fill: true,
+          responsive: true,
+          fluid: true,
           preload: "auto",
-          muted: isMuted,
+          muted: isMutedRef.current,
           liveui: true,
-          width: "100%",
-          height: "100%",
           html5: {
             vhs: {
               withCredentials: false,
-              overrideNative: false,
+              // Chrome/Firefox need VHS; Safari can use native HLS
+              overrideNative: !isSafari,
             },
           },
-          sources: [{ src: STREAM_SRC, type: "application/x-mpegURL" }],
+          sources: [
+            {
+              src: STREAM_URL,
+              type: "application/x-mpegURL",
+            },
+          ],
         },
         () => {
           setPlayerReady(true);
-          const playerEl = vjsPlayer.el() as HTMLElement;
+          const playerEl = player.el() as HTMLElement;
           playerEl.style.width = "100%";
           playerEl.style.height = "100%";
 
-          vjsPlayer.play().catch(() => setAutoplayBlocked(true));
+          player.play().catch(() => setAutoplayBlocked(true));
         }
       );
 
-      vjsPlayer.on("error", () => {
-        console.error("[HeroSection] Video.js error:", vjsPlayer.error());
+      player.on("error", () => {
+        console.error("[HeroSection] Video.js error:", player.error());
       });
 
-      vjsPlayer.on("playing", () => setAutoplayBlocked(false));
+      player.on("playing", () => setAutoplayBlocked(false));
 
-      playerRef.current = {
-        play: () => vjsPlayer.play(),
-        muted: (value?: boolean) => {
-          if (typeof value === "boolean") vjsPlayer.muted(value);
-          return vjsPlayer.muted();
-        },
-        dispose: () => {
-          if (!vjsPlayer.isDisposed()) vjsPlayer.dispose();
-        },
-      };
+      playerRef.current = player;
     } catch (err) {
-      initStartedRef.current = false;
-      console.error("[HeroSection] Failed to initialize player:", err);
+      console.error("[HeroSection] Failed to initialize Video.js:", err);
     }
-  }, [isMuted, loadVideoJs]);
+  }, [loadVideoJs]);
 
   const setVideoRef = useCallback((element: HTMLVideoElement | null) => {
     videoRef.current = element;
@@ -188,21 +139,29 @@ export default function HeroSection() {
     }
 
     let cancelled = false;
-    const tryInitialize = () => {
-      if (cancelled || !videoRef.current) return;
-      initializePlayer(videoRef.current);
+    let attempts = 0;
+
+    const tryInit = () => {
+      if (cancelled) return;
+      const el = videoRef.current;
+      if (el && !playerRef.current) {
+        void initializePlayer(el);
+        return;
+      }
+      if (attempts < 20) {
+        attempts += 1;
+        window.setTimeout(tryInit, 100);
+      }
     };
 
-    const timer = window.setTimeout(tryInitialize, 50);
+    tryInit();
+
     return () => {
       cancelled = true;
-      window.clearTimeout(timer);
     };
   }, [showLiveVideo, initializePlayer, disposePlayer]);
 
-  useEffect(() => {
-    return () => disposePlayer();
-  }, [disposePlayer]);
+  useEffect(() => () => disposePlayer(), [disposePlayer]);
 
   return (
     <>
@@ -211,10 +170,7 @@ export default function HeroSection() {
         className="relative w-full min-h-[90vh] px-4 md:px-10 pt-27 pb-10 bg-white
                    flex flex-col lg:flex-row lg:items-start gap-6"
       >
-        {/* LEFT SIDE */}
-        <div
-          className="flex-1 relative flex justify-center bg-transparent rounded-3xl z-10"
-        >
+        <div className="flex-1 relative flex justify-center bg-transparent rounded-3xl z-10">
           <div
             className={`w-full rounded-3xl shadow-lg overflow-hidden relative ${
               showLiveVideo
@@ -281,9 +237,7 @@ export default function HeroSection() {
                         loadVideoJs().catch(() => undefined);
                       }}
                       onClick={() => {
-                        // Safari allows muted autoplay after click; sound via overlay if needed
-                        const safari = isSafariBrowser();
-                        setIsMuted(safari);
+                        setIsMuted(false);
                         setAutoplayBlocked(false);
                         setShowLiveVideo(true);
                       }}
@@ -300,16 +254,12 @@ export default function HeroSection() {
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.35 }}
-                  className="absolute inset-0 rounded-3xl overflow-hidden bg-black isolate"
+                  className="absolute inset-0 rounded-3xl overflow-hidden bg-black"
                 >
-                  <div className="absolute inset-0">
+                  <div className="relative w-full h-full">
                     <video
                       ref={setVideoRef}
-                      className={
-                        isSafariBrowser()
-                          ? "w-full h-full bg-black object-contain rounded-3xl"
-                          : "video-js vjs-default-skin vjs-fill w-full h-full rounded-3xl"
-                      }
+                      className="video-js vjs-default-skin vjs-fill w-full h-full rounded-3xl"
                       playsInline
                     />
 
@@ -351,9 +301,12 @@ export default function HeroSection() {
                               if (!player) return;
                               player.muted(false);
                               setIsMuted(false);
-                              player.play().then(() => setAutoplayBlocked(false)).catch((err: Error) => {
-                                console.error("[HeroSection] Manual play failed:", err);
-                              });
+                              player
+                                .play()
+                                ?.then(() => setAutoplayBlocked(false))
+                                .catch((err: Error) => {
+                                  console.error("[HeroSection] Manual play failed:", err);
+                                });
                             }}
                             className="px-4 py-2 bg-[#54037C] hover:bg-[#54037C]/90 rounded-xl font-semibold shadow-lg"
                           >
@@ -393,7 +346,6 @@ export default function HeroSection() {
           )}
         </div>
 
-        {/* RIGHT SIDE (TABS + CONTENT) */}
         <div className="w-full lg:w-[35%] flex justify-center">
           <div
             className="w-full max-w-sm rounded-xl overflow-hidden flex flex-col"
@@ -403,7 +355,6 @@ export default function HeroSection() {
                 : "34rem",
             }}
           >
-            {/* Tabs */}
             <div className="flex justify-center gap-3 py-3 ">
               <div className="px-1 py-1 rounded-full bg-black/5">
                 <button
@@ -430,7 +381,6 @@ export default function HeroSection() {
               </div>
             </div>
 
-            {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto px-4 pb-4">
               <Suspense
                 fallback={
@@ -446,7 +396,6 @@ export default function HeroSection() {
         </div>
       </section>
 
-      {/* Divider Animation */}
       <motion.div
         className="h-[2px] bg-black/30 rounded-full w-[88%] mx-auto mt-6"
         initial={{ scaleX: 0 }}
