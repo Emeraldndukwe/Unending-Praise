@@ -35,14 +35,31 @@ function CrusadesSection() {
     }
   };
 
+  const slimCrusades = (data: Crusade[]) =>
+    data.slice(0, 5).map(({ id, title, attendance, date, previewImage, summary }) => ({
+      id,
+      title,
+      attendance,
+      date,
+      previewImage,
+      summary,
+    }));
+
   const saveToCache = (data: Crusade[]) => {
     if (typeof window === "undefined") return;
+    const payload = JSON.stringify({ timestamp: Date.now(), data: slimCrusades(data) });
     try {
-      sessionStorage.setItem(
-        CRUSADES_CACHE_KEY,
-        JSON.stringify({ timestamp: Date.now(), data })
-      );
+      sessionStorage.setItem(CRUSADES_CACHE_KEY, payload);
     } catch (error) {
+      if (error instanceof DOMException && error.name === "QuotaExceededError") {
+        try {
+          sessionStorage.removeItem(CRUSADES_CACHE_KEY);
+          sessionStorage.setItem(CRUSADES_CACHE_KEY, payload);
+        } catch {
+          // Storage full — skip cache silently
+        }
+        return;
+      }
       console.warn("[CrusadesSection] Failed to cache crusades", error);
     }
   };
@@ -82,7 +99,7 @@ function CrusadesSection() {
         if (isMounted) {
           setCrusades(topFive);
           setLoading(false);
-          saveToCache(converted);
+          saveToCache(topFive);
         }
       } catch (err: any) {
         if (err?.name !== 'AbortError') {

@@ -8,6 +8,10 @@ const API_PORT = process.env.VITE_API_PORT || '5001'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [tailwindcss(), react()],
+  build: {
+    // Avoid Safari warning when preloaded chunk is not used immediately
+    modulePreload: false,
+  },
   server: {
     proxy: {
       '/api': {

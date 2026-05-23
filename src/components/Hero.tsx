@@ -15,9 +15,11 @@ export default function HeroSection() {
   const [activeTab, setActiveTab] = useState("songs");
   const [isMuted, setIsMuted] = useState(false);
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
+  const [playerReady, setPlayerReady] = useState(false);
   const [copied, setCopied] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const playerRef = useRef<any>(null);
+  const initStartedRef = useRef(false);
   const videoJsModuleRef = useRef<any>(null);
 
   const loadVideoJs = useCallback(async () => {
@@ -37,181 +39,127 @@ export default function HeroSection() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // ✅ Initialize Video.js player lazily
-  const initializePlayer = useCallback(async (element: HTMLVideoElement) => {
+  const disposePlayer = useCallback(() => {
+    initStartedRef.current = false;
+    setPlayerReady(false);
+    const element = videoRef.current;
     if (playerRef.current) {
-      console.log("[HeroSection] Player already exists, skipping initialization");
-      return;
-    }
-
-    console.log("[HeroSection] Initializing Video.js player");
-
-    try {
-      const streamSrc = STREAM_URL;
-
-      console.log("[HeroSection] Creating Video.js player with source:", streamSrc);
-
-      const videojs = await loadVideoJs();
-
-      playerRef.current = videojs(element, {
-        autoplay: true,
-        controls: true,
-        responsive: true,
-        fluid: true,
-        preload: "auto",
-        muted: isMuted,
-        liveui: true,
-        html5: {
-          vhs: {
-            withCredentials: false,
-            overrideNative: true,
-          },
-        },
-        sources: [
-          {
-            src: streamSrc,
-            type: "application/x-mpegURL",
-          },
-        ],
-      }, () => {
-        console.log("[HeroSection] Video.js player ready");
-
-        // Ensure player fills container
-        const playerEl = playerRef.current?.el();
-        if (playerEl) {
-          playerEl.style.width = "100%";
-          playerEl.style.height = "100%";
-          playerEl.classList.add("vjs-fill");
-        }
-
-        // Try to play
-        playerRef.current.play().catch((err: Error) => {
-          console.error("[HeroSection] Autoplay failed (user interaction may be required):", err);
-          setAutoplayBlocked(true);
-        });
-      });
-
-      // Error handling
-      playerRef.current.on("error", () => {
-        const error = playerRef.current?.error();
-        console.error("[HeroSection] Video.js error:", error);
-        if (error) {
-          console.error("[HeroSection] Error code:", error.code);
-          console.error("[HeroSection] Error message:", error.message);
-        }
-      });
-
-      playerRef.current.on("loadstart", () => {
-        console.log("[HeroSection] Load started");
-      });
-
-      playerRef.current.on("loadedmetadata", () => {
-        console.log("[HeroSection] Metadata loaded");
-      });
-
-      playerRef.current.on("canplay", () => {
-        console.log("[HeroSection] Can play");
-      });
-
-      playerRef.current.on("playing", () => {
-        console.log("[HeroSection] Playing");
-        setAutoplayBlocked(false);
-      });
-
-      playerRef.current.on("waiting", () => {
-        console.log("[HeroSection] Waiting for data");
-      });
-    } catch (err) {
-      console.error("[HeroSection] Failed to initialize Video.js:", err);
-    }
-  }, [loadVideoJs, isMuted]);
-
-  // ✅ Callback ref for video element - ensures it's ready when mounted
-  const setVideoRef = useCallback((element: HTMLVideoElement | null) => {
-    console.log("[HeroSection] Video element ref:", element ? "mounted" : "unmounted");
-    
-    // If element is being unmounted, dispose player
-    if (!element) {
-      if (playerRef.current) {
-        try {
-          console.log("[HeroSection] Disposing player on unmount");
-          playerRef.current.dispose();
-          playerRef.current = null;
-        } catch (err) {
-          console.error("[HeroSection] Error disposing player:", err);
-        }
-      }
-      videoRef.current = null;
-      return;
-    }
-
-    videoRef.current = element;
-
-    // Initialize if showLiveVideo is true
-    if (showLiveVideo && !playerRef.current) {
-      // Small delay to ensure element is fully ready
-      setTimeout(() => {
-        if (videoRef.current && !playerRef.current && showLiveVideo) {
-          initializePlayer(element).catch((err) =>
-            console.error("[HeroSection] Error initializing player in ref callback:", err)
-          );
-        }
-      }, 150);
-    }
-  }, [showLiveVideo, initializePlayer]);
-
-  // ✅ Initialize player if video element is already mounted when showLiveVideo becomes true
-  useEffect(() => {
-    if (!showLiveVideo) return;
-
-    // Retry mechanism in case element isn't ready yet
-    let retries = 0;
-    const maxRetries = 10;
-    
-    const tryInitialize = () => {
-      if (videoRef.current && !playerRef.current) {
-        console.log("[HeroSection] Video element found, initializing player via useEffect");
-        initializePlayer(videoRef.current).catch((err) =>
-          console.error("[HeroSection] Error initializing player in effect:", err)
-        );
-      } else if (retries < maxRetries) {
-        retries++;
-        setTimeout(tryInitialize, 100);
-      }
-    };
-
-    // Start trying after a small delay
-    const timer = setTimeout(tryInitialize, 200);
-    
-    return () => clearTimeout(timer);
-  }, [showLiveVideo, initializePlayer]);
-
-  // ✅ Cleanup when hiding video
-  useEffect(() => {
-    if (!showLiveVideo && playerRef.current) {
-      console.log("[HeroSection] Cleaning up player (video hidden)");
       try {
         playerRef.current.dispose();
-        playerRef.current = null;
       } catch (err) {
         console.error("[HeroSection] Error disposing player:", err);
       }
+      playerRef.current = null;
     }
-  }, [showLiveVideo]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (playerRef.current) {
-        try {
-          playerRef.current.dispose();
-          playerRef.current = null;
-        } catch (err) {
-          console.error("[HeroSection] Error disposing player on unmount:", err);
+    if (element) {
+      try {
+        const videojs = videoJsModuleRef.current;
+        const existing = videojs?.getPlayer?.(element);
+        if (existing && !existing.isDisposed?.()) {
+          existing.dispose();
         }
+      } catch {
+        // ignore stale player lookup errors
       }
-    };
+    }
   }, []);
+
+  // ✅ Initialize Video.js player once when live view opens
+  const initializePlayer = useCallback(async (element: HTMLVideoElement) => {
+    if (initStartedRef.current || playerRef.current) return;
+    initStartedRef.current = true;
+
+    try {
+      const videojs = await loadVideoJs();
+      const existing = videojs.getPlayer(element);
+      if (existing && !existing.isDisposed?.()) {
+        playerRef.current = existing;
+        setPlayerReady(true);
+        return;
+      }
+
+      const isSafari =
+        typeof navigator !== "undefined" &&
+        /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+      playerRef.current = videojs(
+        element,
+        {
+          autoplay: true,
+          controls: true,
+          responsive: true,
+          fill: true,
+          preload: "auto",
+          muted: isMuted,
+          liveui: true,
+          html5: {
+            vhs: {
+              withCredentials: false,
+              // Safari plays HLS natively — forcing VHS causes init/autoplay issues
+              overrideNative: !isSafari,
+            },
+          },
+          sources: [
+            {
+              src: STREAM_URL,
+              type: "application/x-mpegURL",
+            },
+          ],
+        },
+        () => {
+          setPlayerReady(true);
+          const playerEl = playerRef.current?.el();
+          if (playerEl) {
+            playerEl.style.width = "100%";
+            playerEl.style.height = "100%";
+          }
+
+          playerRef.current?.play().catch(() => {
+            setAutoplayBlocked(true);
+          });
+        }
+      );
+
+      playerRef.current.on("error", () => {
+        const error = playerRef.current?.error();
+        console.error("[HeroSection] Video.js error:", error);
+      });
+
+      playerRef.current.on("playing", () => {
+        setAutoplayBlocked(false);
+      });
+    } catch (err) {
+      initStartedRef.current = false;
+      console.error("[HeroSection] Failed to initialize Video.js:", err);
+    }
+  }, [isMuted, loadVideoJs]);
+
+  const setVideoRef = useCallback((element: HTMLVideoElement | null) => {
+    videoRef.current = element;
+  }, []);
+
+  useEffect(() => {
+    if (!showLiveVideo) {
+      disposePlayer();
+      return;
+    }
+
+    let cancelled = false;
+    const tryInitialize = () => {
+      if (cancelled || !videoRef.current) return;
+      initializePlayer(videoRef.current);
+    };
+
+    const timer = window.setTimeout(tryInitialize, 50);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [showLiveVideo, initializePlayer, disposePlayer]);
+
+  useEffect(() => {
+    return () => disposePlayer();
+  }, [disposePlayer]);
 
   return (
     <>
@@ -222,9 +170,7 @@ export default function HeroSection() {
       >
         {/* LEFT SIDE */}
         <div
-          className={`flex-1 relative flex justify-center bg-transparent rounded-3xl z-20 ${
-            isMobile && showLiveVideo ? "sticky top-[88px]" : "static"
-          }`}
+          className="flex-1 relative flex justify-center bg-transparent rounded-3xl z-10"
         >
           <div
             className={`w-full rounded-3xl shadow-lg overflow-hidden relative ${
@@ -285,6 +231,12 @@ export default function HeroSection() {
                     <motion.button
                       whileHover={{ scale: 1.04 }}
                       whileTap={{ scale: 0.98 }}
+                      onMouseEnter={() => {
+                        loadVideoJs().catch(() => undefined);
+                      }}
+                      onFocus={() => {
+                        loadVideoJs().catch(() => undefined);
+                      }}
                       onClick={() => {
                         setIsMuted(false);
                         setAutoplayBlocked(false);
@@ -299,66 +251,69 @@ export default function HeroSection() {
               ) : (
                 <motion.div
                   key="videojs-player"
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -12 }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
                   transition={{ duration: 0.35 }}
-                  className="absolute inset-0 rounded-3xl overflow-hidden bg-black"
+                  className="absolute inset-0 rounded-3xl overflow-hidden bg-black isolate"
                 >
-                  <video
-                    ref={setVideoRef}
-                    className={`video-js vjs-default-skin w-full h-full rounded-3xl ${
-                      isMobile ? "object-cover" : ""
-                    }`}
-                    playsInline
-                  ></video>
-                  {playerRef.current && (
-                    <button
-                      onClick={() => {
-                        const player = playerRef.current;
-                        if (!player) return;
-                        const nextMuted = !player.muted();
-                        player.muted(nextMuted);
-                        setIsMuted(nextMuted);
-                      }}
-                      className="absolute top-4 left-4 bg-black/60 text-white px-3 py-1 rounded-lg hover:bg-black/80 z-10 text-sm"
-                    >
-                      {isMuted ? "Unmute" : "Mute"}
-                    </button>
-                  )}
-                  {autoplayBlocked && (
-                    <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-4 text-white z-20 px-6 text-center">
-                      <p className="text-lg font-semibold">Tap to start the livestream with sound</p>
-                      <button
-                        onClick={() => {
-                          const player = playerRef.current;
-                          if (!player) return;
-                          try {
-                            player.muted(false);
-                            setIsMuted(false);
-                            player.play().then(() => setAutoplayBlocked(false)).catch((err: Error) => {
-                              console.error("[HeroSection] Manual play failed:", err);
-                            });
-                          } catch (err) {
-                            console.error("[HeroSection] Error handling manual play:", err);
-                          }
-                        }}
-                        className="px-4 py-2 bg-[#54037C] hover:bg-[#54037C]/90 rounded-xl font-semibold shadow-lg"
-                      >
-                        Play with Sound
-                      </button>
-                    </div>
-                  )}
+                  <div className="relative w-full h-full min-h-[200px]">
+                    <video
+                      ref={setVideoRef}
+                      className="video-js vjs-default-skin vjs-fill w-full h-full rounded-3xl"
+                      playsInline
+                    />
 
-                  <button
-                    onClick={() => {
-                      setShowLiveVideo(false);
-                      setAutoplayBlocked(false);
-                    }}
-                    className="absolute top-4 right-4 bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700 z-10"
-                  >
-                    Close
-                  </button>
+                    <div className="absolute inset-0 z-30 pointer-events-none">
+                      {playerReady && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const player = playerRef.current;
+                            if (!player) return;
+                            const nextMuted = !player.muted();
+                            player.muted(nextMuted);
+                            setIsMuted(nextMuted);
+                          }}
+                          className="pointer-events-auto absolute top-4 left-4 bg-black/60 text-white px-3 py-1 rounded-lg hover:bg-black/80 text-sm"
+                        >
+                          {isMuted ? "Unmute" : "Mute"}
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowLiveVideo(false);
+                          setAutoplayBlocked(false);
+                        }}
+                        className="pointer-events-auto absolute top-4 right-4 bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700"
+                      >
+                        Close
+                      </button>
+
+                      {autoplayBlocked && (
+                        <div className="pointer-events-auto absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-4 text-white px-6 text-center">
+                          <p className="text-lg font-semibold">Tap to start the livestream with sound</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const player = playerRef.current;
+                              if (!player) return;
+                              player.muted(false);
+                              setIsMuted(false);
+                              player.play().then(() => setAutoplayBlocked(false)).catch((err: Error) => {
+                                console.error("[HeroSection] Manual play failed:", err);
+                              });
+                            }}
+                            className="px-4 py-2 bg-[#54037C] hover:bg-[#54037C]/90 rounded-xl font-semibold shadow-lg"
+                          >
+                            Play with Sound
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
