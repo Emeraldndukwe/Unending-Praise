@@ -26,8 +26,20 @@ export default function HeroSection() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const playerRef = useRef<any>(null);
   const videoJsModuleRef = useRef<any>(null);
-  const isMutedRef = useRef(isMuted);
-  isMutedRef.current = isMuted;
+  const wantsSoundRef = useRef(false);
+
+  const enableSound = useCallback(() => {
+    const player = playerRef.current;
+    if (!player) return;
+    player.muted(false);
+    player.volume(1);
+    setIsMuted(false);
+    setAutoplayBlocked(false);
+    wantsSoundRef.current = false;
+    player.play()?.catch((err: Error) => {
+      console.error("[HeroSection] Enable sound failed:", err);
+    });
+  }, []);
 
   const loadVideoJs = useCallback(async () => {
     if (!videoJsModuleRef.current) {
@@ -37,6 +49,10 @@ export default function HeroSection() {
     }
     return videoJsModuleRef.current;
   }, []);
+
+  useEffect(() => {
+    loadVideoJs().catch(() => undefined);
+  }, [loadVideoJs]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
@@ -81,6 +97,7 @@ export default function HeroSection() {
       }
 
       const isSafari = isSafariBrowser();
+      const tryWithSound = wantsSoundRef.current;
 
       const player = videojs(
         element,
@@ -90,7 +107,8 @@ export default function HeroSection() {
           responsive: true,
           fluid: true,
           preload: "auto",
-          muted: isMutedRef.current,
+          // Start muted so autoplay always works; unmute after or via user tap
+          muted: true,
           liveui: true,
           html5: {
             vhs: {
@@ -112,7 +130,33 @@ export default function HeroSection() {
           playerEl.style.width = "100%";
           playerEl.style.height = "100%";
 
-          player.play().catch(() => setAutoplayBlocked(true));
+          const startPlayback = () => {
+            if (tryWithSound) {
+              player.muted(false);
+              player.volume(1);
+            }
+            player
+              .play()
+              .then(() => {
+                if (player.muted()) {
+                  setIsMuted(true);
+                } else {
+                  setIsMuted(false);
+                  wantsSoundRef.current = false;
+                }
+                setAutoplayBlocked(false);
+              })
+              .catch(() => {
+                player.muted(true);
+                setIsMuted(true);
+                player
+                  .play()
+                  .then(() => setAutoplayBlocked(false))
+                  .catch(() => setAutoplayBlocked(true));
+              });
+          };
+
+          startPlayback();
         }
       );
 
@@ -120,7 +164,16 @@ export default function HeroSection() {
         console.error("[HeroSection] Video.js error:", player.error());
       });
 
-      player.on("playing", () => setAutoplayBlocked(false));
+      player.on("volumechange", () => {
+        setIsMuted(player.muted());
+      });
+
+      player.on("playing", () => {
+        setAutoplayBlocked(false);
+        if (player.muted()) {
+          setIsMuted(true);
+        }
+      });
 
       playerRef.current = player;
     } catch (err) {
@@ -237,8 +290,10 @@ export default function HeroSection() {
                         loadVideoJs().catch(() => undefined);
                       }}
                       onClick={() => {
+                        wantsSoundRef.current = true;
                         setIsMuted(false);
                         setAutoplayBlocked(false);
+                        loadVideoJs().catch(() => undefined);
                         setShowLiveVideo(true);
                       }}
                       className=" bg-[#54037C]/70 hover:bg-purple-800 text-white px-6 py-3 rounded-xl font-semibold shadow-md"
@@ -293,24 +348,26 @@ export default function HeroSection() {
 
                       {autoplayBlocked && (
                         <div className="pointer-events-auto absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-4 text-white px-6 text-center">
-                          <p className="text-lg font-semibold">Tap to start the livestream with sound</p>
+                          <p className="text-lg font-semibold">Tap to start the livestream</p>
                           <button
                             type="button"
-                            onClick={() => {
-                              const player = playerRef.current;
-                              if (!player) return;
-                              player.muted(false);
-                              setIsMuted(false);
-                              player
-                                .play()
-                                ?.then(() => setAutoplayBlocked(false))
-                                .catch((err: Error) => {
-                                  console.error("[HeroSection] Manual play failed:", err);
-                                });
-                            }}
+                            onClick={enableSound}
                             className="px-4 py-2 bg-[#54037C] hover:bg-[#54037C]/90 rounded-xl font-semibold shadow-lg"
                           >
                             Play with Sound
+                          </button>
+                        </div>
+                      )}
+
+                      {playerReady && isMuted && !autoplayBlocked && (
+                        <div className="pointer-events-auto absolute bottom-4 left-1/2 -translate-x-1/2 z-40">
+                          <button
+                            type="button"
+                            onClick={enableSound}
+                            className="flex items-center gap-2 rounded-full bg-[#54037C] px-5 py-2.5 text-sm font-semibold text-white shadow-lg ring-2 ring-white/30 hover:bg-[#54037C]/90 animate-pulse"
+                          >
+                            <span aria-hidden>🔊</span>
+                            Turn on sound
                           </button>
                         </div>
                       )}
